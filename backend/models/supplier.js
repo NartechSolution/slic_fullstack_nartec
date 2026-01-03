@@ -1,9 +1,7 @@
-const { PrismaClient } = require("@prisma/client");
 const { hashPassword, comparePassword } = require("../utils/passwordManager");
 const { generateAccessToken } = require("../utils/tokenManager");
 const CustomError = require("../exceptions/customError");
-
-const prisma = new PrismaClient();
+const prisma = require("../db");
 
 /**
  * Get supplier by email

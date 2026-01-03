@@ -26,9 +26,7 @@ const controlSerialRoutes = require("./routes/controlSerial");
 const supplierRoutes = require("./routes/supplierRoute");
 const binLocationRoutes = require("./routes/binLocation");
 const path = require("path");
-const { PrismaClient } = require("@prisma/client");
-
-const prisma = new PrismaClient();
+const prisma = require("./db");
 const app = express();
 const port = process.env.PORT || 8080;
 
