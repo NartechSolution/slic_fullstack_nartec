@@ -88,7 +88,7 @@ const App = () => {
                         </ProtectedRoute>
                       }
                     />
-                    {/* <Route path="pos" element={<POS />} /> */}
+                    {/* <Route path="pos" element={<POS />}   /> */}
                     <Route path="pos-history" element={<PosHistory />} />
                     <Route path="pos-archive" element={<PosArchive />} />
                     <Route
