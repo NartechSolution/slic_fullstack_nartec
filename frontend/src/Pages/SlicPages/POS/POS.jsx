@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { useTaxContext } from "../../../Contexts/TaxContext";
+import { useSlicToken } from "../../../Contexts/SlicTokenContext";
 
 const POS = () => {
   const { t, i18n } = useTranslation();
@@ -38,6 +39,7 @@ const POS = () => {
   const [selectedSalesType, setSelectedSalesType] = useState(
     "DIRECT SALES INVOICE"
   );
+  const { startTokenRefresh, stopTokenRefresh } = useSlicToken();
   const { taxAmount } = useTaxContext();
   // console.log(taxAmount);
 
@@ -165,9 +167,19 @@ const POS = () => {
 
   }, []);
 
+  // Start token refresh when component mounts
+  useEffect(() => {
+    startTokenRefresh();
+
+    // Cleanup: stop refresh when component unmounts
+    return () => {
+      stopTokenRefresh();
+    };
+  }, [startTokenRefresh, stopTokenRefresh]);
+
   useEffect(() => {
     if (selectedPaymentMode) {
-      console.log("selected mode", selectedPaymentMode)
+      // console.log("selected mode", selectedPaymentMode)
     }
   }, [selectedPaymentMode])
 
@@ -553,26 +565,26 @@ const POS = () => {
             });
 
           } catch (stockStatusError) {
-            const errorMessage = 
-              stockStatusError?.response?.data || 
-              stockStatusError?.response?.data?.message || 
+            const errorMessage =
+              stockStatusError?.response?.data ||
+              stockStatusError?.response?.data?.message ||
               stockStatusError?.response?.data?.Message ||
               stockStatusError?.message ||
               "An error occurred while fetching stock status";
-            
+
             toast.error(errorMessage);
             setBarcode("");
           }
 
           setBarcode("");
         } catch (secondApiError) {
-          const errorMessage = 
-            secondApiError?.response?.data || 
-            secondApiError?.response?.data?.message || 
+          const errorMessage =
+            secondApiError?.response?.data ||
+            secondApiError?.response?.data?.message ||
             secondApiError?.response?.data?.Message ||
             secondApiError?.message ||
             "An error occurred while calling the second API";
-          
+
           toast.error(errorMessage);
           setBarcode("");
         }
@@ -580,13 +592,13 @@ const POS = () => {
         setData([]);
       }
     } catch (error) {
-      const errorMessage = 
-        error?.response?.data?.message || 
+      const errorMessage =
+        error?.response?.data?.message ||
         error?.response?.data?.Message ||
-        error?.response?.data?.error || 
+        error?.response?.data?.error ||
         error?.message ||
         "An error occurred";
-      
+
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -655,7 +667,7 @@ const POS = () => {
             }
           );
           const secondApiData = secondApiResponse?.data;
-          
+
           // Check if the response contains an error message even with 200 status
           if (secondApiData?.Message && secondApiData.Message.includes("No Records Found")) {
             toast.error(secondApiData.Message);
@@ -678,10 +690,10 @@ const POS = () => {
           const itemRates = secondApiData.map(
             (item) => item?.PRICELIST?.PLI_RATE
           );
-          
+
           // Store the array of rates under the respective ItemCode
           storedData[ItemCode] = itemRates;
-        
+
           sessionStorage.setItem(
             "secondApiResponses",
             JSON.stringify(storedData)
@@ -730,13 +742,13 @@ const POS = () => {
           setBarcode("");
 
         } catch (secondApiError) {
-          const errorMessage = 
-            secondApiError?.response?.data || 
-            secondApiError?.response?.data?.message || 
+          const errorMessage =
+            secondApiError?.response?.data ||
+            secondApiError?.response?.data?.message ||
             secondApiError?.response?.data?.Message ||
             secondApiError?.message ||
             "An error occurred while calling the second API";
-          
+
           toast.error(errorMessage);
           setBarcode("");
         }
@@ -744,13 +756,13 @@ const POS = () => {
         setDSalesNoInvoiceData([]);
       }
     } catch (error) {
-      const errorMessage = 
-        error?.response?.data?.message || 
+      const errorMessage =
+        error?.response?.data?.message ||
         error?.response?.data?.Message ||
-        error?.response?.data?.error || 
+        error?.response?.data?.error ||
         error?.message ||
         "No item code found with the given GTIN";
-      
+
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -871,13 +883,13 @@ const POS = () => {
             }
           });
         } catch (secondApiError) {
-          const errorMessage = 
-            secondApiError?.response?.data || 
-            secondApiError?.response?.data?.message || 
+          const errorMessage =
+            secondApiError?.response?.data ||
+            secondApiError?.response?.data?.message ||
             secondApiError?.response?.data?.Message ||
             secondApiError?.message ||
             "An error occurred while calling the second API";
-          
+
           toast.error(errorMessage);
           setBarcode("");
         }
@@ -885,13 +897,13 @@ const POS = () => {
         setDSalesNoInvoiceData([]);
       }
     } catch (error) {
-      const errorMessage = 
-        error?.response?.data?.message || 
+      const errorMessage =
+        error?.response?.data?.message ||
         error?.response?.data?.Message ||
-        error?.response?.data?.error || 
+        error?.response?.data?.error ||
         error?.message ||
         "An error occurred";
-      
+
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -2932,7 +2944,7 @@ const POS = () => {
       invoiceData.forEach((item) => {
         // Calculate net amount (Item Price * Quantity)
         totalNet += parseFloat((item.ItemPrice * item.Qty).toFixed(2));
-        
+
         // Use the VAT directly from the item and multiply by quantity
         totalVat += parseFloat((item.VAT * item.Qty).toFixed(2));
       });

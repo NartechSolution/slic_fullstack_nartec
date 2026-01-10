@@ -18,11 +18,11 @@ import { I18nextProvider, useTranslation } from "react-i18next";
 import i18ns from "../../../i18n";
 
 const SlicFirstScreen = () => {
-  
+
   const { t, i18n } = useTranslation();
   const [companies, setCompanies] = useState([]);
   const [locations, setLocations] = useState([]);
- 
+
   const navigate = useNavigate();
 
   const handleLogin = async () => {
@@ -84,8 +84,8 @@ const SlicFirstScreen = () => {
       // console.log(error);
       toast.error(
         error?.response?.data?.error ||
-          error?.response?.data?.message ||
-          "Something went wrong!"
+        error?.response?.data?.message ||
+        "Something went wrong!"
       );
     }
   };
@@ -125,8 +125,8 @@ const SlicFirstScreen = () => {
       // console.log(error);
       toast.error(
         error?.response?.data?.error ||
-          error?.response?.data?.message ||
-          "Something went wrong!"
+        error?.response?.data?.message ||
+        "Something went wrong!"
       );
     }
   };
@@ -153,7 +153,7 @@ const SlicFirstScreen = () => {
       // console.log(selectedCompany);
     }
   }, [selectedCompany]);
-  
+
   const handleCompanyChange = (e) => {
     const selectedComp = companies.find(
       (company) => company.COMP_NAME === e.target.value
@@ -237,17 +237,17 @@ const SlicFirstScreen = () => {
         userLoginID: email,
         userPassword: password,
       });
-        const adminData = response?.data;
-         
-        // console.log(adminData);
-      
-        sessionStorage.setItem('slicUserData', JSON.stringify(adminData));
-        // fetchRoles(adminData.data?.user?.UserLoginID);
+      const adminData = response?.data;
 
-        await fetchRoles(adminData.data?.user?.UserLoginID);
-        navigate("/gtin-management");
-        toast.success(response?.data?.message || "Login Successful");
-        setLoading(false);
+      // console.log(adminData);
+
+      sessionStorage.setItem('slicUserData', JSON.stringify(adminData));
+      // fetchRoles(adminData.data?.user?.UserLoginID);
+
+      await fetchRoles(adminData.data?.user?.UserLoginID);
+      navigate("/gtin-management");
+      toast.success(response?.data?.message || "Login Successful");
+      setLoading(false);
     } catch (error) {
       // console.log(error);
       toast.error(error?.response?.data?.message || error?.response?.data?.error || "Something went wrong!");
@@ -264,9 +264,8 @@ const SlicFirstScreen = () => {
   return (
     <div>
       <div
-        className={`px-3 py-3 bg-secondary shadow font-semibold font-sans rounded-sm text-gray-100 lg:px-5 flex justify-between ${
-          i18n.language === "ar" ? "flex-row-reverse" : "flex-row"
-        }`}
+        className={`px-3 py-3 bg-secondary shadow font-semibold font-sans rounded-sm text-gray-100 lg:px-5 flex justify-between ${i18n.language === "ar" ? "flex-row-reverse" : "flex-row"
+          }`}
       >
         <p className="my-auto">
           {t("SLIC - Saudi Leather Industries Company")}
@@ -280,20 +279,17 @@ const SlicFirstScreen = () => {
           className={`3xl:h-[775px] 2xl:h-[775px] lg:h-[775px] h-auto w-[95%] pb-3 bg-[#e7f4f3] flex flex-col justify-start items-start border-2 border-primary rounded-md shadow-xl`}
         >
           <div
-            className={`flex flex-col items-center justify-between w-full sm:p-10 p-3 ${
-              i18n.language === "ar" ? "sm:flex-row-reverse" : "sm:flex-row"
-            }`}
+            className={`flex flex-col items-center justify-between w-full sm:p-10 p-3 ${i18n.language === "ar" ? "sm:flex-row-reverse" : "sm:flex-row"
+              }`}
           >
             <div
-              className={`flex flex-col  space-y-4 w-full ${
-                i18n.language === "ar" ? "items-end" : "items-start"
-              }`}
+              className={`flex flex-col  space-y-4 w-full ${i18n.language === "ar" ? "items-end" : "items-start"
+                }`}
             >
               <img src={sliclogo} alt="SLIC Logo" className="h-32 mb-4" />
               <div
-                className={`w-full ${
-                  i18n.language === "ar" ? "text-end" : "text-start"
-                }`}
+                className={`w-full ${i18n.language === "ar" ? "text-end" : "text-start"
+                  }`}
               >
                 <label
                   className="block text-gray-700 text-sm font-bold mb-2"
@@ -315,9 +311,8 @@ const SlicFirstScreen = () => {
                 </select>
               </div>
               <div
-                className={`w-full ${
-                  i18n.language === "ar" ? "text-end" : "text-start"
-                }`}
+                className={`w-full ${i18n.language === "ar" ? "text-end" : "text-start"
+                  }`}
               >
                 <label
                   className="block text-gray-700 text-sm font-bold mb-2"
@@ -363,9 +358,8 @@ const SlicFirstScreen = () => {
 
               {/* Email */}
               <div
-                className={`w-full sm:px-0 px-4 mb-6 ${
-                  i18n.language === "ar" ? "text-end" : "text-start"
-                }`}
+                className={`w-full sm:px-0 px-4 mb-6 ${i18n.language === "ar" ? "text-end" : "text-start"
+                  }`}
               >
                 <label
                   htmlFor="email"
@@ -381,18 +375,16 @@ const SlicFirstScreen = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t("Enter your Email")}
-                    className={`p-2 border rounded-md border-secondary text-lg ${
-                      i18n.language === "ar" ? "text-end" : "text-start"
-                    }`}
+                    className={`p-2 border rounded-md border-secondary text-lg ${i18n.language === "ar" ? "text-end" : "text-start"
+                      }`}
                   />
                 </div>
               </div>
 
               {/* Password */}
               <div
-                className={`w-full sm:px-0 px-4 mb-6 ${
-                  i18n.language === "ar" ? "text-end" : "text-start"
-                }`}
+                className={`w-full sm:px-0 px-4 mb-6 ${i18n.language === "ar" ? "text-end" : "text-start"
+                  }`}
               >
                 <label
                   htmlFor="password"
@@ -408,24 +400,21 @@ const SlicFirstScreen = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={t("Enter your password")}
-                    className={`p-2 border rounded-md border-secondary text-lg ${
-                      i18n.language === "ar" ? "text-end" : "text-start"
-                    }`}
+                    className={`p-2 border rounded-md border-secondary text-lg ${i18n.language === "ar" ? "text-end" : "text-start"
+                      }`}
                   />
                 </div>
               </div>
 
               {/* Stock Location */}
               <div
-                className={`w-full sm:px-0 px-4 mb-6 ${
-                  i18n.language === "ar" ? "text-end" : "text-start"
-                }`}
+                className={`w-full sm:px-0 px-4 mb-6 ${i18n.language === "ar" ? "text-end" : "text-start"
+                  }`}
               >
                 <label
                   htmlFor="stocklocation"
-                  className={`sm:text-2xl text-secondary text-lg font-sans ${
-                    i18n.language === "ar" ? "text-end" : "text-start"
-                  }`}
+                  className={`sm:text-2xl text-secondary text-lg font-sans ${i18n.language === "ar" ? "text-end" : "text-start"
+                    }`}
                 >
                   {t("Stock Location")}
                 </label>
@@ -435,9 +424,8 @@ const SlicFirstScreen = () => {
                     required
                     value={selectedStockLocation}
                     onChange={handleStockLocationChange}
-                    className={`p-2 border rounded-md border-secondary text-lg ${
-                      i18n.language === "ar" ? "text-end" : "text-start"
-                    }`}
+                    className={`p-2 border rounded-md border-secondary text-lg ${i18n.language === "ar" ? "text-end" : "text-start"
+                      }`}
                     disabled={!selectedShowroom}
                   >
                     <option value="" disabled selected>
@@ -480,9 +468,8 @@ const SlicFirstScreen = () => {
 
               {/* Create Account Link */}
               <div
-                className={`w-full sm:px-0 px-4 text-secondary text-lg font-sans ${
-                  i18n.language === "ar" ? "text-end" : "text-start"
-                }`}
+                className={`w-full sm:px-0 px-4 text-secondary text-lg font-sans ${i18n.language === "ar" ? "text-end" : "text-start"
+                  }`}
               >
                 <span
                   onClick={handleShowResetPasswordPopup}
@@ -498,18 +485,17 @@ const SlicFirstScreen = () => {
           <div className="grid 3xl:grid-cols-3 2xl:grid-cols-3 xl:grid-cols-3 lg:grid-cols-3 md:grid-cols-2 grid-cols-1 sm:gap-6 gap-4 sm:px-6 px-2 mt-6">
             <div
               // onClick={() => navigate("/user-login")}
-              className={`h-auto w-full flex justify-center items-center bg-white border-[2px] rounded-lg shadow-lg px-2 py-4 shadow-[#B4B2AE] cursor-pointer transition-transform transform hover:scale-90 ${
-                i18n.language === "ar" ? "flex-row-reverse" : "flex-row"
-              }`}
+              className={`h-auto w-full flex justify-center items-center bg-white border-[2px] rounded-lg shadow-lg px-2 py-4 shadow-[#B4B2AE] cursor-pointer transition-transform transform hover:scale-90 ${i18n.language === "ar" ? "flex-row-reverse" : "flex-row"
+                }`}
             >
-              <div className={`h-auto w-[35%] flex ${i18n.language==='ar'?'justify-end':'justify-start'}`}>
+              <div className={`h-auto w-[35%] flex ${i18n.language === 'ar' ? 'justify-end' : 'justify-start'}`}>
                 <img
                   src={gtinmanagement}
                   className="h-auto w-auto object-contain"
                   alt=""
                 />
               </div>
-              <div className={`h-auto w-[65%] flex flex-col gap-1 px-2 ${i18n.language==='ar'?'text-end':'text-start'}`}>
+              <div className={`h-auto w-[65%] flex flex-col gap-1 px-2 ${i18n.language === 'ar' ? 'text-end' : 'text-start'}`}>
                 <h2 className="text-xl font-semibold text-secondary font-sans">
                   {t("GTIN Management")}
                 </h2>
@@ -523,18 +509,17 @@ const SlicFirstScreen = () => {
 
             <div
               // onClick={() => navigate("/user-login")}
-              className={`h-auto w-full flex justify-center items-center bg-white border-[2px] rounded-lg shadow-lg px-2 py-4 shadow-[#B4B2AE] cursor-pointer transition-transform transform hover:scale-90 ${
-                i18n.language === "ar" ? "flex-row-reverse" : "flex-row"
-              }`}
+              className={`h-auto w-full flex justify-center items-center bg-white border-[2px] rounded-lg shadow-lg px-2 py-4 shadow-[#B4B2AE] cursor-pointer transition-transform transform hover:scale-90 ${i18n.language === "ar" ? "flex-row-reverse" : "flex-row"
+                }`}
             >
-              <div className={`h-auto w-[35%] flex ${i18n.language==='ar'?'justify-end':'justify-start'}`}>
+              <div className={`h-auto w-[35%] flex ${i18n.language === 'ar' ? 'justify-end' : 'justify-start'}`}>
                 <img
                   src={supplychain}
                   className="h-auto w-auto object-contain"
                   alt=""
                 />
               </div>
-              <div className={`h-auto w-[65%] flex flex-col gap-1 px-2 ${i18n.language==='ar'?'text-end':'text-start'}`}>
+              <div className={`h-auto w-[65%] flex flex-col gap-1 px-2 ${i18n.language === 'ar' ? 'text-end' : 'text-start'}`}>
                 <h2 className="text-xl font-semibold text-secondary font-sans">
                   {t("Supply Chain Application")}
                 </h2>
@@ -548,16 +533,16 @@ const SlicFirstScreen = () => {
 
             <div
               // onClick={() => navigate("/user-login")}
-             className={`h-auto w-full flex justify-center items-center bg-white border-[2px] rounded-lg shadow-lg px-2 py-4 shadow-[#B4B2AE] cursor-pointer transition-transform transform hover:scale-90 ${i18n.language==='ar'?'flex-row-reverse':'flex-row'}`}
+              className={`h-auto w-full flex justify-center items-center bg-white border-[2px] rounded-lg shadow-lg px-2 py-4 shadow-[#B4B2AE] cursor-pointer transition-transform transform hover:scale-90 ${i18n.language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}
             >
-              <div className={`h-auto w-[35%] flex ${i18n.language==='ar'?'justify-end':'justify-start'}`}>
+              <div className={`h-auto w-[35%] flex ${i18n.language === 'ar' ? 'justify-end' : 'justify-start'}`}>
                 <img
                   src={pointofsale}
                   className="h-auto w-auto object-contain"
                   alt=""
                 />
               </div>
-              <div className={`h-auto w-[65%] flex flex-col gap-1 px-2 ${i18n.language==='ar'?'text-end':'text-start'}`}>
+              <div className={`h-auto w-[65%] flex flex-col gap-1 px-2 ${i18n.language === 'ar' ? 'text-end' : 'text-start'}`}>
                 <h2 className="text-xl font-semibold text-secondary font-sans">
                   {t("Point of Sale System")}
                 </h2>

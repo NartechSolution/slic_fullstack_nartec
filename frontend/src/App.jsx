@@ -32,6 +32,7 @@ import { TaxProvider } from "./Contexts/TaxContext.jsx";
 import DigitalLinks from "./Pages/SlicPages/DigitalLinks/DigitalLinks.jsx";
 import SupplierList from "./Pages/SlicPages/SupplierList/SupplierList.jsx";
 import ArchivedPO from "./Pages/SlicPages/MasterData/ArchivedPO/ArchivedPO.jsx";
+import { SlicTokenProvider } from "./Contexts/SlicTokenContext.jsx";
 
 const queryClient = new QueryClient();
 
@@ -39,29 +40,30 @@ const App = () => {
   return (
     <>
       <DataTableProvider>
-        <RolesProvider>
-          <TaxProvider>
-            <div>
-              <BrowserRouter>
-                <QueryClientProvider client={queryClient}>
-                  <Routes>
-                    <Route path="/" element={<SlicFirstScreen />} />
-                    <Route path="/user-login" element={<SlicUserLogin />} />
-                    <Route path="slic-signup" element={<SlicUserSignUp />} />
+        <SlicTokenProvider>
+          <RolesProvider>
+            <TaxProvider>
+              <div>
+                <BrowserRouter>
+                  <QueryClientProvider client={queryClient}>
+                    <Routes>
+                      <Route path="/" element={<SlicFirstScreen />} />
+                      <Route path="/user-login" element={<SlicUserLogin />} />
+                      <Route path="slic-signup" element={<SlicUserSignUp />} />
 
-                    <Route
-                      path="gtin-management"
-                      element={<GtinManagement />}
-                    />
-                    <Route
-                      path="gtin"
-                      element={
-                        <ProtectedRoute requiredRoles="products">
-                          <GTIN />
-                        </ProtectedRoute>
-                      }
-                    />
-                    {/* <Route
+                      <Route
+                        path="gtin-management"
+                        element={<GtinManagement />}
+                      />
+                      <Route
+                        path="gtin"
+                        element={
+                          <ProtectedRoute requiredRoles="products">
+                            <GTIN />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/* <Route
                       path="controlled-serials/:Id"
                       element={
                         <ProtectedRoute requiredRoles="controlled_serials">
@@ -69,156 +71,157 @@ const App = () => {
                         </ProtectedRoute>
                       }
                     /> */}
-                    <Route path="controlled-serials/:Id" element={<DigitalLinks />} />
-                    {/* <Route path="gtin" element={<GTIN />} /> */}
-                    <Route
-                      path="user-profile"
-                      element={
-                        <ProtectedRoute requiredRoles="user_profile">
-                          <UserProfile />
-                        </ProtectedRoute>
-                      }
-                    />
-                    {/* <Route path="user-profile" element={<UserProfile />} /> */}
-                    <Route
-                      path="pos"
-                      element={
-                        <ProtectedRoute requiredRoles="point_of_sale">
-                          <POS />
-                        </ProtectedRoute>
-                      }
-                    />
-                    {/* <Route path="pos" element={<POS />}   /> */}
-                    <Route path="pos-history" element={<PosHistory />} />
-                    <Route path="pos-archive" element={<PosArchive />} />
-                    <Route
-                      path="tax-settings"
-                      element={
-                        <ProtectedRoute requiredRoles="tax_settings">
-                          <TaxSettings />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="pos-bulkcash-receipts"
-                      element={
-                        <ProtectedRoute requiredRoles="bulk_cash">
-                          <PosBulkCashReceipts />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="pos-bulkmatch-receipts"
-                      element={
-                        <ProtectedRoute requiredRoles="bulk_cash">
-                          <PosBulkMatchReceipts />
-                        </ProtectedRoute>
-                      }
-                    />
-                    {/* <Route
+                      <Route path="controlled-serials/:Id" element={<DigitalLinks />} />
+                      {/* <Route path="gtin" element={<GTIN />} /> */}
+                      <Route
+                        path="user-profile"
+                        element={
+                          <ProtectedRoute requiredRoles="user_profile">
+                            <UserProfile />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/* <Route path="user-profile" element={<UserProfile />} /> */}
+                      <Route
+                        path="pos"
+                        element={
+                          <ProtectedRoute requiredRoles="point_of_sale">
+                            <POS />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/* <Route path="pos" element={<POS />}   /> */}
+                      <Route path="pos-history" element={<PosHistory />} />
+                      <Route path="pos-archive" element={<PosArchive />} />
+                      <Route
+                        path="tax-settings"
+                        element={
+                          <ProtectedRoute requiredRoles="tax_settings">
+                            <TaxSettings />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="pos-bulkcash-receipts"
+                        element={
+                          <ProtectedRoute requiredRoles="bulk_cash">
+                            <PosBulkCashReceipts />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="pos-bulkmatch-receipts"
+                        element={
+                          <ProtectedRoute requiredRoles="bulk_cash">
+                            <PosBulkMatchReceipts />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/* <Route
                       path="pos-bulkmatch-receipts"
                       element={<PosBulkMatchReceipts />}
                     /> */}
-                    {/* <Route
+                      {/* <Route
                       path="pos-Matched-receipts"
                       element={<PosBrvMatchedReceipts />}
                     /> */}
-                    <Route
-                      path="pos-Matched-receipts"
-                      element={
-                        <ProtectedRoute requiredRoles="bulk_cash">
-                          <PosBrvMatchedReceipts />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route path="pos-error-logs" element={<PosErrorLogs />} />
-                    <Route
-                      path="purchase-order"
-                      element={
-                        <ProtectedRoute requiredRoles="purchase_order">
-                          <PurchaseOrder />
-                        </ProtectedRoute>
-                      }
-                    />
-                    {/* <Route path="purchase-order" element={<PurchaseOrder />} /> */}
-                    <Route
-                      path="sales-order"
-                      element={
-                        <ProtectedRoute requiredRoles="sales_order">
-                          <SalesOrder />
-                        </ProtectedRoute>
-                      }
-                    />
-                    {/* <Route path="sales-order" element={<SalesOrder />} /> */}
-                    {/* <Route path="direct-invoice" element={<DirectInvoice />} /> */}
-                    <Route
-                      path="users"
-                      element={
-                        <ProtectedRoute requiredRoles="users">
-                          <Users />
-                        </ProtectedRoute>
-                      }
-                    />
-                    {/* <Route path="users" element={<Users />} /> */}
-                    <Route path="whats-app" element={<WhatsAppSetting />} />
-                    <Route path="products" element={<Products />} />
-                    <Route
-                      path="roles"
-                      element={
-                        <ProtectedRoute requiredRoles="roles">
-                          <Roles />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="Language/Dynamic"
-                      element={<LaanguageChange />}
-                    />
-                    {/* <Route path="roles" element={<Roles />} /> */}
-                    {/* <Route path="transaction-codes" element={<TransactionCodes />} /> */}
-                    <Route
-                      path="transaction-codes"
-                      element={
-                        <ProtectedRoute requiredRoles="transaction_codes">
-                          <TransactionCodes />
-                        </ProtectedRoute>
-                      }
-                    />
-                    {/* <Route path="customer-codes" element={<CustomerCodes />} /> */}
-                    <Route
-                      path="customer-codes"
-                      element={
-                        <ProtectedRoute requiredRoles="customer_codes">
-                          <CustomerCodes />
-                        </ProtectedRoute>
-                      }
-                    />
+                      <Route
+                        path="pos-Matched-receipts"
+                        element={
+                          <ProtectedRoute requiredRoles="bulk_cash">
+                            <PosBrvMatchedReceipts />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route path="pos-error-logs" element={<PosErrorLogs />} />
+                      <Route
+                        path="purchase-order"
+                        element={
+                          <ProtectedRoute requiredRoles="purchase_order">
+                            <PurchaseOrder />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/* <Route path="purchase-order" element={<PurchaseOrder />} /> */}
+                      <Route
+                        path="sales-order"
+                        element={
+                          <ProtectedRoute requiredRoles="sales_order">
+                            <SalesOrder />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/* <Route path="sales-order" element={<SalesOrder />} /> */}
+                      {/* <Route path="direct-invoice" element={<DirectInvoice />} /> */}
+                      <Route
+                        path="users"
+                        element={
+                          <ProtectedRoute requiredRoles="users">
+                            <Users />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/* <Route path="users" element={<Users />} /> */}
+                      <Route path="whats-app" element={<WhatsAppSetting />} />
+                      <Route path="products" element={<Products />} />
+                      <Route
+                        path="roles"
+                        element={
+                          <ProtectedRoute requiredRoles="roles">
+                            <Roles />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="Language/Dynamic"
+                        element={<LaanguageChange />}
+                      />
+                      {/* <Route path="roles" element={<Roles />} /> */}
+                      {/* <Route path="transaction-codes" element={<TransactionCodes />} /> */}
+                      <Route
+                        path="transaction-codes"
+                        element={
+                          <ProtectedRoute requiredRoles="transaction_codes">
+                            <TransactionCodes />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/* <Route path="customer-codes" element={<CustomerCodes />} /> */}
+                      <Route
+                        path="customer-codes"
+                        element={
+                          <ProtectedRoute requiredRoles="customer_codes">
+                            <CustomerCodes />
+                          </ProtectedRoute>
+                        }
+                      />
 
-                    {/* <Route path="supplier-list" element={<SupplierList />} />
+                      {/* <Route path="supplier-list" element={<SupplierList />} />
                     <Route path="archived-po" element={<ArchivedPO />} /> */}
 
-                    <Route
-                      path="supplier-list"
-                      element={
-                        <ProtectedRoute requiredRoles="supplier_list">
-                          <SupplierList />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="archived-po"
-                      element={
-                        <ProtectedRoute requiredRoles="archived_po">
-                          <ArchivedPO />
-                        </ProtectedRoute>
-                      }
-                    />
-                  </Routes>
-                </QueryClientProvider>
-              </BrowserRouter>
-            </div>
-          </TaxProvider>
-        </RolesProvider>
+                      <Route
+                        path="supplier-list"
+                        element={
+                          <ProtectedRoute requiredRoles="supplier_list">
+                            <SupplierList />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="archived-po"
+                        element={
+                          <ProtectedRoute requiredRoles="archived_po">
+                            <ArchivedPO />
+                          </ProtectedRoute>
+                        }
+                      />
+                    </Routes>
+                  </QueryClientProvider>
+                </BrowserRouter>
+              </div>
+            </TaxProvider>
+          </RolesProvider>
+        </SlicTokenProvider>
       </DataTableProvider>
     </>
   );
