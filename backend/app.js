@@ -26,9 +26,7 @@ const controlSerialRoutes = require("./routes/controlSerial");
 const supplierRoutes = require("./routes/supplierRoute");
 const binLocationRoutes = require("./routes/binLocation");
 const path = require("path");
-const { PrismaClient } = require("@prisma/client");
-
-const prisma = new PrismaClient();
+const prisma = require("./db");
 const app = express();
 const port = process.env.PORT || 8080;
 
@@ -153,22 +151,52 @@ app.use((error, req, res, next) => {
     .json(response(status, success, message, data, error?.stack));
 });
 
-const server = app.listen(port, function () {
-  console.log("Server is running on port " + port);
+// Test database connection before starting server
+async function testDatabaseConnection(retries = 3) {
+  for (let i = 1; i <= retries; i++) {
+    try {
+      console.log(`🔄 Testing database connection (attempt ${i}/${retries})...`);
+      await prisma.$connect();
+      // Try a simple query to verify connection works
+      await prisma.$queryRaw`SELECT 1 as test`;
+      console.log("✅ Database connection successful!");
+      return true;
+    } catch (error) {
+      console.error(`❌ Connection attempt ${i} failed:`, error.message);
+
+      if (i === retries) {
+        console.warn("⚠️  Database connection failed after all retries");
+        console.warn("⚠️  Server will start anyway, but database operations may fail");
+        return false;
+      }
+
+      // Wait before retrying
+      console.log(`⏳ Waiting 3 seconds before retry...`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  }
+}
+
+// Start server only after DB connection is verified
+testDatabaseConnection().then(() => {
+  const server = app.listen(port, function () {
+    console.log(`✅ Server is running on port ${port}`);
+  });
+
+  // Move graceful shutdown handlers inside (need access to server)
+  // Graceful shutdown handling for PM2
+  process.on("SIGINT", async () => {
+    console.log("\n🔄 SIGINT received: Starting graceful shutdown...");
+    await gracefulShutdown("SIGINT", server);
+  });
+
+  process.on("SIGTERM", async () => {
+    console.log("\n🔄 SIGTERM received: Starting graceful shutdown...");
+    await gracefulShutdown("SIGTERM", server);
+  });
 });
 
-// Graceful shutdown handling for PM2
-process.on("SIGINT", async () => {
-  console.log("\n🔄 SIGINT received: Starting graceful shutdown...");
-  await gracefulShutdown("SIGINT");
-});
-
-process.on("SIGTERM", async () => {
-  console.log("\n🔄 SIGTERM received: Starting graceful shutdown...");
-  await gracefulShutdown("SIGTERM");
-});
-
-async function gracefulShutdown(signal) {
+async function gracefulShutdown(signal, server) {
   console.log(`⏳ ${signal} - Closing server...`);
 
   // Close server to stop accepting new connections

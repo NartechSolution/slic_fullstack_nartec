@@ -5,8 +5,7 @@ const POSInvoiceDetails = require("../models/tblPOSInvoiceDetails");
 const POSInvoiceTemp = require("../models/TblSalesReturnInvoicetmp");
 const response = require("../utils/response");
 const CustomError = require("../exceptions/customError");
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../db");
 const Joi = require("joi");
 
 // exports.getInvoiceDetailsByTransactionCode = async (req, res, next) => {

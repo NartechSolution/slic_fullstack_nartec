@@ -13,7 +13,10 @@ let isClientReady = false;
 let isIntentionalLogout = false;
 let initializationInProgress = false;
 let reconnectAttempts = 0;
+let sessionCorruptionDetected = false;
+let qrRetryCount = 0;
 const MAX_RECONNECT_ATTEMPTS = 3;
+const MAX_QR_RETRIES = 2; // Reduced from 3 to 2 for faster detection
 
 // Function to forcefully remove directories with multiple fallback methods
 function forceRemoveDirectory(dirPath) {
@@ -82,7 +85,6 @@ async function destroyClient(skipPageClose = false) {
     try {
       client.removeAllListeners();
       
-      // Only try to close page/browser if not already closed and not skipping
       if (!skipPageClose) {
         if (client.pupPage) {
           try {
@@ -123,12 +125,10 @@ function isClientHealthy() {
       return false;
     }
     
-    // Check if we have the necessary info
     if (!client.info || !client.info.wid) {
       return false;
     }
     
-    // Check if Puppeteer page is still alive
     if (!client.pupPage || client.pupPage.isClosed()) {
       return false;
     }
@@ -140,50 +140,57 @@ function isClientHealthy() {
   }
 }
 
+// Check if session exists before auto-initializing
+function hasExistingSession() {
+  const authPath = path.join(__dirname, "../.wwebjs_auth/session-client-one");
+  return fs.existsSync(authPath);
+}
+
 // Function to initialize the client and wait for QR code
 async function initializeClient(forceNew = false) {
-  // Prevent multiple simultaneous initializations
   if (initializationInProgress && !forceNew) {
     console.log("Initialization already in progress, waiting...");
     let waitTime = 0;
-    while (initializationInProgress && waitTime < 30000) {
+    while (initializationInProgress && waitTime < 15000) { // Reduced from 30s to 15s
       await new Promise(resolve => setTimeout(resolve, 500));
       waitTime += 500;
     }
     return { status: isClientReady ? 'ready' : 'initializing' };
   }
 
-  // If client is already ready and healthy, return immediately
   if (!forceNew && isClientHealthy()) {
     console.log("Client is already healthy and ready");
-    reconnectAttempts = 0; // Reset reconnect attempts on successful check
+    reconnectAttempts = 0;
+    qrRetryCount = 0;
+    sessionCorruptionDetected = false;
     return { status: 'ready' };
   }
 
   initializationInProgress = true;
 
   try {
-    // If forcing new client, clean up everything first
     if (forceNew) {
       console.log("Force new client requested, cleaning up...");
       await destroyClient(false);
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 1000)); // Reduced from 2s to 1s
       cleanupWhatsAppData();
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 500)); // Reduced from 1s to 0.5s
       reconnectAttempts = 0;
+      qrRetryCount = 0;
+      sessionCorruptionDetected = false;
     }
 
-    // If client exists but is not healthy, destroy it
     if (client && !isClientHealthy()) {
       console.log("Client exists but is not healthy, destroying...");
-      await destroyClient(true); // Skip page close since it's already problematic
-      await new Promise(r => setTimeout(r, 1000));
+      await destroyClient(true);
+      await new Promise(r => setTimeout(r, 500)); // Reduced from 1s to 0.5s
     }
 
     if (client && clientInitialized && isClientReady && isClientHealthy()) {
       console.log("Client already initialized and ready");
       initializationInProgress = false;
       reconnectAttempts = 0;
+      qrRetryCount = 0;
       return { status: 'ready' };
     }
 
@@ -192,11 +199,9 @@ async function initializeClient(forceNew = false) {
       isIntentionalLogout = false;
       console.log("Starting new client initialization...");
 
-      // Check if we have an existing session
       const sessionExists = hasExistingSession();
       console.log(`Initializing client... Existing session found: ${sessionExists}`);
 
-      // Initialize WhatsApp client with session persistence
       client = new Client({
         authStrategy: new LocalAuth({
           clientId: "client-one",
@@ -218,27 +223,38 @@ async function initializeClient(forceNew = false) {
             '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
           ]
         },
-        // Don't show QR if session exists, only if no session (for new connections)
         qrMaxRetries: sessionExists ? 0 : 5
       });
 
       let resolved = false;
 
-      // Generate QR code when 'qr' event is emitted
       client.on("qr", async (qr) => {
         try {
           currentQRCodeDataURL = await QRCode.toDataURL(qr);
           console.log("QR code received, scan with your phone");
 
-          // Only resolve with QR if we don't have a session (new connection)
-          // If session exists but QR is shown, it means session failed to load
-          if (!resolved && !sessionExists) {
+          if (sessionExists) {
+            qrRetryCount++;
+            console.warn(`QR shown despite existing session (attempt ${qrRetryCount}/${MAX_QR_RETRIES})`);
+            
+            // Immediately mark as corrupted after 2 attempts
+            if (qrRetryCount >= MAX_QR_RETRIES) {
+              console.error("Session is corrupted - marking for cleanup");
+              sessionCorruptionDetected = true;
+              
+              if (!resolved) {
+                resolved = true;
+                initializationInProgress = false;
+                resolve({ status: 'auth_failed', needsQR: true, sessionCorrupted: true });
+                return;
+              }
+            }
+          }
+
+          if (!resolved && (!sessionExists || qrRetryCount >= 1)) {
             resolved = true;
             initializationInProgress = false;
-            resolve({ status: 'qr', qrCode: currentQRCodeDataURL });
-          } else if (!resolved && sessionExists) {
-            // Session exists but QR shown - session might be corrupted
-            console.warn("QR shown despite existing session - session may be corrupted");
+            resolve({ status: 'qr', qrCode: currentQRCodeDataURL, sessionCorrupted: sessionExists });
           }
         } catch (err) {
           console.error("Error generating QR code:", err);
@@ -250,12 +266,13 @@ async function initializeClient(forceNew = false) {
         }
       });
 
-      // Log when the client is ready to use
       client.on("ready", () => {
         console.log("WhatsApp client is ready!");
         isClientReady = true;
         currentQRCodeDataURL = null;
-        reconnectAttempts = 0; // Reset on successful connection
+        reconnectAttempts = 0;
+        qrRetryCount = 0;
+        sessionCorruptionDetected = false;
         
         if (!resolved) {
           resolved = true;
@@ -266,31 +283,26 @@ async function initializeClient(forceNew = false) {
 
       client.on("authenticated", () => {
         console.log("Authenticated successfully!");
-        isClientReady = false; // Not ready until 'ready' event fires
+        isClientReady = false;
       });
 
       client.on("auth_failure", async (msg) => {
         console.error("Authentication failure:", msg);
-        console.log("Session may be corrupted, cleaning up...");
-
-        // Clean up corrupted session
+        sessionCorruptionDetected = true;
         await destroyClient(true);
         cleanupWhatsAppData();
 
         if (!resolved) {
           resolved = true;
           initializationInProgress = false;
-          // Return a status that indicates need for QR instead of rejecting
-          resolve({ status: 'auth_failed', needsQR: true });
+          resolve({ status: 'auth_failed', needsQR: true, sessionCorrupted: true });
         }
       });
 
-      // CRITICAL: Handle disconnection events with better logic
       client.on("disconnected", async (reason) => {
         console.log(`WhatsApp client disconnected. Reason: ${reason}, Intentional: ${isIntentionalLogout}`);
         isClientReady = false;
         
-        // If it was an intentional logout, clean everything
         if (isIntentionalLogout) {
           console.log("Intentional logout - destroying client and clearing data");
           await destroyClient(true);
@@ -300,87 +312,62 @@ async function initializeClient(forceNew = false) {
           return;
         }
         
-        // Check reconnect attempts to avoid infinite loops
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          console.log(`Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Stopping reconnection.`);
+          console.log(`Max reconnect attempts reached. Stopping reconnection.`);
           await destroyClient(true);
           reconnectAttempts = 0;
           return;
         }
         
         reconnectAttempts++;
-        console.log(`Unexpected disconnection (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) - will reconnect on next request`);
-        
-        // Don't auto-reconnect immediately - let it reconnect on next API call
-        // This prevents the infinite loop issue
+        console.log(`Unexpected disconnection (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
         await destroyClient(true);
       });
 
-      // Keep the session alive with periodic pings
       client.on("change_state", (state) => {
         console.log("Client state changed:", state);
       });
 
-      client.on("loading_screen", (percent, message) => {
-        console.log("Loading screen:", percent, message);
-      });
-
-      // Handle remote session saved
-      client.on("remote_session_saved", () => {
-        console.log("Remote session saved");
-      });
-
-      // Handle initialization errors (like network errors)
       client.on("error", (error) => {
         console.error("Client error:", error);
 
-        // Check for network-related errors
         if (error.message && (
           error.message.includes('ERR_NAME_NOT_RESOLVED') ||
           error.message.includes('ERR_INTERNET_DISCONNECTED') ||
           error.message.includes('net::ERR')
         )) {
-          console.error("Network error detected during initialization");
+          console.error("Network error detected");
           if (!resolved) {
             resolved = true;
             initializationInProgress = false;
-            reject(new Error("Network error: Unable to reach WhatsApp Web. Please check your internet connection."));
+            reject(new Error("Network error: Unable to reach WhatsApp Web."));
           }
         }
       });
 
-      // Timeout for initialization - longer if we have a session (it needs time to restore)
-      const timeout = sessionExists ? 120000 : 60000;
+      // Reduced timeout for faster failure detection
+      const timeout = sessionExists ? 20000 : 30000; // Reduced from 120s/60s to 20s/30s
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
           initializationInProgress = false;
 
-          // If we have a session but timed out, it might be corrupted
           if (sessionExists) {
-            console.log("Session restoration timed out, session may be corrupted");
-            resolve({ status: 'auth_failed', needsQR: true });
+            console.log("Session restoration timed out - session corrupted");
+            sessionCorruptionDetected = true;
+            resolve({ status: 'auth_failed', needsQR: true, sessionCorrupted: true });
           } else {
             reject(new Error("Client initialization timeout"));
           }
         }
       }, timeout);
 
-      // Initialize the client
       try {
         client.initialize();
       } catch (error) {
         console.error("Error initializing client:", error);
-
-        // Check if it's a network error
-        if (error.message && error.message.includes('ERR_NAME_NOT_RESOLVED')) {
-          console.error("Network/DNS error - unable to reach WhatsApp Web");
-          initializationInProgress = false;
-          reject(new Error("Network error: Unable to reach WhatsApp Web. Please check your internet connection."));
-        } else {
-          initializationInProgress = false;
-          reject(error);
-        }
+        initializationInProgress = false;
+        reject(error);
       }
     });
   } catch (error) {
@@ -390,96 +377,125 @@ async function initializeClient(forceNew = false) {
   }
 }
 
-// Check if session exists before auto-initializing
-function hasExistingSession() {
-  const authPath = path.join(__dirname, "../.wwebjs_auth/session-client-one");
-  return fs.existsSync(authPath);
-}
+// Auto-initialize client on server start with faster timeout
+setTimeout(async () => {
+  const sessionExists = hasExistingSession();
+  console.log(`Auto-initializing client... Session exists: ${sessionExists}`);
 
-// Auto-initialize client on server start (will use existing session if available)
-// TEMPORARILY DISABLED - Testing network issue
-// setTimeout(async () => {
-//   const sessionExists = hasExistingSession();
-//   console.log(`Auto-initializing client on server start... Session exists: ${sessionExists}`);
+  if (sessionExists) {
+    console.log("Found existing session, auto-initializing...");
+    try {
+      const result = await initializeClient(false);
+      if (result.status === 'ready') {
+        console.log("✅ Session restored successfully!");
+      } else if (result.status === 'auth_failed' || result.sessionCorrupted) {
+        console.warn("⚠️ Session corrupted - will need QR scan");
+        sessionCorruptionDetected = true;
+      }
+    } catch (error) {
+      console.error("Auto-initialization failed:", error.message);
+      sessionCorruptionDetected = true;
+    }
+  } else {
+    console.log("No existing session, waiting for user");
+  }
+}, 3000); // Reduced from 5s to 3s
 
-//   if (sessionExists) {
-//     console.log("Found existing session, auto-initializing...");
-//     try {
-//       await initializeClient(false);
-//       console.log("Auto-initialization completed successfully");
-//     } catch (error) {
-//       console.error("Auto-initialization failed:", error.message);
-//       // Session might be corrupted, will retry on first API call
-//     }
-//   } else {
-//     console.log("No existing session found, waiting for user to connect");
-//   }
-// }, 3000);
-
-console.log("Auto-initialization disabled - user must manually connect");
-
-// Endpoint to check session status and return QR code if not authenticated
+// Endpoint to check session status
 exports.checkSession = async (req, res) => {
   try {
-    // Check if client is healthy
     if (isClientHealthy()) {
+      qrRetryCount = 0;
+      sessionCorruptionDetected = false;
       return res.json({ status: "success", message: "Session is active" });
     }
 
-    // Client is not healthy, initialize it (will use existing session if available)
     const forceNew = req.query.forceNew === 'true';
 
+    if (sessionCorruptionDetected || forceNew) {
+      console.log("Session corrupted - force cleanup and generate fresh QR");
+      await destroyClient(true);
+      cleanupWhatsAppData();
+      await new Promise(r => setTimeout(r, 1000));
+      sessionCorruptionDetected = false;
+      qrRetryCount = 0;
+    }
+
     try {
-      const result = await initializeClient(forceNew);
+      const result = await initializeClient(forceNew || sessionCorruptionDetected);
 
       if (result.status === 'ready') {
+        qrRetryCount = 0;
+        sessionCorruptionDetected = false;
         res.json({ status: "success", message: "Session is active" });
       } else if (result.status === 'qr') {
         res.json({
-          status: "failure",
-          message: "No active session. Please scan the QR code.",
+          status: "qr_required",
+          message: result.sessionCorrupted ? "Session expired. Please scan QR code." : "Please scan the QR code.",
           qrCode: result.qrCode,
+          sessionCorrupted: result.sessionCorrupted || false
         });
       } else if (result.status === 'auth_failed') {
-        // Session was corrupted, need fresh QR - force new initialization
+        sessionCorruptionDetected = true;
+        await destroyClient(true);
+        cleanupWhatsAppData();
+        await new Promise(r => setTimeout(r, 1000));
+        
         const freshResult = await initializeClient(true);
         if (freshResult.status === 'qr') {
           res.json({
-            status: "failure",
+            status: "qr_required",
             message: "Session expired. Please scan QR code to reconnect.",
             qrCode: freshResult.qrCode,
+            sessionCorrupted: true,
+            autoLoggedOut: true
           });
         } else {
           res.json({
-            status: "initializing",
-            message: "Client is initializing, please wait..."
+            status: "error",
+            message: "Failed to generate QR code. Please try again.",
+            needsRetry: true
           });
         }
       } else {
         res.json({
           status: "initializing",
-          message: "Client is initializing, please wait..."
+          message: "Initializing..."
         });
       }
     } catch (err) {
-      console.error("Error during client initialization:", err);
-      res.status(500).json({ error: "Failed to initialize WhatsApp client" });
+      console.error("Error during initialization:", err);
+      
+      if (err.message && err.message.includes('Network error')) {
+        res.status(500).json({ 
+          status: "error",
+          error: "Network error. Please check your connection.",
+          needsRetry: true
+        });
+      } else {
+        sessionCorruptionDetected = true;
+        res.status(500).json({ 
+          status: "error",
+          error: "Failed to initialize. Please logout and reconnect.",
+          sessionCorrupted: true
+        });
+      }
     }
   } catch (error) {
     console.error("Error in checkSession:", error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ 
+      status: "error",
+      error: "Internal error. Please try again.",
+      needsRetry: true
+    });
   }
 };
 
-// Controller function to send WhatsApp message with attachment and text
+// Send WhatsApp message
 exports.sendWhatsAppMessage = [
   [
-    check("phoneNumber")
-      .isMobilePhone()
-      .withMessage("Please enter a valid phone number"),
-    check("messageText")
-      .isLength({ min: 1 })
-      .withMessage("Message text cannot be empty"),
+    check("phoneNumber").isMobilePhone().withMessage("Invalid phone number"),
+    check("messageText").isLength({ min: 1 }).withMessage("Message cannot be empty"),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -491,12 +507,10 @@ exports.sendWhatsAppMessage = [
     const attachmentPath = req.file ? req.file.path : null;
 
     try {
-      // Check if client is healthy, if not try to reconnect
       if (!isClientHealthy()) {
-        console.log("Client not healthy for sending message, attempting to initialize...");
         const result = await initializeClient(false);
         if (result.status !== 'ready') {
-          return res.status(400).json({ error: "WhatsApp client is not connected. Please connect first." });
+          return res.status(400).json({ error: "WhatsApp not connected." });
         }
       }
 
@@ -504,203 +518,163 @@ exports.sendWhatsAppMessage = [
 
       if (attachmentPath) {
         const media = MessageMedia.fromFilePath(attachmentPath);
-        await client.sendMessage(formattedPhoneNumber, media, {
-          caption: messageText,
-        });
-        
-        try {
-          fs.unlinkSync(attachmentPath);
-        } catch (fileError) {
-          console.warn("Could not remove uploaded file:", fileError.message);
-        }
+        await client.sendMessage(formattedPhoneNumber, media, { caption: messageText });
+        try { fs.unlinkSync(attachmentPath); } catch (e) {}
       } else {
         await client.sendMessage(formattedPhoneNumber, messageText);
       }
 
-      const ratingLink =
-        "https://docs.google.com/forms/d/e/1FAIpQLSceYlSsIGZ9j6YjB0pFBnn7xcWBSRP7UOmYalyPPrWstvVvQA/viewform";
-      const ratingMessage = `We value your feedback! Please take a moment to rate your purchase order: ${ratingLink}`;
-      
+      const ratingLink = "https://docs.google.com/forms/d/e/1FAIpQLSceYlSsIGZ9j6YjB0pFBnn7xcWBSRP7UOmYalyPPrWstvVvQA/viewform";
+      const ratingMessage = `We value your feedback! Please rate your purchase: ${ratingLink}`;
       await client.sendMessage(formattedPhoneNumber, ratingMessage);
 
-      res.json({ message: "WhatsApp messages sent successfully!" });
+      res.json({ message: "Messages sent successfully!" });
     } catch (error) {
-      console.error("Error sending WhatsApp message:", error);
+      console.error("Error sending message:", error);
       res.status(500).json({ error: "Failed to send messages" });
-      
       if (attachmentPath) {
-        try {
-          fs.unlinkSync(attachmentPath);
-        } catch (fileError) {
-          console.warn("Could not remove uploaded file after error:", fileError.message);
-        }
+        try { fs.unlinkSync(attachmentPath); } catch (e) {}
       }
     }
   },
 ];
 
-// Endpoint to logout the WhatsApp client and clear the server cache
+// Logout WhatsApp
 exports.logoutWhatsApp = async (req, res) => {
   try {
-    console.log("Logout requested - setting intentional logout flag");
-    // CRITICAL: Set flag BEFORE logout
+    console.log("Logout requested");
     isIntentionalLogout = true;
     reconnectAttempts = 0;
+    qrRetryCount = 0;
+    sessionCorruptionDetected = false;
     
     if (client && client.info && client.info.wid) {
       try {
         await client.logout();
-        console.log("Logout command sent successfully");
-      } catch (logoutError) {
-        console.warn("Error during logout:", logoutError.message);
+      } catch (e) {
+        console.warn("Logout error:", e.message);
       }
     }
 
-    // Wait for disconnect event to fire
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(r => setTimeout(r, 2000));
     
-    // Ensure cleanup happened
     if (client) {
       await destroyClient(true);
       cleanupWhatsAppData();
     }
 
-    res.json({
-      status: "success",
-      message: "Logged out and cache cleared successfully",
-    });
+    res.json({ status: "success", message: "Logged out successfully" });
   } catch (error) {
     console.error("Error during logout:", error);
-    
-    // Force cleanup
     isIntentionalLogout = true;
     await destroyClient(true);
     cleanupWhatsAppData();
-    
-    res.json({
-      status: "success",
-      message: "Cache cleared successfully (forced cleanup)",
-    });
+    res.json({ status: "success", message: "Logged out successfully" });
   }
 };
 
-// Endpoint to fetch the current connected user's profile
+// Get user profile
 exports.getUserProfile = async (req, res) => {
   try {
-    // First check if client is healthy
+    if (sessionCorruptionDetected) {
+      return res.status(400).json({
+        status: "error",
+        message: "Session corrupted. Please logout and reconnect.",
+        needsConnection: true,
+        sessionCorrupted: true
+      });
+    }
+
     if (!isClientHealthy()) {
-      console.log("Client not healthy for getUserProfile, attempting to reconnect...");
-
-      // If client exists and is initialized but not ready yet, wait for it
       if (client && clientInitialized && !isClientReady) {
-        console.log("Client is initializing, waiting for ready event...");
-
-        // Wait up to 30 seconds for the client to become ready
+        // Wait only 5 seconds instead of 10
         let waitTime = 0;
-        while (!isClientReady && waitTime < 30000) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          waitTime += 1000;
-
-          if (isClientReady) {
-            console.log("Client became ready while waiting");
-            break;
-          }
+        while (!isClientReady && waitTime < 5000) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          waitTime += 500;
+          if (isClientReady) break;
         }
 
         if (!isClientReady) {
           return res.status(400).json({
-            status: "failure",
-            message: "WhatsApp client is still initializing",
-            needsConnection: true
+            status: "error",
+            message: "Still initializing. Please wait...",
+            needsConnection: true,
+            isInitializing: true
           });
         }
       } else {
-        // Client doesn't exist or failed, try to initialize
-        try {
-          const result = await initializeClient(false);
-
-          if (result.status !== 'ready') {
-            return res.status(400).json({
-              status: "failure",
-              message: "WhatsApp client is not connected",
-              needsConnection: true
-            });
-          }
-
-          // Give it a moment to fully stabilize
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-        } catch (initError) {
-          console.error("Failed to initialize client:", initError);
-          return res.status(400).json({
-            status: "failure",
-            message: "WhatsApp client is not connected",
-            needsConnection: true
-          });
-        }
+        return res.status(400).json({
+          status: "error",
+          message: "Not connected. Please connect first.",
+          needsConnection: true
+        });
       }
     }
 
-    // Double check health after potential initialization
     if (!isClientHealthy()) {
       return res.status(400).json({
-        status: "failure",
-        message: "WhatsApp client is not connected",
+        status: "error",
+        message: "Not ready. Please connect first.",
         needsConnection: true
       });
     }
 
     const userId = client.info.wid._serialized;
-    
     let profilePicUrl;
     try {
       profilePicUrl = await client.getProfilePicUrl(userId);
-    } catch (picError) {
-      console.warn("Could not fetch profile picture:", picError.message);
+    } catch (e) {
       profilePicUrl = null;
     }
     
     const userName = client.info.pushname;
     const userNumber = client.info.me.user;
 
+    qrRetryCount = 0;
+    sessionCorruptionDetected = false;
+
     res.json({
       status: "success",
-      data: {
-        name: userName,
-        number: userNumber,
-        profilePicUrl: profilePicUrl,
-      },
+      data: { name: userName, number: userNumber, profilePicUrl }
     });
   } catch (error) {
-    console.error("Error fetching user profile:", error);
+    console.error("Error fetching profile:", error);
     
-    // If we get a context destroyed error, the client is dead
     if (error.message && (
-      error.message.includes("Execution context was destroyed") ||
+      error.message.includes("context was destroyed") ||
       error.message.includes("Target closed") ||
       error.message.includes("Protocol error")
     )) {
-      console.log("Client context destroyed, marking as unhealthy");
       isClientReady = false;
+      sessionCorruptionDetected = true;
+      
+      res.status(500).json({ 
+        status: "error",
+        error: "Session expired. Please logout and reconnect.",
+        needsConnection: true,
+        sessionCorrupted: true
+      });
+    } else {
+      res.status(500).json({ 
+        status: "error",
+        error: "Failed to fetch profile.",
+        needsConnection: true
+      });
     }
-    
-    res.status(500).json({ 
-      error: "Failed to fetch user profile",
-      needsConnection: true
-    });
   }
 };
 
-// Graceful shutdown handling
+// Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('Received SIGINT, cleaning up...');
+  console.log('SIGINT - cleaning up...');
   isIntentionalLogout = true;
   await destroyClient(false);
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('Received SIGTERM, cleaning up...');
+  console.log('SIGTERM - cleaning up...');
   isIntentionalLogout = true;
   await destroyClient(false);
   process.exit(0);
