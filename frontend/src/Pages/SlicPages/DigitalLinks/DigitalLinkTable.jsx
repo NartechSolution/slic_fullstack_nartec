@@ -14,9 +14,9 @@ const DigitalLinkTable = ({
   isLoading, 
   refetchSerials, 
   onAddSerial,
+  pagination,
+  onPageChange,
 }) => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
   const [isEditPopupVisible, setIsEditPopupVisible] = useState(false);
   const [selectedSerial, setSelectedSerial] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -24,9 +24,14 @@ const DigitalLinkTable = ({
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectAllMode, setSelectAllMode] = useState(false);
   const printTriggerRef = useRef(null);
-  const itemsPerPage = 10;
 
   const serialsArray = Array.isArray(serials) ? serials : [];
+
+  // Use server-side pagination data
+  const currentPage = pagination?.page || 1;
+  const totalPages = pagination?.totalPages || 1;
+  const totalItems = pagination?.total || 0;
+  const limit = pagination?.limit || 10;
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -53,20 +58,11 @@ const DigitalLinkTable = ({
     setIsEditPopupVisible(true);
   };
 
-  const filteredSerials = serialsArray.filter(serial => 
-    serial.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    serial.itemName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    serial.ItemCode?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const totalPages = Math.ceil(filteredSerials.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentSerials = filteredSerials.slice(startIndex, endIndex);
-
   const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
+    if (page >= 1 && page <= totalPages && onPageChange) {
+      onPageChange(page);
+      setSelectedRows([]);
+      setSelectAllMode(false);
     }
   };
 
@@ -98,10 +94,10 @@ const DigitalLinkTable = ({
     return pages;
   };
 
-  // Handle select all checkbox - NOW SELECTS ALL FILTERED SERIALS
+  // Handle select all checkbox - Selects all serials on current page
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedRows(filteredSerials);
+      setSelectedRows(serialsArray);
       setSelectAllMode(true);
     } else {
       setSelectedRows([]);
@@ -131,9 +127,9 @@ const DigitalLinkTable = ({
     return selectedRows.some(row => row.id === serial.id);
   };
 
-  // Check if all filtered serials are selected (not just current page)
-  const isAllSelected = filteredSerials.length > 0 && 
-    selectedRows.length === filteredSerials.length;
+  // Check if all serials on current page are selected
+  const isAllSelected = serialsArray.length > 0 && 
+    selectedRows.length === serialsArray.length;
 
   const isSomeSelected = selectedRows.length > 0 && !isAllSelected;
 
@@ -163,24 +159,11 @@ const DigitalLinkTable = ({
         <div>
           <h3 className="font-bold text-gray-900 text-lg mb-1">Controlled Serials</h3>
           <p className="text-sm text-gray-500">
-            Total {filteredSerials.length} controlled serials
+            Total {totalItems} controlled serials
             {selectedRows.length > 0 && ` • ${selectedRows.length} selected`}
-            {selectAllMode && ` (All serials selected)`}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-          <input
-            type="text"
-            placeholder="Search by serial number, item name..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-              setSelectedRows([]);
-              setSelectAllMode(false);
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm flex-1 sm:w-96 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent"
-          />
           {selectedRows.length > 0 && (
             <Button 
               onClick={handlePrint}
@@ -235,7 +218,7 @@ const DigitalLinkTable = ({
           >
             {isRefreshing ? "Refreshing..." : "Refresh"}
           </Button>
-          <ExportControlSerials serials={filteredSerials} />
+          <ExportControlSerials serials={serialsArray} />
         </div>
       </div>
       
@@ -286,14 +269,14 @@ const DigitalLinkTable = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {currentSerials.length === 0 ? (
+                {serialsArray.length === 0 ? (
                   <tr>
                     <td colSpan="12" className="px-4 py-8 text-center text-gray-500">
                       No control serials found
                     </td>
                   </tr>
                 ) : (
-                  currentSerials.map((serial, idx) => (
+                  serialsArray.map((serial, idx) => (
                     <tr 
                       key={serial.id || idx} 
                       className={`hover:bg-gray-50 transition-colors ${
@@ -364,7 +347,7 @@ const DigitalLinkTable = ({
 
           <div className="px-4 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-600">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredSerials.length)} of {filteredSerials.length} entries
+              Showing {((currentPage - 1) * limit) + 1} to {Math.min(currentPage * limit, totalItems)} of {totalItems} entries
             </div>
             <div className="flex flex-wrap gap-1 justify-center">
               <button
