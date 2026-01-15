@@ -331,6 +331,9 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
       const supplier = group.supplier;
 
       try {
+        // Get base URL from request
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+
         // Send email notification
         const emailResult = await sendControlSerialNotificationEmail({
           supplierEmail: supplier.email,
@@ -339,6 +342,7 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
           itemCode: group.serials.map((s) => s.product?.ItemCode).join(", "),
           quantity: group.serials.length,
           size: group.size || null,
+          baseUrl: baseUrl,
         });
 
         // Mark all serials in this group as sent
