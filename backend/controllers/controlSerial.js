@@ -331,8 +331,8 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
       const supplier = group.supplier;
 
       try {
-        // Get base URL from request
-        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        // Get base URL from environment variable
+        const baseUrl = process.env.FRONTEND_URL;
 
         // Send email notification
         const emailResult = await sendControlSerialNotificationEmail({
