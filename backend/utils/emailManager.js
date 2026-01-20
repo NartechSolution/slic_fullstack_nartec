@@ -230,7 +230,7 @@ async function sendAdminNewSupplierNotificationEmail(options) {
  * @returns {Promise<Object>} - Email send result
  */
 async function sendControlSerialNotificationEmail(options) {
-  const { supplierEmail, supplierName, poNumber, itemCode, quantity, size } =
+  const { supplierEmail, supplierName, poNumber, itemCode, quantity, size, baseUrl } =
     options;
 
   // Validate required parameters
@@ -258,6 +258,7 @@ async function sendControlSerialNotificationEmail(options) {
       itemCode: itemCode,
       quantity: quantity,
       size: size || null,
+      baseUrl: baseUrl,
     };
 
     console.log(
