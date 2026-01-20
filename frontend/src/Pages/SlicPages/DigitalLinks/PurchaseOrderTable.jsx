@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Button, CircularProgress } from "@mui/material";
 import { HiRefresh } from "react-icons/hi";
 import { IoSend } from "react-icons/io5";
+import { FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
 import newRequest from "../../../utils/userRequest";
@@ -165,6 +166,26 @@ const PurchaseOrderTable = ({
     return statusMap[status] || 'bg-gray-100 text-gray-800';
   };
 
+  // Get sent to supplier badge
+  const getSentToSupplierBadge = (isSent) => {
+    console.log(isSent)
+    if (isSent === true) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <FaCheckCircle className="text-green-600" />
+          Sent
+        </span>
+      );
+    } else {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <FaTimesCircle className="text-red-600" />
+          Not Sent
+        </span>
+      );
+    }
+  };
+
   return (
     <div className="bg-white">
       {/* Header Section */}
@@ -264,6 +285,7 @@ const PurchaseOrderTable = ({
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ItemCode</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SQTY</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sent to Supplier</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created At</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Updated At</th>
                 </tr>
@@ -271,7 +293,7 @@ const PurchaseOrderTable = ({
               <tbody className="divide-y divide-gray-200 bg-white">
                 {currentOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
                       No PO Number found
                     </td>
                   </tr>
@@ -292,6 +314,9 @@ const PurchaseOrderTable = ({
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadge(order.supplierStatus)}`}>
                           {order.supplierStatus || 'N/A'}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {getSentToSupplierBadge(order.isSentToSupplier)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{order.createdAt || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{order.updatedAt || 'N/A'}</td>
