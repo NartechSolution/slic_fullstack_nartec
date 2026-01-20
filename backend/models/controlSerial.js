@@ -46,7 +46,7 @@ class ControlSerialModel {
     itemCode = null,
     supplierId = null,
     isArchived = false,
-    size = null
+    size = null,
   ) {
     const skip = (page - 1) * limit;
 
@@ -142,7 +142,7 @@ class ControlSerialModel {
     poNumber,
     includeArchived = false,
     size = null,
-    hasPutAway = null
+    hasPutAway = null,
   ) {
     const where = {
       poNumber: poNumber,
@@ -367,7 +367,7 @@ class ControlSerialModel {
     itemCode,
     size = null,
     isArchived = null,
-    hasPutAway = null
+    hasPutAway = null,
   ) {
     const where = {};
     if (itemCode) {
@@ -395,6 +395,8 @@ class ControlSerialModel {
       select: {
         poNumber: true,
         size: true,
+        isSentToSupplier: true,
+        ItemCode: true,
         binLocation: {
           select: {
             binNumber: true,

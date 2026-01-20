@@ -7,12 +7,6 @@ exports.createControlSerials = [
     .isString()
     .withMessage("ItemCode must be a string."),
 
-  body("qty")
-    .notEmpty()
-    .withMessage("Quantity is required.")
-    .isInt({ min: 1, max: 10000 })
-    .withMessage("Quantity must be an integer between 1 and 10000."),
-
   body("supplierId")
     .notEmpty()
     .withMessage("Supplier ID is required.")
@@ -25,7 +19,21 @@ exports.createControlSerials = [
     .isString()
     .withMessage("PO Number must be a string."),
 
-  body("size").optional().isString().withMessage("Size must be a string."),
+  body("sizeQuantities")
+    .isArray({ min: 1 })
+    .withMessage("sizeQuantities must be an array with at least 1 item."),
+
+  body("sizeQuantities.*.qty")
+    .notEmpty()
+    .withMessage("Each item must have a quantity.")
+    .isInt({ min: 1, max: 10000 })
+    .withMessage("Quantity must be an integer between 1 and 10000."),
+
+  body("sizeQuantities.*.size")
+    .notEmpty()
+    .withMessage("Each item must have a size.")
+    .isString()
+    .withMessage("Size must be a string."),
 ];
 
 exports.updateControlSerial = [
