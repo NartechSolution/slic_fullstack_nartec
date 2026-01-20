@@ -11,14 +11,15 @@ import AddPurchaseOrderPopUp from "./AddPurchaseOrderPopUp";
 import UpdatePurchaseOrderPopUp from "./UpdatePurchaseOrderPopUp";
 import ErpTeamRequest from "../../../utils/ErpTeamRequest";
 import { useTranslation } from "react-i18next";
+import { useSlicToken } from "../../../Contexts/SlicTokenContext";
 
 const PurchaseOrder = () => {
   const { t } = useTranslation();
   const [data, setData] = useState([]);
+  const { startTokenRefresh, stopTokenRefresh } = useSlicToken();
   const token = JSON.parse(sessionStorage.getItem("slicLoginToken"));
 
   const [isLoading, setIsLoading] = useState(true);
-  const [secondGridData, setSecondGridData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [isPurchaseOrderDataLoading, setIsPurchaseOrderDataLoading] = useState(false);
   
@@ -59,7 +60,17 @@ const PurchaseOrder = () => {
     }
   };  
 
-    useEffect(() => {
+  // Start token refresh when component mounts
+  useEffect(() => {
+    startTokenRefresh();
+  
+    // Cleanup: stop refresh when component unmounts
+    return () => {
+      stopTokenRefresh();
+    };
+  }, [startTokenRefresh, stopTokenRefresh]);
+
+  useEffect(() => {
     fetchData();
   }, []);
 
@@ -67,7 +78,6 @@ const PurchaseOrder = () => {
   const handleRowClickInParent = async (item) => {
     // console.log(item)
     if (item.length === 0) {
-      setFilteredData(secondGridData);
       return;
     }
 
