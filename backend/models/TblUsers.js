@@ -1,10 +1,8 @@
-const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 const CustomError = require("../exceptions/customError");
-
-const prisma = new PrismaClient();
+const prisma = require("../db");
 const JWT_SECRET = process.env.JWT_SECRET || "your_secret_key";
 
 async function getUserByLoginId(loginId) {

@@ -20,7 +20,7 @@ function generateSerialNumber(itemCode, seriesNumber) {
 
 exports.createControlSerials = async (req, res, next) => {
   try {
-    const { ItemCode, qty, supplierId, poNumber, size } = req.body;
+    const { ItemCode, supplierId, poNumber, sizeQuantities } = req.body;
 
     // Validate request
     const errors = validationResult(req);
@@ -40,40 +40,53 @@ exports.createControlSerials = async (req, res, next) => {
       throw error;
     }
 
-    // Verify product exists
-    const product = await ItemCodeModel.findByItemCodeAndSize(ItemCode, size);
-    if (!product) {
-      const error = new CustomError("Product with given ItemCode not found");
-      error.statusCode = 404;
-      throw error;
+    // Verify products exist for each size and collect product info
+    const productsMap = new Map();
+    for (const item of sizeQuantities) {
+      const product = await ItemCodeModel.findByItemCodeAndSize(ItemCode, item.size);
+      if (!product) {
+        const error = new CustomError(
+          `Product with ItemCode "${ItemCode}" and size "${item.size}" not found`
+        );
+        error.statusCode = 404;
+        throw error;
+      }
+      productsMap.set(item.size, product);
     }
 
-    // Generate bulk serials
+    // Generate bulk serials for all sizes
     const serials = [];
+    let totalQty = 0;
 
-    // Get the starting series number (only query once)
-    let currentSeriesNumber = await ControlSerialModel.getNextSeriesNumber(
-      product.id
-    );
+    for (const item of sizeQuantities) {
+      const product = productsMap.get(item.size);
+      const qty = item.qty;
+      totalQty += qty;
 
-    for (let i = 0; i < qty; i++) {
-      // Generate serial number using the actual ItemCode string + series number
-      const serialNumber = generateSerialNumber(ItemCode, currentSeriesNumber);
+      // Get the starting series number for this product
+      let currentSeriesNumber = await ControlSerialModel.getNextSeriesNumber(
+        product.id
+      );
 
-      serials.push({
-        serialNumber,
-        ItemCode: product.id, // Use the product's id (foreign key reference)
-        supplierId: supplierId,
-        poNumber: poNumber,
-        size: size || null,
-      });
+      for (let i = 0; i < qty; i++) {
+        // Generate serial number using the actual ItemCode string + series number
+        const serialNumber = generateSerialNumber(ItemCode, currentSeriesNumber);
 
-      // Increment series number for next iteration
-      const nextNum = parseInt(currentSeriesNumber) + 1;
-      if (nextNum > 999999) {
-        throw new Error("Series number exceeds maximum value (999999)");
+        serials.push({
+          serialNumber,
+          ItemCode: product.id, // Use the product's id (foreign key reference)
+          supplierId: supplierId,
+          poNumber: poNumber,
+          size: item.size,
+        });
+
+        // Increment series number for next iteration
+        const nextNum = parseInt(currentSeriesNumber) + 1;
+        if (nextNum > 999999) {
+          throw new Error("Series number exceeds maximum value (999999)");
+        }
+        currentSeriesNumber = nextNum.toString().padStart(6, "0");
       }
-      currentSeriesNumber = nextNum.toString().padStart(6, "0");
     }
 
     // Create all serials
@@ -99,8 +112,8 @@ exports.createControlSerials = async (req, res, next) => {
     //     supplierName: supplier.name,
     //     poNumber: poNumber,
     //     itemCode: ItemCode,
-    //     quantity: qty,
-    //     size: size || null,
+    //     quantity: totalQty,
+    //     size: sizeQuantities.map(s => s.size).join(", "),
     //   });
     //   console.log("Email notification result:", emailResult);
     // } catch (emailError) {
@@ -114,7 +127,7 @@ exports.createControlSerials = async (req, res, next) => {
         generateResponse(
           201,
           true,
-          `${qty} control serial(s) created successfully`,
+          `${totalQty} control serial(s) created successfully`,
           createdSerials
         )
       );
@@ -331,6 +344,9 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
       const supplier = group.supplier;
 
       try {
+        // Get base URL from environment variable
+        const baseUrl = process.env.FRONTEND_URL;
+
         // Send email notification
         const emailResult = await sendControlSerialNotificationEmail({
           supplierEmail: supplier.email,
@@ -339,6 +355,7 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
           itemCode: group.serials.map((s) => s.product?.ItemCode).join(", "),
           quantity: group.serials.length,
           size: group.size || null,
+          baseUrl: baseUrl,
         });
 
         // Mark all serials in this group as sent

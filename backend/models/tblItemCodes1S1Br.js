@@ -1,6 +1,5 @@
-const { PrismaClient } = require("@prisma/client");
 const { body } = require("express-validator");
-const prisma = new PrismaClient();
+const prisma = require("../db");
 
 class ItemCodeModel {
   static async create(data) {
