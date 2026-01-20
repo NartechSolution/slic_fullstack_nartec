@@ -137,6 +137,10 @@ exports.slicGetApi = async (req, res) => {
     Authorization: `Bearer ${token}`,
   };
 
+  console.log('Request Body:', requestBody);
+  console.log("url:", url);
+  console.log("headers:", headers);
+
   try {
     const response = await axios.post(url, requestBody, { headers });
     res.status(response.status).json(response.data);
