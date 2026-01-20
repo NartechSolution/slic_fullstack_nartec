@@ -42,7 +42,7 @@ const DigitalLinks = () => {
     isLoading: isLoadingOrders, 
     refetch: refetchOrders,
   } = useQuery({
-    queryKey: ['purchaseOrders', rowData?.ItemCode, rowData?.ProductSize],
+    queryKey: ['purchaseOrders', rowData?.ItemCode],
     queryFn: fetchPurchaseOrders,
     staleTime: 5 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
