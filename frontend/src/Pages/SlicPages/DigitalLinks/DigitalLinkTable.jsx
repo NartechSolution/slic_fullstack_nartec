@@ -11,6 +11,7 @@ import ControlledSerialsPrint from "./ControlledSerialsPrint";
 
 const DigitalLinkTable = ({ 
   serials, 
+  allSerials,
   isLoading, 
   refetchSerials, 
   onAddSerial,
@@ -26,6 +27,7 @@ const DigitalLinkTable = ({
   const printTriggerRef = useRef(null);
 
   const serialsArray = Array.isArray(serials) ? serials : [];
+  const allSerialsArray = Array.isArray(allSerials) ? allSerials : [];
 
   // Use server-side pagination data
   const currentPage = pagination?.page || 1;
@@ -61,8 +63,10 @@ const DigitalLinkTable = ({
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages && onPageChange) {
       onPageChange(page);
-      setSelectedRows([]);
-      setSelectAllMode(false);
+      // Don't clear selection if in "select all" mode
+      if (!selectAllMode) {
+        setSelectedRows([]);
+      }
     }
   };
 
@@ -97,7 +101,7 @@ const DigitalLinkTable = ({
   // Handle select all checkbox - Selects all serials on current page
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedRows(serialsArray);
+      setSelectedRows(allSerialsArray.length > 0 ? allSerialsArray : serialsArray);
       setSelectAllMode(true);
     } else {
       setSelectedRows([]);
@@ -128,10 +132,10 @@ const DigitalLinkTable = ({
   };
 
   // Check if all serials on current page are selected
-  const isAllSelected = serialsArray.length > 0 && 
-    selectedRows.length === serialsArray.length;
+  const isAllCurrentPageSelected = serialsArray.length > 0 && 
+    serialsArray.every(serial => isRowSelected(serial));
 
-  const isSomeSelected = selectedRows.length > 0 && !isAllSelected;
+  const isSomeSelected = selectedRows.length > 0 && !selectAllMode;
 
   // Handle print
   const handlePrint = () => {
@@ -218,7 +222,7 @@ const DigitalLinkTable = ({
           >
             {isRefreshing ? "Refreshing..." : "Refresh"}
           </Button>
-          <ExportControlSerials serials={serialsArray} />
+          <ExportControlSerials serials={allSerialsArray} />
         </div>
       </div>
       
@@ -239,18 +243,13 @@ const DigitalLinkTable = ({
                     <div className="flex flex-col gap-1">
                       <input
                         type="checkbox"
-                        checked={isAllSelected}
+                        checked={selectAllMode}
                         ref={(el) => {
                           if (el) el.indeterminate = isSomeSelected;
                         }}
                         onChange={handleSelectAll}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                        className="w-4 h-4 text-secondary border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                       />
-                      {isAllSelected && (
-                        <span className="text-[9px] text-blue-600 font-medium whitespace-nowrap">
-                          All
-                        </span>
-                      )}
                     </div>
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">PO Number</th>
@@ -288,7 +287,7 @@ const DigitalLinkTable = ({
                           type="checkbox"
                           checked={isRowSelected(serial)}
                           onChange={() => handleSelectRow(serial)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                          className="w-4 h-4 text-secondary border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -319,7 +318,7 @@ const DigitalLinkTable = ({
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleEdit(serial)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                            className="p-1.5 text-secondary hover:bg-blue-50 rounded-md transition-colors"
                             title="Edit"
                           >
                             <FiEdit2 className="w-4 h-4" />

@@ -54,36 +54,29 @@ const DigitalLinks = () => {
     },
   });
 
-  // Fetch Control Serials - Only when PO is selected
-  const fetchControlSerials = async ({ queryKey }) => {
-    const [_key, currentPage, currentLimit, poNumber] = queryKey;
+  // Fetch ALL Control Serials ONCE - Frontend pagination
+  const fetchAllControlSerials = async ({ queryKey }) => {
+    const [_key, poNumber] = queryKey;
     
     const response = await newRequest.get(
-      `/controlSerials?page=${currentPage}&limit=${currentLimit}&poNumber=${poNumber}&itemCode=${rowData?.ItemCode}&size=${rowData?.ProductSize}&isArchived=false`
+      `/controlSerials?page=1&limit=999999&poNumber=${poNumber}&itemCode=${rowData?.ItemCode}&size=${rowData?.ProductSize}&isArchived=false`
     );
     
-    return {
-      data: response?.data?.data?.controlSerials || [],
-      pagination: response?.data?.data?.pagination || null,
-      totalPages: response?.data?.data?.pagination?.totalPages || 0,
-      currentPage: response?.data?.data?.pagination?.page || 1,
-      totalItems: response?.data?.data?.pagination?.total || 0
-    };
+    return response?.data?.data?.controlSerials || [];
   };
 
   const { 
-    data: serialsResponse, 
+    data: allSerials = [],
     isLoading, 
     refetch,
     isFetching 
   } = useQuery({
-    queryKey: ['controlSerials', page, limit, selectedPO?.poNumber],
-    queryFn: fetchControlSerials,
+    queryKey: ['allControlSerials', selectedPO?.poNumber],
+    queryFn: fetchAllControlSerials,
     enabled: !!selectedPO?.poNumber,
     staleTime: 2 * 60 * 1000,
     cacheTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    keepPreviousData: true,
     retry: false,
     onError: (err) => {
       toast.error(err?.response?.data?.error || err?.response?.data?.message || "Failed to load control serials");
@@ -96,7 +89,7 @@ const DigitalLinks = () => {
     setPage(1);
   };
 
-  const serialsData = (serialsResponse?.data || []).map(serial => ({
+  const allSerialsData = allSerials.map(serial => ({
     id: serial.id,
     poNumber: serial.poNumber || 'N/A',
     serialNumber: serial.serialNumber,
@@ -112,6 +105,20 @@ const DigitalLinks = () => {
     supplierName: serial.supplier?.name || 'N/A',
     supplierEmail: serial.supplier?.email || 'N/A',
   }));
+
+  // Calculate pagination on frontend
+  const totalItems = allSerialsData.length;
+  const totalPages = Math.ceil(totalItems / limit);
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const currentPageSerials = allSerialsData.slice(startIndex, endIndex);
+
+  const paginationData = {
+    page: page,
+    limit: limit,
+    total: totalItems,
+    totalPages: totalPages
+  };
 
   // Transform purchase orders data
   const ordersData = purchaseOrders.map(order => ({
@@ -198,12 +205,13 @@ const DigitalLinks = () => {
                 </div>
               )}
               <DigitalLinkTable 
-                serials={selectedPO ? serialsData : []}
+                serials={selectedPO ? currentPageSerials : []}
+                allSerials={allSerialsData}
                 isLoading={isLoading || isFetching}
                 refetchSerials={refetch}
                 itemCode={rowData?.ItemCode}
                 onAddSerial={() => setIsAddPopupVisible(true)}
-                pagination={serialsResponse?.pagination}
+                pagination={paginationData}
                 onPageChange={setPage}
                 onLimitChange={setLimit}
               />
