@@ -1,6 +1,6 @@
 
 
-// let mainUrl = 'http://localhost:1101';
+let mainUrl = 'http://localhost:1101';
 // let mainUrl = 'http://gs1ksa.org:8080';
 // let mainUrl = 'https://slicapp.online:8082';
 
@@ -10,7 +10,7 @@
 // ... for PRODUCTION .... //
 
 
-let mainUrl = 'https://slicapp.online';
+// let mainUrl = 'https://slicapp.online';
 
 // ... For New ERPBase Url ... //
 let newERPBase = "https://slicuat05api.oneerpcloud.com/oneerpreport/api/postdata";

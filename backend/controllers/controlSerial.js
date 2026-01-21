@@ -479,7 +479,7 @@ exports.searchByPoNumber = async (req, res, next) => {
 exports.updateControlSerial = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { ItemCode, size, poNumber, supplierId, binLocationId } = req.body;
+    const { ItemCode, size, poNumber, supplierId, binLocationId, isSentToSupplier, isArchived } = req.body;
 
     // Validate request
     const errors = validationResult(req);
@@ -546,6 +546,12 @@ exports.updateControlSerial = async (req, res, next) => {
     }
     if (poNumber !== undefined) {
       updateData.poNumber = poNumber;
+    }
+    if (isSentToSupplier !== undefined) {
+      updateData.isSentToSupplier = isSentToSupplier;
+    }
+    if (isArchived !== undefined) {
+      updateData.isArchived = isArchived;
     }
 
     // Check if there's anything to update
@@ -920,6 +926,115 @@ exports.unarchiveControlSerialsByPoNumber = async (req, res, next) => {
         {
           poNumber,
           unarchivedCount: result.count,
+        }
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET - Get unique PO numbers with combined total qty across all sizes
+ * Returns: poNumber, serialNumber (sample), ItemCode, product, totalQty
+ */
+exports.getUniquePONumbersWithTotalQty = async (req, res, next) => {
+  try {
+    const isArchived =
+      req.query.isArchived !== undefined
+        ? req.query.isArchived === "true"
+        : null;
+
+    // Get unique PO numbers
+    const uniquePOs = await ControlSerialModel.getUniquePONumbersWithTotalQty(
+      isArchived
+    );
+
+    if (!uniquePOs || uniquePOs.length === 0) {
+      const error = new CustomError("No PO numbers found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Get total count for each PO number (all sizes combined)
+    const posWithTotalQty = await Promise.all(
+      uniquePOs.map(async (po) => {
+        const totalQty = await ControlSerialModel.countAllByPoNumber(po.poNumber);
+        return {
+          id: po.id,
+          poNumber: po.poNumber,
+          serialNumber: po.serialNumber,
+          ItemCode: po.ItemCode,
+          product: po.product,
+          supplier: po.supplier,
+          totalQty: totalQty,
+          createdAt: po.createdAt,
+        };
+      })
+    );
+
+    res
+      .status(200)
+      .json(
+        generateResponse(
+          200,
+          true,
+          "Unique PO numbers with total quantities retrieved successfully",
+          posWithTotalQty
+        )
+      );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET - Get all control serial details for a specific PO number grouped by size
+ * Query: ?poNumber=value
+ * Returns: All records for the PO number with size summary
+ */
+exports.getControlSerialDetailsByPONumber = async (req, res, next) => {
+  try {
+    const { poNumber } = req.query;
+
+    if (!poNumber) {
+      const error = new CustomError("poNumber query parameter is required");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Get size summary (unique sizes with counts)
+    const sizeSummary = await ControlSerialModel.getSizeSummaryByPoNumber(
+      poNumber
+    );
+
+    if (!sizeSummary || sizeSummary.length === 0) {
+      const error = new CustomError(
+        "No control serials found for the given PO number"
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Get all records grouped by size
+    const allRecords =
+      await ControlSerialModel.getControlSerialsByPONumberGroupedBySize(
+        poNumber
+      );
+
+    // Calculate total qty
+    const totalQty = sizeSummary.reduce((sum, item) => sum + item.qty, 0);
+
+    res.status(200).json(
+      generateResponse(
+        200,
+        true,
+        "Control serial details retrieved successfully",
+        {
+          poNumber,
+          totalQty,
+          sizeSummary,
+          records: allRecords,
         }
       )
     );
