@@ -48,6 +48,7 @@ const PoNumberTable = () => {
         queryFn: fetchPoNumbers,
         staleTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
+        retry: false,
         onError: (err) => {
             toast.error(err?.response?.data?.error || err?.response?.data?.message || "Failed to load PO numbers");
         },
