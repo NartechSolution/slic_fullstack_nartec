@@ -585,6 +585,68 @@ exports.updateControlSerial = async (req, res, next) => {
   }
 };
 
+
+exports.updateSizeByPO = async (req, res, next) => {
+  try {
+    const { poNumber, oldSize, newSize } = req.body;
+
+    // express-validator result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const error = new CustomError(errors.errors[0].msg);
+      error.statusCode = 422;
+      error.data = errors;
+      return next(error);
+    }
+
+    if (oldSize === newSize) {
+      return res.status(200).json(
+        generateResponse(
+          200,
+          true,
+          "Old size and new size are the same. No update required.",
+          null
+        )
+      );
+    }
+
+    // 🔑 Use existing model method
+    const result = await ControlSerialModel.updateByPoNumberAndSize(
+      poNumber,
+      oldSize,
+      {
+        size: newSize
+      }
+    );
+
+    if (result.count === 0) {
+      const error = new CustomError(
+        "No control serials found for given PO number and old size"
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return res.status(200).json(
+      generateResponse(
+        200,
+        true,
+        `Size updated successfully for ${result.count} record(s)`,
+        {
+          poNumber,
+          oldSize,
+          newSize,
+          updatedCount: result.count
+        }
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
 /**
  * PUT - Update control serials by PO number and size
  * @param {*} req
