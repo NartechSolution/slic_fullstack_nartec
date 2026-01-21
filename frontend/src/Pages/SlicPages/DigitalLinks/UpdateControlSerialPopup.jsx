@@ -75,7 +75,7 @@ const UpdateControlSerialPopup = ({ isVisible, setVisibility, refreshData, data 
               <div className="relative">
                 <div className="fixed top-0 left-0 z-10 flex justify-between w-full px-3 bg-secondary">
                   <h2 className="text-white sm:text-xl text-lg font-body font-semibold">
-                    {t("Update Control Serial")}
+                    {t("Update PO Size")}
                   </h2>
                   <div className="flex items-center space-x-3">
                     <button 
