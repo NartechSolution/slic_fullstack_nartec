@@ -71,6 +71,24 @@ exports.updateControlSerial = [
     
 ];
 
+exports.updateSizeByPO = [
+  body("poNumber")
+    .notEmpty()
+    .isString()
+    .withMessage("PO Number is required and must be a string."),
+
+  body("oldSize")
+    .notEmpty()
+    .isString()
+    .withMessage("Old size is required and must be a string."),
+
+  body("newSize")
+    .notEmpty()
+    .isString()
+    .withMessage("New size is required and must be a string.")
+];
+
+
 exports.updateControlSerialsByPoNumber = [
   body("poNumber")
     .notEmpty()
