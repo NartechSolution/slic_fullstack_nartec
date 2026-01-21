@@ -33,7 +33,7 @@ const DigitalLinks = () => {
 
   // Fetch Purchase Orders
   const fetchPurchaseOrders = async () => {
-    const response = await newRequest.get(`/controlSerials/po-numbers?itemCode=${rowData?.ItemCode}&size=${rowData?.ProductSize}`);
+    const response = await newRequest.get(`/controlSerials/po-numbers?itemCode=${rowData?.ItemCode}`);
     return response?.data?.data || [];
   };
 
@@ -42,7 +42,7 @@ const DigitalLinks = () => {
     isLoading: isLoadingOrders, 
     refetch: refetchOrders,
   } = useQuery({
-    queryKey: ['purchaseOrders', rowData?.ItemCode, rowData?.ProductSize],
+    queryKey: ['purchaseOrders', rowData?.ItemCode],
     queryFn: fetchPurchaseOrders,
     staleTime: 5 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
@@ -59,7 +59,7 @@ const DigitalLinks = () => {
     const [_key, poNumber] = queryKey;
     
     const response = await newRequest.get(
-      `/controlSerials?page=1&limit=999999&poNumber=${poNumber}&itemCode=${rowData?.ItemCode}&size=${rowData?.ProductSize}&isArchived=false`
+      `/controlSerials?page=1&limit=999999&poNumber=${poNumber}&itemCode=${rowData?.ItemCode}&isArchived=false`
     );
     
     return response?.data?.data?.controlSerials || [];
@@ -129,6 +129,7 @@ const DigitalLinks = () => {
     size: order?.size || 'N/A',
     totalCount: order.totalCount || '',
     supplierStatus: order.supplier?.status || 'N/A',
+    isSentToSupplier: order.isSentToSupplier || 'N/A',
     createdAt: order?.createdAt ? new Date(order?.createdAt).toLocaleString() : 'N/A',
     updatedAt: order?.updatedAt ? new Date(order?.updatedAt).toLocaleString() : 'N/A'
   }));
