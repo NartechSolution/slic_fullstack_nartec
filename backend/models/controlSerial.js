@@ -672,6 +672,8 @@ class ControlSerialModel {
             size: true,
             poNumber: true,
             ItemCode: true,
+            isSentToSupplier: true,
+            isArchived: true,
             product: {
               select: {
                 id: true,
