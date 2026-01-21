@@ -58,6 +58,17 @@ exports.updateControlSerial = [
     .optional({ nullable: true })
     .isString()
     .withMessage("Bin Location ID must be a string."),
+
+  body("isSentToSupplier")
+    .optional()
+    .isBoolean()
+    .withMessage("isSentToSupplier must be a boolean."),
+
+  body("isArchived")
+    .optional()
+    .isBoolean()
+    .withMessage("isArchived must be a boolean."),
+    
 ];
 
 exports.updateControlSerialsByPoNumber = [

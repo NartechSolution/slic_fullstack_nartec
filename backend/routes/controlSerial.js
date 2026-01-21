@@ -90,6 +90,27 @@ router.get(
 );
 
 /**
+ * GET /api/controlSerials/po-numbers-with-total-qty
+ * Get unique PO numbers with combined total qty across all sizes
+ * Query: ?isArchived=true|false (optional)
+ */
+router.get(
+  "/po-numbers-with-total-qty",
+  isAuth,
+  controlSerialController.getUniquePONumbersWithTotalQty
+);
+
+/**
+ * GET /api/controlSerials/po-details?poNumber=value
+ * Get all control serial details for a specific PO number grouped by size
+ */
+router.get(
+  "/po-details",
+  isAuth,
+  controlSerialController.getControlSerialDetailsByPONumber
+);
+
+/**
  * POST /api/controlSerials/archive/by-po
  * Body: { poNumber: string }
  * Archive all control serials for a given PO number
