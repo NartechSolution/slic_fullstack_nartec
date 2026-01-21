@@ -1017,10 +1017,10 @@ exports.getControlSerialDetailsByPONumber = async (req, res, next) => {
     }
 
     // Get all records grouped by size
-    const allRecords =
-      await ControlSerialModel.getControlSerialsByPONumberGroupedBySize(
-        poNumber
-      );
+    // const allRecords =
+    //   await ControlSerialModel.getControlSerialsByPONumberGroupedBySize(
+    //     poNumber
+    //   );
 
     // Calculate total qty
     const totalQty = sizeSummary.reduce((sum, item) => sum + item.qty, 0);
@@ -1034,7 +1034,7 @@ exports.getControlSerialDetailsByPONumber = async (req, res, next) => {
           poNumber,
           totalQty,
           sizeSummary,
-          records: allRecords,
+          // records: allRecords,
         }
       )
     );
