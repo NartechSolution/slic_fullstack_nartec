@@ -117,7 +117,7 @@ const GTIN = () => {
   };
 
   const handleDigitalLinks = (row) => {
-    navigate(`/controlled-serials/${row?.GTIN}`, { 
+    navigate(`/po-number/${row?.GTIN}`, { 
       state: { rowData: row } 
     });
   };

@@ -33,6 +33,7 @@ import DigitalLinks from "./Pages/SlicPages/DigitalLinks/DigitalLinks.jsx";
 import SupplierList from "./Pages/SlicPages/SupplierList/SupplierList.jsx";
 import ArchivedPO from "./Pages/SlicPages/MasterData/ArchivedPO/ArchivedPO.jsx";
 import { SlicTokenProvider } from "./Contexts/SlicTokenContext.jsx";
+import PoNumberTable from "./Pages/SlicPages/DigitalLinks/PoNumberTable.jsx";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const App = () => {
                         </ProtectedRoute>
                       }
                     /> */}
+                      <Route path="po-number/:Id" element={<PoNumberTable />} />
                       <Route path="controlled-serials/:Id" element={<DigitalLinks />} />
                       {/* <Route path="gtin" element={<GTIN />} /> */}
                       <Route

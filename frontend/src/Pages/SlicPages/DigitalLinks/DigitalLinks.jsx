@@ -2,39 +2,30 @@ import React, { useState } from 'react';
 import { IoIosArrowBack } from "react-icons/io";
 import { useQuery } from 'react-query';
 import { toast } from 'react-toastify';
-import ProductCard from './ProductCard';
-import CodesSection from './CodesSection';
 import DigitalLinkTable from './DigitalLinkTable';
 import PurchaseOrderTable from './PurchaseOrderTable';
 import AddControlSerialPopup from './AddControlSerialPopup';
+import UpdateControlSerialPopup from './UpdateControlSerialPopup';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SideNav from '../../../components/Sidebar/SideNav';
-import imageLiveUrl from '../../../utils/urlConverter/imageLiveUrl';
 import newRequest from '../../../utils/userRequest';
 
 const DigitalLinks = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isAddPopupVisible, setIsAddPopupVisible] = useState(false);
+  const [isUpdatePopupVisible, setIsUpdatePopupVisible] = useState(false);
+  const [selectedSerialForUpdate, setSelectedSerialForUpdate] = useState(null);
   const [selectedPO, setSelectedPO] = useState(null);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
 
   const rowData = location.state?.rowData;
+  const poData = location.state.poData;
 
-  const productDetails = [
-    { label: "Item Code", value: rowData?.ItemCode || "N/A" },
-    { label: "English Name", value: rowData?.EnglishName || "N/A" },
-    { label: "Arabic Name", value: rowData?.ArabicName || "N/A" },
-    { label: "GTIN", value: rowData?.GTIN || "N/A" },
-    { label: "Unit", value: rowData?.ProductUnit || "N/A" },
-    { label: "Size", value: rowData?.ProductSize || "N/A" },
-  ];
-
-  // Fetch Purchase Orders
   const fetchPurchaseOrders = async () => {
-    const response = await newRequest.get(`/controlSerials/po-numbers?itemCode=${rowData?.ItemCode}`);
-    return response?.data?.data || [];
+    const response = await newRequest.get(`/controlSerials/po-details?poNumber=${poData?.poNumber}`);
+    return response?.data?.data?.sizeSummary || [];
   };
 
   const { 
@@ -42,7 +33,7 @@ const DigitalLinks = () => {
     isLoading: isLoadingOrders, 
     refetch: refetchOrders,
   } = useQuery({
-    queryKey: ['purchaseOrders', rowData?.ItemCode],
+    queryKey: ['purchaseOrders', poData?.poNumber],
     queryFn: fetchPurchaseOrders,
     staleTime: 5 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
@@ -54,12 +45,11 @@ const DigitalLinks = () => {
     },
   });
 
-  // Fetch ALL Control Serials ONCE - Frontend pagination
   const fetchAllControlSerials = async ({ queryKey }) => {
-    const [_key, poNumber] = queryKey;
+    const [_key, poNumber, size] = queryKey;
     
     const response = await newRequest.get(
-      `/controlSerials?page=1&limit=999999&poNumber=${poNumber}&itemCode=${rowData?.ItemCode}&isArchived=false`
+      `/controlSerials?page=1&limit=999999&poNumber=${poNumber}&size=${size}&itemCode=${rowData?.ItemCode}&isArchived=false`
     );
     
     return response?.data?.data?.controlSerials || [];
@@ -71,7 +61,7 @@ const DigitalLinks = () => {
     refetch,
     isFetching 
   } = useQuery({
-    queryKey: ['allControlSerials', selectedPO?.poNumber],
+    queryKey: ['allControlSerials', selectedPO?.poNumber, selectedPO?.size],
     queryFn: fetchAllControlSerials,
     enabled: !!selectedPO?.poNumber,
     staleTime: 2 * 60 * 1000,
@@ -87,6 +77,11 @@ const DigitalLinks = () => {
   const handleViewOrder = (order) => {
     setSelectedPO(order);
     setPage(1);
+  };
+
+  const handleUpdateSerial = (serialData) => {
+    setSelectedSerialForUpdate(serialData);
+    setIsUpdatePopupVisible(true);
   };
 
   const allSerialsData = allSerials.map(serial => ({
@@ -120,18 +115,18 @@ const DigitalLinks = () => {
     totalPages: totalPages
   };
 
-  // Transform purchase orders data
-  const ordersData = purchaseOrders.map(order => ({
-    id: order.supplier?.id || order.poNumber,
-    poNumber: order.poNumber,
-    ItemCode: order.product?.ItemCode || 'N/A',
-    ProductSize: order.product?.ProductSize || 'N/A',
-    size: order?.size || 'N/A',
-    totalCount: order.totalCount || '',
-    supplierStatus: order.supplier?.status || 'N/A',
-    isSentToSupplier: order.isSentToSupplier || 'N/A',
-    createdAt: order?.createdAt ? new Date(order?.createdAt).toLocaleString() : 'N/A',
-    updatedAt: order?.updatedAt ? new Date(order?.updatedAt).toLocaleString() : 'N/A'
+  // Transform purchase orders data (now records)
+  const ordersData = purchaseOrders.map(record => ({
+    id: record.id,
+    poNumber: record.poNumber,
+    qty: record.qty,
+    ItemCode: record.product?.ItemCode || 'N/A',
+    ProductSize: record.product?.ProductSize || 'N/A',
+    size: record.size || 'N/A',
+    isSentToSupplier: record.isSentToSupplier,
+    supplierName: record.supplier?.name || 'N/A', // Added
+    createdAt: record.createdAt ? new Date(record.createdAt).toLocaleString() : 'N/A',
+    updatedAt: record.updatedAt ? new Date(record.updatedAt).toLocaleString() : 'N/A'
   }));
 
   return (
@@ -164,25 +159,6 @@ const DigitalLinks = () => {
 
         <div className="p-6 bg-gray-50 min-h-screen">
           <div className="max-w-7xl mx-auto space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Column - Product Card */}
-              <div>
-                <ProductCard
-                  imageUrl={imageLiveUrl(rowData?.image)}
-                  productCode={rowData?.ProductSize || "N/A"}
-                  GTIN={rowData?.GTIN || "N/A"}
-                  label={rowData?.label || "Product Name"}
-                  upper={rowData?.upper || "Product Subtitle"}
-                  details={productDetails}
-                />
-              </div>
-
-              {/* Right Column - QR Code and Barcode Stacked */}
-              <div>
-                <CodesSection gtin={rowData?.GTIN || ""} />
-              </div>
-            </div>
-
             {/* Purchase Orders Section */}
             <div className="bg-white rounded-lg shadow-sm">
               <PurchaseOrderTable 
@@ -190,8 +166,8 @@ const DigitalLinks = () => {
                 isLoading={isLoadingOrders}
                 refetchOrders={refetchOrders}
                 onViewOrder={handleViewOrder}
+                onUpdateSerial={handleUpdateSerial}
                 selectedOrderId={selectedPO?.id}
-                size={rowData?.ProductSize}
               />
             </div>
 
@@ -227,6 +203,14 @@ const DigitalLinks = () => {
           // refreshData={refetch}
           itemCode={rowData?.ItemCode}
           size={rowData?.ProductSize}
+        />
+
+        {/* Update Control Serial Popup */}
+        <UpdateControlSerialPopup
+          isVisible={isUpdatePopupVisible}
+          setVisibility={setIsUpdatePopupVisible}
+          refreshData={refetchOrders}
+          data={selectedSerialForUpdate}
         />
       </SideNav>
     </div>

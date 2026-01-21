@@ -141,7 +141,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
       });
       
       toast.success(response?.data?.message || t("Control serials added successfully"));
-      queryClient.invalidateQueries(['purchaseOrders']);
+      queryClient.invalidateQueries(['poNumbersWithQty']);
       setLoading(false);
       handleClosePopup();
     } catch (err) {

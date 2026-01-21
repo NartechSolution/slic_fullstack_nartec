@@ -12,7 +12,7 @@ const PurchaseOrderTable = ({
   isLoading, 
   refetchOrders, 
   onViewOrder,
-  size,
+  onUpdateSerial,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,6 +47,7 @@ const PurchaseOrderTable = ({
     }
 
     const poNumber = selectedOrder.poNumber;
+    const size = selectedOrder.size;
 
     if (!poNumber) {
       toast.error("PO Number is required");
@@ -111,7 +112,8 @@ const PurchaseOrderTable = ({
     order.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     order.ItemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     order.size?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.supplierStatus?.toLowerCase().includes(searchTerm.toLowerCase())
+    order.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.supplierName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -155,20 +157,8 @@ const PurchaseOrderTable = ({
     return pages;
   };
 
-  // Get status badge styling
-  const getStatusBadge = (status) => {
-    const statusMap = {
-      'approved': 'bg-green-100 text-green-800',
-      'Approved': 'bg-green-100 text-green-800',
-      'pending': 'bg-yellow-100 text-yellow-800',
-      'Pending': 'bg-yellow-100 text-yellow-800',
-    };
-    return statusMap[status] || 'bg-gray-100 text-gray-800';
-  };
-
   // Get sent to supplier badge
   const getSentToSupplierBadge = (isSent) => {
-    console.log(isSent)
     if (isSent === true) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -191,9 +181,9 @@ const PurchaseOrderTable = ({
       {/* Header Section */}
       <div className="px-6 py-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div>
-          <h3 className="font-bold text-gray-900 text-lg mb-1">PO Number</h3>
+          <h3 className="font-bold text-gray-900 text-lg mb-1">Purchase Orders</h3>
           <p className="text-sm text-gray-500">
-            Total {filteredOrders.length} PO Number
+            Total {filteredOrders.length} Records
             {selectedOrder && (
               <span className="ml-2 text-blue-600 font-medium">
                 • Selected: {selectedOrder.poNumber}
@@ -204,7 +194,7 @@ const PurchaseOrderTable = ({
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
           <input
             type="text"
-            placeholder="Search by PO number, supplier..."
+            placeholder="Search by PO, serial, supplier..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -264,7 +254,7 @@ const PurchaseOrderTable = ({
       </div>
 
       <div className="text-sm text-gray-500 px-6 pb-3">
-        Click on any row to select and view its controlled serials
+        Click on any row to select
       </div>
 
       {/* Loading Overlay */}
@@ -282,19 +272,18 @@ const PurchaseOrderTable = ({
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">PO Number</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Qty</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ItemCode</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SQTY</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sent to Supplier</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created At</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Updated At</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {currentOrders.length === 0 ? (
                   <tr>
                     <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
-                      No PO Number found
+                      No Records found
                     </td>
                   </tr>
                 ) : (
@@ -306,20 +295,34 @@ const PurchaseOrderTable = ({
                         selectedRowIndex === idx ? 'bg-blue-100 border-l-4 border-l-blue-600' : ''
                       }`}
                     >
-                      <td className="px-4 py-3 text-sm text-gray-900 font-medium">{order.poNumber || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{order.ProductSize || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{order.poNumber || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{order.size || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 font-medium">{order.qty || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{order.ItemCode || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{order.totalCount || 'N/A'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadge(order.supplierStatus)}`}>
-                          {order.supplierStatus || 'N/A'}
-                        </span>
-                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{order.supplierName || 'N/A'}</td>
                       <td className="px-4 py-3">
                         {getSentToSupplierBadge(order.isSentToSupplier)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{order.createdAt || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{order.updatedAt || 'N/A'}</td>
+                      <td className="px-4 py-3">
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if(onUpdateSerial) onUpdateSerial(order);
+                          }}
+                          sx={{
+                            color: '#1D2F90',
+                            borderColor: '#1D2F90',
+                            '&:hover': {
+                              borderColor: '#162561',
+                              backgroundColor: 'rgba(29, 47, 144, 0.04)',
+                            }
+                          }}
+                        >
+                          Update
+                        </Button>
+                      </td>
                     </tr>
                   ))
                 )}

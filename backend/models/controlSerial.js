@@ -536,6 +536,168 @@ class ControlSerialModel {
       data: data,
     });
   }
+
+  /**
+   * Get unique PO numbers with combined total qty across all sizes
+   * Returns one representative record per PO number with total count
+   * @param {boolean} isArchived - Filter by archived status (optional)
+   * @returns {Promise<Array>} - Array of unique PO numbers with details
+   */
+  static async getUniquePONumbersWithTotalQty(isArchived = null) {
+    const where = {};
+
+    if (isArchived !== null && typeof isArchived === "boolean") {
+      where.isArchived = isArchived;
+    }
+
+    // Get unique PO numbers with one representative record each
+    const uniquePOs = await prisma.controlSerial.findMany({
+      where,
+      select: {
+        id: true,
+        poNumber: true,
+        serialNumber: true,
+        ItemCode: true,
+        product: {
+          select: {
+            id: true,
+            ItemCode: true,
+            ProductSize: true,
+          },
+        },
+        supplier: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        createdAt: true,
+      },
+      distinct: ["poNumber"],
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return uniquePOs;
+  }
+
+  /**
+   * Get total count of control serials for a PO number (all sizes combined)
+   * @param {string} poNumber - PO number
+   * @returns {Promise<number>} - Total count
+   */
+  static async countAllByPoNumber(poNumber) {
+    return await prisma.controlSerial.count({
+      where: { poNumber: poNumber },
+    });
+  }
+
+  /**
+   * Get all control serials for a PO number grouped by size with counts
+   * @param {string} poNumber - PO number
+   * @returns {Promise<Array>} - Array of records grouped by size
+   */
+  static async getControlSerialsByPONumberGroupedBySize(poNumber) {
+    // Get all records for this PO number
+    const records = await prisma.controlSerial.findMany({
+      where: { poNumber: poNumber },
+      select: {
+        id: true,
+        serialNumber: true,
+        size: true,
+        poNumber: true,
+        ItemCode: true,
+        isSentToSupplier: true,
+        isArchived: true,
+        binLocationId: true,
+        product: {
+          select: {
+            id: true,
+            ItemCode: true,
+            ProductSize: true,
+          },
+        },
+        supplier: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        binLocation: {
+          select: {
+            id: true,
+            binNumber: true,
+            binType: true,
+          },
+        },
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: [
+        { size: "asc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    return records;
+  }
+
+  /**
+   * Get size summary for a PO number (unique sizes with their counts)
+   * @param {string} poNumber - PO number
+   * @returns {Promise<Array>} - Array of size summaries
+   */
+  static async getSizeSummaryByPoNumber(poNumber) {
+    const sizeCounts = await prisma.controlSerial.groupBy({
+      by: ["size"],
+      where: { poNumber: poNumber },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Get one representative record per size for product details
+    const sizeDetails = await Promise.all(
+      sizeCounts.map(async (sizeGroup) => {
+        const representative = await prisma.controlSerial.findFirst({
+          where: {
+            poNumber: poNumber,
+            size: sizeGroup.size,
+          },
+          select: {
+            id: true,
+            size: true,
+            poNumber: true,
+            ItemCode: true,
+            product: {
+              select: {
+                id: true,
+                ItemCode: true,
+                ProductSize: true,
+              },
+            },
+            supplier: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        });
+
+        return {
+          ...representative,
+          qty: sizeGroup._count.id,
+        };
+      })
+    );
+
+    return sizeDetails;
+  }
 }
 
 module.exports = ControlSerialModel;

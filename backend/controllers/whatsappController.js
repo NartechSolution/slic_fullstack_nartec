@@ -223,7 +223,12 @@ async function initializeClient(forceNew = false) {
             '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
           ]
         },
-        qrMaxRetries: sessionExists ? 0 : 5
+        webVersionCache: {
+          type: 'remote',
+          remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+        },
+        qrMaxRetries: sessionExists ? 0 : 5,
+        sendSeen: false
       });
 
       let resolved = false;
