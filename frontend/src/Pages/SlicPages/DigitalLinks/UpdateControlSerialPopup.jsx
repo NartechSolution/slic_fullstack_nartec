@@ -9,9 +9,8 @@ import { useTranslation } from "react-i18next";
 
 const UpdateControlSerialPopup = ({ isVisible, setVisibility, refreshData, data }) => {
   const { t, i18n } = useTranslation();
-  const [size, setSize] = useState("");
+  const [newSize, setNewSize] = useState("");
   const [loading, setLoading] = useState(false);
-  console.log(data)
   
   // Generate size options from 31 to 49
   const sizeOptions = Array.from({ length: 19 }, (_, i) => ({
@@ -21,43 +20,53 @@ const UpdateControlSerialPopup = ({ isVisible, setVisibility, refreshData, data 
 
   useEffect(() => {
     if (isVisible && data) {
-      setSize(data.size || "");
+      setNewSize("");
     }
   }, [isVisible, data]);
 
   const handleClosePopup = () => {
     setVisibility(false);
-    setSize("");
+    setNewSize("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!data?.id) {
-      toast.error(t("Invalid record selected"));
+    if (!data?.poNumber) {
+      toast.error(t("Invalid PO Number"));
       return;
     }
 
-    if (!size) {
-      toast.error(t("Size is required"));
+    if (!data?.size) {
+      toast.error(t("Current size not found"));
+      return;
+    }
+
+    if (!newSize) {
+      toast.error(t("New size is required"));
+      return;
+    }
+
+    if (data.size === newSize) {
+      toast.warning(t("New size must be different from current size"));
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await newRequest.put(`/controlSerials/${data.id}`, {
-        ItemCode: data.ItemCode,
-        size: size,
-        poNumber: data.poNumber
+      const response = await newRequest.put(`/controlSerials/bulk/update-size-by-po`, {
+        poNumber: data.poNumber,
+        oldSize: data.size,
+        newSize: newSize
       });
       
-      toast.success(response?.data?.message || t("Updated successfully"));
+      toast.success(response?.data?.message || t("Size updated successfully for all items in PO"));
       if (refreshData) refreshData();
       handleClosePopup();
     } catch (err) {
-      console.error(err);
-      toast.error(err?.response?.data?.message || err?.response?.data?.error || t("Error updating record"));
+      // console.error(err);
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || t("Error updating size"));
     } finally {
       setLoading(false);
     }
@@ -75,7 +84,7 @@ const UpdateControlSerialPopup = ({ isVisible, setVisibility, refreshData, data 
               <div className="relative">
                 <div className="fixed top-0 left-0 z-10 flex justify-between w-full px-3 bg-secondary">
                   <h2 className="text-white sm:text-xl text-lg font-body font-semibold">
-                    {t("Update PO Size")}
+                    {t("Bulk Update PO Size")}
                   </h2>
                   <div className="flex items-center space-x-3">
                     <button 
@@ -122,6 +131,13 @@ const UpdateControlSerialPopup = ({ isVisible, setVisibility, refreshData, data 
 
               <form onSubmit={handleSubmit} className="w-full overflow-y-auto mt-6 px-4">
                 <div className="space-y-4">
+                  {/* Info message */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                    <p className="text-sm text-blue-800">
+                      {t("This will update the size for all items in this PO")}
+                    </p>
+                  </div>
+
                   {/* PO Number - Read Only */}
                   <div className="w-full font-body sm:text-base text-sm flex flex-col gap-2">
                     <label 
@@ -152,22 +168,37 @@ const UpdateControlSerialPopup = ({ isVisible, setVisibility, refreshData, data 
                     />
                   </div>
 
-                  {/* Size - Editable */}
+                  {/* Current Size - Read Only */}
+                  <div className="w-full font-body sm:text-base text-sm flex flex-col gap-2">
+                    <label 
+                      className={`text-secondary font-semibold ${i18n.language==='ar'?'text-end':'text-start'}`}
+                    >
+                      {t("Current Size")}:
+                    </label>
+                    <input
+                      type="text"
+                      value={data?.size || ""}
+                      readOnly
+                      className="border w-full rounded-md border-secondary bg-gray-100 p-2 text-gray-600 font-semibold"
+                    />
+                  </div>
+
+                  {/* New Size - Editable */}
                   <div className="w-full font-body sm:text-base text-sm flex flex-col gap-2">
                     <label className={`text-secondary font-semibold ${i18n.language==='ar'?'text-end':'text-start'}`}>
-                      {t("Size")} *:
+                      {t("New Size")} *:
                     </label>
                     <Autocomplete
                       options={sizeOptions}
                       getOptionLabel={(option) => option.label || ""}
-                      value={sizeOptions.find(opt => opt.value === size) || null}
+                      value={sizeOptions.find(opt => opt.value === newSize) || null}
                       onChange={(event, newValue) => {
-                        setSize(newValue?.value || "");
+                        setNewSize(newValue?.value || "");
                       }}
                       renderInput={(params) => (
                         <TextField
                           {...params}
-                          placeholder={t("Select size")}
+                          placeholder={t("Select new size")}
                           variant="outlined"
                           size="small"
                           sx={{
@@ -199,7 +230,7 @@ const UpdateControlSerialPopup = ({ isVisible, setVisibility, refreshData, data 
                         )
                       }
                     >
-                      {t("UPDATE")}
+                      {t("UPDATE ALL ITEMS IN PO")}
                     </Button>
                   </div>
                 </div>
