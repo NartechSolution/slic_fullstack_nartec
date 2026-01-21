@@ -183,7 +183,7 @@ const DigitalLinkTable = ({
               Print Labels ({selectedRows.length})
             </Button>
           )}
-          <Button 
+          {/* <Button 
             onClick={onAddSerial}
             variant="contained"
             sx={{
@@ -198,7 +198,7 @@ const DigitalLinkTable = ({
             endIcon={<FiPlus className="w-4 h-4" />}
           >
             Add Serial
-          </Button>
+          </Button> */}
           <Button 
             onClick={handleRefresh}
             variant="contained"
