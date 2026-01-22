@@ -426,10 +426,7 @@ const GTIN = () => {
             <AddControlSerialPopup
               isVisible={isAddControlSerialPopupVisible}
               setVisibility={setAddControlSerialPopupVisibility}
-              refreshData={() => {
-                // Determine what data to refresh, maybe not needed here or use a generic refresh
-              }}
-              itemCode={selectedItemForControlSerial?.itemCode}
+              itemCode={selectedItemForControlSerial?.ItemCode}
             />
           )}
 
