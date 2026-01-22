@@ -652,7 +652,53 @@ exports.updateSizeByPO = async (req, res, next) => {
   }
 };
 
+/**
+ * DELETE - Bulk delete all control serials by PO number
+ * Body: { poNumber: string }
+ */
+exports.bulkDeleteByPoNumber = async (req, res, next) => {
+  try {
+    const { poNumber } = req.body;
 
+    if (!poNumber) {
+      const error = new CustomError("PO number is required");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Check if any control serials exist for this PO number
+    const existingSerials = await ControlSerialModel.findByPoNumber(
+      poNumber,
+      true, // include archived
+      null  // all sizes
+    );
+
+    if (!existingSerials || existingSerials.length === 0) {
+      const error = new CustomError(
+        "No control serials found for the given PO number"
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Delete all control serials for this PO number
+    const result = await ControlSerialModel.deleteByPoNumber(poNumber);
+
+    res.status(200).json(
+      generateResponse(
+        200,
+        true,
+        `${result.count} control serial(s) deleted successfully for PO number: ${poNumber}`,
+        {
+          poNumber,
+          deletedCount: result.count,
+        }
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * PUT - Update control serials by PO number and size
