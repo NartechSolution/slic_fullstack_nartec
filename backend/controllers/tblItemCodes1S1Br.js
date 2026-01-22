@@ -117,6 +117,43 @@ exports.getAllItemCodes = async (req, res, next) => {
   }
 };
 
+/**
+ * GET - Search item codes by ItemCode field
+ * Returns top 20 matching records
+ * Query: ?search=value
+ */
+exports.searchItemCodes = async (req, res, next) => {
+  try {
+    const { search } = req.query;
+
+    if (!search || search.trim().length === 0) {
+      const error = new CustomError("Search query parameter is required");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    const results = await ItemCodeModel.searchByItemCode(search.trim());
+
+    res
+      .status(200)
+      .json(
+        generateResponse(
+          200,
+          true,
+          `Found ${results.length} matching item codes`,
+          results
+        )
+      );
+  } catch (error) {
+    console.log(error);
+    if (error instanceof CustomError) {
+      return next(error);
+    }
+    error.message = null;
+    next(error);
+  }
+};
+
 // exports.updateGTINs = async (req, res, next) => {
 //   try {
 //     // Fetch all item codes

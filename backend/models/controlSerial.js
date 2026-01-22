@@ -538,10 +538,10 @@ class ControlSerialModel {
   }
 
   /**
-   * Get unique PO numbers with combined total qty across all sizes
-   * Returns one representative record per PO number with total count
+   * Get unique PO numbers with combined total qty, isSentToSupplier status
+   * Optimized: Uses groupBy for aggregation and fetches details in parallel
    * @param {boolean} isArchived - Filter by archived status (optional)
-   * @returns {Promise<Array>} - Array of unique PO numbers with details
+   * @returns {Promise<Array>} - Array of unique PO numbers with details, totalQty, isSentToSupplier
    */
   static async getUniquePONumbersWithTotalQty(isArchived = null) {
     const where = {};
@@ -550,14 +550,60 @@ class ControlSerialModel {
       where.isArchived = isArchived;
     }
 
-    // Get unique PO numbers with one representative record each
-    const uniquePOs = await prisma.controlSerial.findMany({
+    // Step 1: Get aggregated data per PO number (totalQty and sent counts)
+    const poAggregations = await prisma.controlSerial.groupBy({
+      by: ["poNumber"],
       where,
+      _count: {
+        id: true,
+      },
+      _max: {
+        createdAt: true,
+      },
+    });
+
+    if (!poAggregations || poAggregations.length === 0) {
+      return [];
+    }
+
+    // Step 2: Get sent status counts for each PO in a single query
+    const sentCounts = await prisma.controlSerial.groupBy({
+      by: ["poNumber", "isSentToSupplier"],
+      where: {
+        ...where,
+        poNumber: { in: poAggregations.map((p) => p.poNumber) },
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Build a map of PO -> { totalSent, totalNotSent }
+    const sentStatusMap = {};
+    for (const item of sentCounts) {
+      if (!sentStatusMap[item.poNumber]) {
+        sentStatusMap[item.poNumber] = { sent: 0, notSent: 0 };
+      }
+      if (item.isSentToSupplier === true) {
+        sentStatusMap[item.poNumber].sent = item._count.id;
+      } else {
+        sentStatusMap[item.poNumber].notSent = item._count.id;
+      }
+    }
+
+    // Step 3: Fetch representative records for each PO (for product/supplier details)
+    const poNumbers = poAggregations.map((p) => p.poNumber);
+    const representatives = await prisma.controlSerial.findMany({
+      where: {
+        ...where,
+        poNumber: { in: poNumbers },
+      },
       select: {
         id: true,
         poNumber: true,
         serialNumber: true,
         ItemCode: true,
+        createdAt: true,
         product: {
           select: {
             id: true,
@@ -572,7 +618,6 @@ class ControlSerialModel {
             email: true,
           },
         },
-        createdAt: true,
       },
       distinct: ["poNumber"],
       orderBy: {
@@ -580,7 +625,42 @@ class ControlSerialModel {
       },
     });
 
-    return uniquePOs;
+    // Build a map for quick lookup
+    const repMap = {};
+    for (const rep of representatives) {
+      repMap[rep.poNumber] = rep;
+    }
+
+    // Step 4: Combine all data
+    const result = poAggregations.map((agg) => {
+      const rep = repMap[agg.poNumber] || {};
+      const status = sentStatusMap[agg.poNumber] || { sent: 0, notSent: 0 };
+
+      // Determine isSentToSupplier: true if all sent, false if none sent, null if partial
+      let isSentToSupplier = null;
+      if (status.notSent === 0 && status.sent > 0) {
+        isSentToSupplier = true;
+      } else if (status.sent === 0 && status.notSent > 0) {
+        isSentToSupplier = false;
+      }
+
+      return {
+        id: rep.id,
+        poNumber: agg.poNumber,
+        serialNumber: rep.serialNumber,
+        ItemCode: rep.ItemCode,
+        product: rep.product,
+        supplier: rep.supplier,
+        totalQty: agg._count.id,
+        isSentToSupplier,
+        createdAt: rep.createdAt,
+      };
+    });
+
+    // Sort by createdAt desc
+    result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return result;
   }
 
   /**

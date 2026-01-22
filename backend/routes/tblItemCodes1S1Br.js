@@ -16,6 +16,12 @@ router.get("/v1/itemCodes", itemCodesController.getItemCodes);
 
 router.get("/v1/itemCodes/all", isAuth, itemCodesController.getAllItemCodes);
 
+/**
+ * GET /v1/itemCodes/search?search=value
+ * Search item codes by ItemCode field, returns top 20 matching records
+ */
+router.get("/v1/itemCodes/search", isAuth, itemCodesController.searchItemCodes);
+
 router.post(
   "/v1/itemCode",
   isAuth,

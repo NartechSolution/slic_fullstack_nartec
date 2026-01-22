@@ -15,7 +15,7 @@ router.post(
   "/",
   isAuth,
   controlSerialValidator.createControlSerials,
-  controlSerialController.createControlSerials
+  controlSerialController.createControlSerials,
 );
 
 /**
@@ -38,7 +38,7 @@ router.get("/all", isAuth, controlSerialController.getAllControlSerials);
 router.get(
   "/search/by-itemcode",
   isAuth,
-  controlSerialController.searchByItemCode
+  controlSerialController.searchByItemCode,
 );
 
 /**
@@ -48,7 +48,7 @@ router.get(
 router.get(
   "/search/by-serial",
   isAuth,
-  controlSerialController.searchBySerialNumber
+  controlSerialController.searchBySerialNumber,
 );
 
 /**
@@ -59,7 +59,7 @@ router.get(
 router.post(
   "/send-by-po",
   isAuth,
-  controlSerialController.sendControlSerialsByPoNumber
+  controlSerialController.sendControlSerialsByPoNumber,
 );
 
 /**
@@ -76,7 +76,7 @@ router.get("/search/by-po", isAuth, controlSerialController.searchByPoNumber);
 router.get(
   "/supplier/po-numbers",
   isAuth,
-  controlSerialController.getSupplierPoNumbersWithSupplierDetails
+  controlSerialController.getSupplierPoNumbersWithSupplierDetails,
 );
 
 /**
@@ -86,7 +86,7 @@ router.get(
 router.get(
   "/po-numbers",
   isAuth,
-  controlSerialController.getPoNumbersWithSupplierDetails
+  controlSerialController.getPoNumbersWithSupplierDetails,
 );
 
 /**
@@ -97,7 +97,7 @@ router.get(
 router.get(
   "/po-numbers-with-total-qty",
   isAuth,
-  controlSerialController.getUniquePONumbersWithTotalQty
+  controlSerialController.getUniquePONumbersWithTotalQty,
 );
 
 /**
@@ -107,7 +107,7 @@ router.get(
 router.get(
   "/po-details",
   isAuth,
-  controlSerialController.getControlSerialDetailsByPONumber
+  controlSerialController.getControlSerialDetailsByPONumber,
 );
 
 /**
@@ -118,7 +118,7 @@ router.get(
 router.post(
   "/archive/by-po",
   isAuth,
-  controlSerialController.archiveControlSerialsByPoNumber
+  controlSerialController.archiveControlSerialsByPoNumber,
 );
 
 /**
@@ -129,7 +129,7 @@ router.post(
 router.post(
   "/unarchive/by-po",
   isAuth,
-  controlSerialController.unarchiveControlSerialsByPoNumber
+  controlSerialController.unarchiveControlSerialsByPoNumber,
 );
 
 /**
@@ -147,7 +147,7 @@ router.put(
   "/put-away",
   isAuth,
   controlSerialValidator.updateControlSerialsByPoNumber,
-  controlSerialController.putAway
+  controlSerialController.putAway,
 );
 
 /**
@@ -159,7 +159,14 @@ router.put(
   "/:id",
   isAuth,
   controlSerialValidator.updateControlSerial,
-  controlSerialController.updateControlSerial
+  controlSerialController.updateControlSerial,
+);
+
+router.put(
+  "/bulk/update-size-by-po",
+  isAuth,
+  controlSerialValidator.updateSizeByPO,
+  controlSerialController.updateSizeByPO,
 );
 
 /**

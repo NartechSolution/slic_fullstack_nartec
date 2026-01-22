@@ -288,13 +288,13 @@ exports.searchByItemCode = async (req, res, next) => {
 /**
  * POST - Send control serial notification emails by PO number
  * Body: { poNumber: string }
- * This will find all control serials for the PO number which are not yet sent,
- * group them by supplier and size, send notification email for each group,
+ * This will find all control serials for the PO number (all sizes) which are not yet sent,
+ * group them by supplier, send notification email for each supplier,
  * and mark those control serials as isSentToSupplier = true when email sending succeeds.
  */
 exports.sendControlSerialsByPoNumber = async (req, res, next) => {
   try {
-    const { poNumber, size } = req.body;
+    const { poNumber } = req.body;
 
     if (!poNumber) {
       const error = new CustomError("PO number is required");
@@ -302,12 +302,11 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
       throw error;
     }
 
-    // Find all control serials for this PO number (including archived ones)
-    // We pass true to include archived records, then filter by isSentToSupplier
+    // Find all control serials for this PO number (all sizes, not archived)
     const allSerials = await ControlSerialModel.findByPoNumber(
       poNumber,
       false,
-      size
+      null // null size to get all sizes
     );
     const unsent = (allSerials || []).filter((s) => !s.isSentToSupplier);
 
@@ -319,20 +318,23 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
       throw error;
     }
 
-    // Group by supplierId + size to preserve the original email payload shape
+    // Group by supplierId only (send all sizes together)
     const groups = {};
     for (const s of unsent) {
-      const key = `${s.supplierId}_${s.size || ""}`;
+      const key = s.supplierId;
       if (!groups[key]) {
         groups[key] = {
           supplierId: s.supplierId,
           supplier: s.supplier,
           poNumber: s.poNumber,
-          size: s.size,
           serials: [],
+          sizes: new Set(),
         };
       }
       groups[key].serials.push(s);
+      if (s.size) {
+        groups[key].sizes.add(s.size);
+      }
     }
 
     const sentSummary = [];
@@ -347,14 +349,18 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
         // Get base URL from environment variable
         const baseUrl = process.env.FRONTEND_URL;
 
+        // Collect unique item codes and sizes
+        const uniqueItemCodes = [...new Set(group.serials.map((s) => s.product?.ItemCode).filter(Boolean))];
+        const allSizes = [...group.sizes].sort().join(", ") || null;
+
         // Send email notification
         const emailResult = await sendControlSerialNotificationEmail({
           supplierEmail: supplier.email,
           supplierName: supplier.name,
           poNumber: group.poNumber,
-          itemCode: group.serials.map((s) => s.product?.ItemCode).join(", "),
+          itemCode: uniqueItemCodes.join(", "),
           quantity: group.serials.length,
-          size: group.size || null,
+          size: allSizes,
           baseUrl: baseUrl,
         });
 
@@ -367,6 +373,7 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
           supplierEmail: supplier.email,
           poNumber: group.poNumber,
           quantity: group.serials.length,
+          sizes: allSizes,
         });
       } catch (groupError) {
         console.error(`Error sending email for group ${key}:`, groupError);
@@ -584,6 +591,68 @@ exports.updateControlSerial = async (req, res, next) => {
     next(error);
   }
 };
+
+
+exports.updateSizeByPO = async (req, res, next) => {
+  try {
+    const { poNumber, oldSize, newSize } = req.body;
+
+    // express-validator result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const error = new CustomError(errors.errors[0].msg);
+      error.statusCode = 422;
+      error.data = errors;
+      return next(error);
+    }
+
+    if (oldSize === newSize) {
+      return res.status(200).json(
+        generateResponse(
+          200,
+          true,
+          "Old size and new size are the same. No update required.",
+          null
+        )
+      );
+    }
+
+    // 🔑 Use existing model method
+    const result = await ControlSerialModel.updateByPoNumberAndSize(
+      poNumber,
+      oldSize,
+      {
+        size: newSize
+      }
+    );
+
+    if (result.count === 0) {
+      const error = new CustomError(
+        "No control serials found for given PO number and old size"
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return res.status(200).json(
+      generateResponse(
+        200,
+        true,
+        `Size updated successfully for ${result.count} record(s)`,
+        {
+          poNumber,
+          oldSize,
+          newSize,
+          updatedCount: result.count
+        }
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 
 /**
  * PUT - Update control serials by PO number and size
@@ -936,7 +1005,8 @@ exports.unarchiveControlSerialsByPoNumber = async (req, res, next) => {
 
 /**
  * GET - Get unique PO numbers with combined total qty across all sizes
- * Returns: poNumber, serialNumber (sample), ItemCode, product, totalQty
+ * Returns: poNumber, serialNumber (sample), ItemCode, product, totalQty, isSentToSupplier
+ * Optimized: Single query approach with aggregations
  */
 exports.getUniquePONumbersWithTotalQty = async (req, res, next) => {
   try {
@@ -945,33 +1015,16 @@ exports.getUniquePONumbersWithTotalQty = async (req, res, next) => {
         ? req.query.isArchived === "true"
         : null;
 
-    // Get unique PO numbers
-    const uniquePOs = await ControlSerialModel.getUniquePONumbersWithTotalQty(
+    // Get unique PO numbers with totalQty and isSentToSupplier (optimized single query)
+    const posWithDetails = await ControlSerialModel.getUniquePONumbersWithTotalQty(
       isArchived
     );
 
-    if (!uniquePOs || uniquePOs.length === 0) {
+    if (!posWithDetails || posWithDetails.length === 0) {
       const error = new CustomError("No PO numbers found");
       error.statusCode = 404;
       throw error;
     }
-
-    // Get total count for each PO number (all sizes combined)
-    const posWithTotalQty = await Promise.all(
-      uniquePOs.map(async (po) => {
-        const totalQty = await ControlSerialModel.countAllByPoNumber(po.poNumber);
-        return {
-          id: po.id,
-          poNumber: po.poNumber,
-          serialNumber: po.serialNumber,
-          ItemCode: po.ItemCode,
-          product: po.product,
-          supplier: po.supplier,
-          totalQty: totalQty,
-          createdAt: po.createdAt,
-        };
-      })
-    );
 
     res
       .status(200)
@@ -980,7 +1033,7 @@ exports.getUniquePONumbersWithTotalQty = async (req, res, next) => {
           200,
           true,
           "Unique PO numbers with total quantities retrieved successfully",
-          posWithTotalQty
+          posWithDetails
         )
       );
   } catch (error) {
@@ -1017,10 +1070,10 @@ exports.getControlSerialDetailsByPONumber = async (req, res, next) => {
     }
 
     // Get all records grouped by size
-    // const allRecords =
-    //   await ControlSerialModel.getControlSerialsByPONumberGroupedBySize(
-    //     poNumber
-    //   );
+    const allRecords =
+      await ControlSerialModel.getControlSerialsByPONumberGroupedBySize(
+        poNumber
+      );
 
     // Calculate total qty
     const totalQty = sizeSummary.reduce((sum, item) => sum + item.qty, 0);
@@ -1034,7 +1087,7 @@ exports.getControlSerialDetailsByPONumber = async (req, res, next) => {
           poNumber,
           totalQty,
           sizeSummary,
-          // records: allRecords,
+          records: allRecords,
         }
       )
     );
