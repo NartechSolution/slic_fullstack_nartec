@@ -9,7 +9,7 @@ import newRequest from '../../../utils/userRequest';
 import { Button, CircularProgress } from '@mui/material';
 import { HiRefresh } from 'react-icons/hi';
 import { IoSend } from "react-icons/io5";
-import { FaEye } from "react-icons/fa";
+import { FaCheckCircle, FaTimesCircle, FaEye } from "react-icons/fa";
 import Swal from "sweetalert2";
 
 const PoNumberTable = () => {
@@ -24,15 +24,6 @@ const PoNumberTable = () => {
     const itemsPerPage = 10;
 
     const rowData = location.state?.rowData;
-
-    const productDetails = [
-        { label: "Item Code", value: rowData?.ItemCode || "N/A" },
-        { label: "English Name", value: rowData?.EnglishName || "N/A" },
-        { label: "Arabic Name", value: rowData?.ArabicName || "N/A" },
-        { label: "GTIN", value: rowData?.GTIN || "N/A" },
-        { label: "Unit", value: rowData?.ProductUnit || "N/A" },
-        { label: "Size", value: rowData?.ProductSize || "N/A" },
-    ];
 
     // Fetch PO Numbers
     const fetchPoNumbers = async () => {
@@ -77,7 +68,7 @@ const PoNumberTable = () => {
         }
 
         const poNumber = selectedPO.poNumber;
-        const size = rowData?.ProductSize;
+        // const size = rowData?.ProductSize;
 
         if (!poNumber) {
             toast.error("PO Number is required");
@@ -105,7 +96,7 @@ const PoNumberTable = () => {
         try {
             const response = await newRequest.post("/controlSerials/send-by-po", {
                 poNumber: poNumber,
-                size: size,
+                // size: size,
             });
 
             // Success notification
@@ -137,13 +128,11 @@ const PoNumberTable = () => {
             setSendingPO(false);
         }
     };
-
-    // Filtering
-    const productPOs = poList.filter(po => po.product?.ItemCode === rowData?.ItemCode);
     
-    const filteredPOs = productPOs.filter(po =>
+    const filteredPOs = poList.filter(po =>
         po.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        po.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+        po.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        po.product.ItemCode?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Pagination
@@ -186,6 +175,25 @@ const PoNumberTable = () => {
         return pages;
     };
 
+    // Get sent to supplier badge
+    const getSentToSupplierBadge = (isSent) => {
+        if (isSent === true) {
+        return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            <FaCheckCircle className="text-green-600" />
+            Sent
+            </span>
+        );
+        } else {
+        return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+            <FaTimesCircle className="text-red-600" />
+            Not Sent
+            </span>
+        );
+        }
+    };
+
     return (
         <div>
             <SideNav>
@@ -216,23 +224,6 @@ const PoNumberTable = () => {
 
                 <div className="p-6 bg-gray-50 min-h-screen">
                     <div className="max-w-7xl mx-auto space-y-6">
-                        {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div>
-                                <ProductCard
-                                    imageUrl={imageLiveUrl(rowData?.image)}
-                                    productCode={rowData?.ProductSize || "N/A"}
-                                    GTIN={rowData?.GTIN || "N/A"}
-                                    label={rowData?.label || "Product Name"}
-                                    upper={rowData?.upper || "Product Subtitle"}
-                                    details={productDetails}
-                                />
-                            </div>
-
-                            <div>
-                                <CodesSection gtin={rowData?.GTIN || ""} />
-                            </div>
-                        </div> */}
-
                         {/* PO Table Section */}
                         <div className="bg-white rounded-lg shadow-sm">
                             <div className="px-6 py-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 border-b border-gray-200">
@@ -335,6 +326,7 @@ const PoNumberTable = () => {
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Qty</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Code</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent To Supplier</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                                         </tr>
@@ -368,6 +360,9 @@ const PoNumberTable = () => {
                                                     </td>
                                                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {po.supplier?.name || "N/A"}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {getSentToSupplierBadge(po.isSentToSupplier)}
                                                     </td>
                                                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {new Date(po.createdAt).toLocaleDateString()}

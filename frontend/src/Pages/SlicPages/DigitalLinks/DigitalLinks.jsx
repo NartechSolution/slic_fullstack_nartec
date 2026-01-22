@@ -46,10 +46,10 @@ const DigitalLinks = () => {
   });
 
   const fetchAllControlSerials = async ({ queryKey }) => {
-    const [_key, poNumber, size] = queryKey;
+    const [_key, poNumber, size, ItemCode] = queryKey;
     
     const response = await newRequest.get(
-      `/controlSerials?page=1&limit=999999&poNumber=${poNumber}&size=${size}&itemCode=${rowData?.ItemCode}&isArchived=false`
+      `/controlSerials?page=1&limit=999999&poNumber=${poNumber}&size=${size}&itemCode=${ItemCode}&isArchived=false`
     );
     
     return response?.data?.data?.controlSerials || [];
@@ -61,7 +61,7 @@ const DigitalLinks = () => {
     refetch,
     isFetching 
   } = useQuery({
-    queryKey: ['allControlSerials', selectedPO?.poNumber, selectedPO?.size],
+    queryKey: ['allControlSerials', selectedPO?.poNumber, selectedPO?.size, selectedPO?.ItemCode],
     queryFn: fetchAllControlSerials,
     enabled: !!selectedPO?.poNumber,
     staleTime: 2 * 60 * 1000,
@@ -186,7 +186,7 @@ const DigitalLinks = () => {
                 allSerials={allSerialsData}
                 isLoading={isLoading || isFetching}
                 refetchSerials={refetch}
-                itemCode={rowData?.ItemCode}
+                itemCode={selectedPO?.ItemCode}
                 onAddSerial={() => setIsAddPopupVisible(true)}
                 pagination={paginationData}
                 onPageChange={setPage}

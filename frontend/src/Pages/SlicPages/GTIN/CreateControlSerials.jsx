@@ -4,6 +4,8 @@ import CircularProgress from "@mui/material/CircularProgress";
 import SearchIcon from "@mui/icons-material/Search";
 import { useTranslation } from "react-i18next";
 import CheckCircle from "@mui/icons-material/CheckCircle";
+import newRequest from "../../../utils/userRequest";
+import { toast } from "react-toastify";
 
 const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
   const { t, i18n } = useTranslation();
@@ -19,49 +21,38 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
     setSelectedItem(null);
   };
 
-  const handleSearch = (e) => {
+  const handleSearch = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
     setLoading(true);
-    // Dummy search logic as requested
-    setTimeout(() => {
-        // Mock result
-        const dummyData = [
-            {
-                 id: 1,
-                 itemCode: searchQuery,
-                 description: "Sample Product Description",
-                 quantity: 100,
-                 brand: "Nike",
-                 category: "Shoes"
-            },
-            {
-                 id: 2,
-                 itemCode: searchQuery,
-                 description: "Sample Product Description",
-                 quantity: 100,
-                 brand: "Nike",
-                 category: "Shoes"
-            },
-            {
-                 id: 3,
-                 itemCode: searchQuery,
-                 description: "Sample Product Description",
-                 quantity: 100,
-                 brand: "Nike",
-                 category: "Shoes"
-            }
-        ];
-        setSearchResults(dummyData);
-        setLoading(false);
-    }, 1000);
+    try {
+      const response = await newRequest.get(
+        `/itemCodes/v1/itemCodes/search?search=${searchQuery}`
+      );
+      
+      if (response?.data?.success) {
+        setSearchResults(response.data.data);
+        if (response.data.data.length === 0) {
+          toast.info(t("No results found"));
+        }
+      } else {
+        toast.error(response?.data?.message || t("Error searching items"));
+        setSearchResults([]);
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.error || t("Error searching items"));
+      // console.error(error);
+      setSearchResults([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleContinue = () => {
     if (selectedItem) {
-        onContinue(selectedItem);
-        handleClose();
+      onContinue(selectedItem);
+      handleClose();
     }
   };
 
@@ -126,53 +117,64 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
                   {searchResults.map((item) => (
                     <div
                       key={item.id}
-                      className={`relative rounded-xl p-4 cursor-pointer transition-all duration-200 group ${
+                      className={`relative rounded-lg p-3 cursor-pointer transition-all duration-200 group ${
                         selectedItem?.id === item.id
-                          ? "bg-white ring-2 ring-secondary shadow-lg scale-[1.01]"
+                          ? "bg-white ring-2 ring-secondary shadow-lg"
                           : "bg-white border border-gray-200 hover:border-secondary hover:shadow-md"
                       }`}
                       onClick={() => setSelectedItem(item)}
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                             <div className="bg-blue-50 text-secondary px-3 py-1 rounded-md text-sm font-bold border border-blue-100">
-                               {item.itemCode}
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                             <div className="bg-blue-50 text-secondary px-2 py-0.5 rounded text-xs font-bold border border-blue-100">
+                               {item.ItemCode}
                              </div>
                              {selectedItem?.id === item.id && (
-                                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                                <span className="bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1">
                                   <CheckCircle fontSize="inherit" /> {t("Selected")}
                                 </span>
                              )}
                           </div>
                           
-                          <h3 className="font-semibold text-gray-800 text-lg mb-1 group-hover:text-secondary transition-colors">
-                            {item.description}
-                          </h3>
+                          <div className="space-y-1.5 mb-2">
+                            <div className="flex items-start gap-2 text-sm">
+                              <span className="text-gray-500 min-w-[90px] text-xs">{t("English Name")}:</span>
+                              <span className="font-medium text-gray-800 truncate">{item.EnglishName || '-'}</span>
+                            </div>
+                            <div className="flex items-start gap-2 text-sm">
+                              <span className="text-gray-500 min-w-[90px] text-xs">{t("Arabic Name")}:</span>
+                              <span className="font-medium text-gray-800 truncate">{item.ArabicName || '-'}</span>
+                            </div>
+                          </div>
                           
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-2 gap-x-6 mt-4 text-sm text-gray-600">
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-2 border-t border-gray-100">
                             <div className="flex flex-col">
-                              <span className="text-gray-400 text-xs uppercase tracking-wider">{t("Brand")}</span>
-                              <span className="font-medium">{item.brand}</span>
+                              <span className="text-gray-400 text-xs uppercase tracking-wide">{t("GTIN")}</span>
+                              <span className="font-semibold text-gray-700 text-sm">{item.GTIN}</span>
                             </div>
                             <div className="flex flex-col">
-                               <span className="text-gray-400 text-xs uppercase tracking-wider">{t("Category")}</span>
-                               <span className="font-medium">{item.category}</span>
+                               <span className="text-gray-400 text-xs uppercase tracking-wide">{t("Size")}</span>
+                               <span className="font-semibold text-gray-700 text-sm">{item.ProductSize}</span>
                             </div>
-                             <div className="flex flex-col">
-                               <span className="text-gray-400 text-xs uppercase tracking-wider">{t("Quantity")}</span>
-                               <span className="font-medium">{item.quantity}</span>
+                            <div className="flex flex-col">
+                              <span className="text-gray-400 text-xs uppercase tracking-wide">{t("Brand")}</span>
+                              <span className="font-semibold text-gray-700 text-sm truncate">{item.BrandName || '-'}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-gray-400 text-xs uppercase tracking-wide">{t("Model")}</span>
+                              <span className="font-semibold text-gray-700 text-sm truncate">{item.ModelName || '-'}</span>
                             </div>
                           </div>
                         </div>
                         
-                        <div className={`ml-4 mt-1 rounded-full p-1 transition-colors ${
+                        <div className={`flex-shrink-0 transition-colors ${
                              selectedItem?.id === item.id ? "text-secondary" : "text-gray-300 group-hover:text-secondary"
                         }`}>
                            {selectedItem?.id === item.id ? (
-                               <CheckCircle fontSize="large" style={{ color: "#021F69" }} /> 
+                               <CheckCircle style={{ fontSize: '28px', color: "#021F69" }} /> 
                            ) : (
-                               <div className="w-7 h-7 rounded-full border-2 border-gray-300 group-hover:border-secondary"></div>
+                               <div className="w-6 h-6 rounded-full border-2 border-gray-300 group-hover:border-secondary"></div>
                            )}
                         </div>
                       </div>

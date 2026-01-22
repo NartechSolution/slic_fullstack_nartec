@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Button, CircularProgress } from "@mui/material";
 import { HiRefresh } from "react-icons/hi";
-import { FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 
 const PurchaseOrderTable = ({ 
   orders, 
@@ -83,25 +82,6 @@ const PurchaseOrderTable = ({
     return pages;
   };
 
-  // Get sent to supplier badge
-  const getSentToSupplierBadge = (isSent) => {
-    if (isSent === true) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          <FaCheckCircle className="text-green-600" />
-          Sent
-        </span>
-      );
-    } else {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-          <FaTimesCircle className="text-red-600" />
-          Not Sent
-        </span>
-      );
-    }
-  };
-
   return (
     <div className="bg-white">
       {/* Header Section */}
@@ -111,7 +91,7 @@ const PurchaseOrderTable = ({
           <p className="text-sm text-gray-500">
             Total {filteredOrders.length} Records
             {selectedOrder && (
-              <span className="ml-2 text-blue-600 font-medium">
+              <span className="ml-2 text-secondary font-medium">
                 • Selected: {selectedOrder.poNumber}
               </span>
             )}
@@ -179,7 +159,6 @@ const PurchaseOrderTable = ({
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Qty</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ItemCode</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sent to Supplier</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
                 </tr>
               </thead>
@@ -204,9 +183,6 @@ const PurchaseOrderTable = ({
                       <td className="px-4 py-3 text-sm text-gray-900 font-medium">{order.qty || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{order.ItemCode || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{order.supplierName || 'N/A'}</td>
-                      <td className="px-4 py-3">
-                        {getSentToSupplierBadge(order.isSentToSupplier)}
-                      </td>
                       <td className="px-4 py-3">
                         <Button
                           variant="outlined"
