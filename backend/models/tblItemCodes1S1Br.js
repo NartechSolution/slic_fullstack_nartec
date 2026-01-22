@@ -324,6 +324,36 @@ class ItemCodeModel {
       },
     });
   }
+
+  /**
+   * Search item codes by ItemCode field
+   * Returns top 20 matching records
+   * @param {string} search - Search term for ItemCode
+   * @returns {Promise<Array>} - Array of matching item codes (max 20)
+   */
+  static async searchByItemCode(search) {
+    return await prisma.tblItemCodes1S1Br.findMany({
+      where: {
+        ItemCode: {
+          contains: search,
+        },
+      },
+      take: 20,
+      orderBy: {
+        ItemCode: "asc",
+      },
+      select: {
+        id: true,
+        ItemCode: true,
+        EnglishName: true,
+        ArabicName: true,
+        GTIN: true,
+        ProductSize: true,
+        BrandName: true,
+        ModelName: true,
+      },
+    });
+  }
 }
 
 module.exports = ItemCodeModel;
