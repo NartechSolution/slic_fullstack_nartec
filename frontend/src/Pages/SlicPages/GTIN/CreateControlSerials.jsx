@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import CheckCircle from "@mui/icons-material/CheckCircle";
 import newRequest from "../../../utils/userRequest";
 import { toast } from "react-toastify";
+import imageLiveUrl from "../../../utils/urlConverter/imageLiveUrl";
 
 const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
   const { t, i18n } = useTranslation();
@@ -21,8 +22,7 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
     setSelectedItem(null);
   };
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
     setLoading(true);
@@ -46,6 +46,13 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
       setSearchResults([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
     }
   };
 
@@ -88,7 +95,7 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
 
             {/* Scrollable Content */}
             <div className="w-full flex-1 overflow-y-auto px-4 py-4 bg-gray-50">
-              <form onSubmit={handleSearch} className="flex items-end gap-3 mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+              <div className="flex items-end gap-3 mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                 <div className="flex-1">
                   <label className={`text-secondary font-semibold text-sm mb-1 block ${i18n.language==='ar'?'text-end':'text-start'}`}>
                     {t("Search Item Code")}
@@ -97,6 +104,7 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={handleKeyPress}
                     placeholder={t("Enter Item Code")}
                     className={`border w-full rounded-md border-secondary p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all ${i18n.language==='ar'?'text-end':'text-start'}`}
                   />
@@ -104,13 +112,13 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
                 <Button
                   variant="contained"
                   style={{ backgroundColor: "#021F69", color: "#ffffff", height: "45px" }}
-                  type="submit"
+                  onClick={handleSearch}
                   disabled={loading}
                   className="shadow-md hover:shadow-lg"
                 >
                   {loading ? <CircularProgress size={24} color="inherit" /> : <SearchIcon />}
                 </Button>
-              </form>
+              </div>
 
               {searchResults.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
@@ -125,6 +133,23 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
                       onClick={() => setSelectedItem(item)}
                     >
                       <div className="flex justify-between items-start gap-3">
+                        {/* Product Image */}
+                        <div className="flex-shrink-0">
+                          {item.image ? (
+                            <img 
+                              src={imageLiveUrl(item.image)} 
+                              alt={item.EnglishName || item.ItemCode}
+                              className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-24 h-24 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
                              <div className="bg-blue-50 text-secondary px-2 py-0.5 rounded text-xs font-bold border border-blue-100">
@@ -154,16 +179,12 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
                               <span className="font-semibold text-gray-700 text-sm">{item.GTIN}</span>
                             </div>
                             <div className="flex flex-col">
-                               <span className="text-gray-400 text-xs uppercase tracking-wide">{t("Size")}</span>
-                               <span className="font-semibold text-gray-700 text-sm">{item.ProductSize}</span>
+                              <span className="text-gray-400 text-xs uppercase tracking-wide">{t("sole")}</span>
+                              <span className="font-semibold text-gray-700 text-sm truncate">{item.sole || '-'}</span>
                             </div>
-                            <div className="flex flex-col">
-                              <span className="text-gray-400 text-xs uppercase tracking-wide">{t("Brand")}</span>
-                              <span className="font-semibold text-gray-700 text-sm truncate">{item.BrandName || '-'}</span>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-gray-400 text-xs uppercase tracking-wide">{t("Model")}</span>
-                              <span className="font-semibold text-gray-700 text-sm truncate">{item.ModelName || '-'}</span>
+                            <div className="flex flex-col col-span-2">
+                              <span className="text-gray-400 text-xs uppercase tracking-wide">{t("Upper")}</span>
+                              <span className="font-semibold text-gray-700 text-sm truncate">{item.upper || '-'}</span>
                             </div>
                           </div>
                         </div>
