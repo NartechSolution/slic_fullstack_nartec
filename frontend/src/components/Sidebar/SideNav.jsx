@@ -83,7 +83,7 @@ function SideNav({ children }) {
                   <img
                     src={sliclogo}
                     alt="logo"
-                    className="object-contain h-28 w-full"
+                    className="object-contain h-20 w-full"
                   />
                 </Link>
               </div>
