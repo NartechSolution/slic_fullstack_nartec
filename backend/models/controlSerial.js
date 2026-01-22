@@ -780,6 +780,17 @@ class ControlSerialModel {
 
     return sizeDetails;
   }
+
+  /**
+   * Delete all control serials by PO number
+   * @param {string} poNumber - PO number
+   * @returns {Promise<Object>} - Delete result with count
+   */
+  static async deleteByPoNumber(poNumber) {
+    return await prisma.controlSerial.deleteMany({
+      where: { poNumber: poNumber },
+    });
+  }
 }
 
 module.exports = ControlSerialModel;

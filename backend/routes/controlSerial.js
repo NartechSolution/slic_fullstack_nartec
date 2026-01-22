@@ -133,6 +133,17 @@ router.post(
 );
 
 /**
+ * DELETE /api/controlSerials/bulk/by-po
+ * Body: { poNumber: string }
+ * Delete all control serials for a given PO number
+ */
+router.delete(
+  "/bulk/by-po",
+  isAuth,
+  controlSerialController.bulkDeleteByPoNumber,
+);
+
+/**
  * GET /api/controlSerials/:id
  * Get control serial by ID
  */

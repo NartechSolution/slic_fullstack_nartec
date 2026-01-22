@@ -281,7 +281,7 @@ class ItemCodeModel {
   static async findAllByGTIN(gtin) {
     return await prisma.tblItemCodes1S1Br.findMany({
       where: { GTIN: gtin },
-      orderBy: { Created_at: 'desc' }, // Most recent first
+      orderBy: { Created_at: "desc" }, // Most recent first
     });
   }
 
@@ -306,10 +306,7 @@ class ItemCodeModel {
   static async deleteWithoutBarcode() {
     return await prisma.tblItemCodes1S1Br.deleteMany({
       where: {
-        OR: [
-          { GTIN: null },
-          { GTIN: '' },
-        ],
+        OR: [{ GTIN: null }, { GTIN: "" }],
       },
     });
   }
@@ -317,10 +314,7 @@ class ItemCodeModel {
   static async countWithoutBarcode() {
     return await prisma.tblItemCodes1S1Br.count({
       where: {
-        OR: [
-          { GTIN: null },
-          { GTIN: '' },
-        ],
+        OR: [{ GTIN: null }, { GTIN: "" }],
       },
     });
   }
@@ -341,16 +335,6 @@ class ItemCodeModel {
       take: 20,
       orderBy: {
         ItemCode: "asc",
-      },
-      select: {
-        id: true,
-        ItemCode: true,
-        EnglishName: true,
-        ArabicName: true,
-        GTIN: true,
-        ProductSize: true,
-        BrandName: true,
-        ModelName: true,
       },
     });
   }
