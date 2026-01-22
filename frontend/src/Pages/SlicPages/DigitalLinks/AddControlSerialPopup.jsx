@@ -9,6 +9,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { Autocomplete, TextField, IconButton } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "react-query";
+import { useNavigate } from "react-router-dom";
 
 const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode }) => {
   const { t, i18n } = useTranslation();
@@ -17,6 +18,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
   const [loading, setLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [supplierData, setSupplierData] = useState([]);
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   
   // Array to store multiple qty-size pairs
@@ -141,8 +143,9 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
       });
       
       toast.success(response?.data?.message || t("Control serials added successfully"));
-      queryClient.invalidateQueries(['poNumbersWithQty']);
+      // queryClient.invalidateQueries(['poNumbersWithQty']);
       setLoading(false);
+      navigate('/po-number');
       handleClosePopup();
     } catch (err) {
       toast.error(err?.response?.data?.message || err?.response?.data?.error || t("Error in adding control serials"));
@@ -156,7 +159,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     <div>
       {isVisible && (
         <div className="popup-overlay z-50">
-          <div className="popup-container h-auto sm:w-[40%] w-full">
+          <div className="popup-container h-auto sm:w-[50%] w-full">
             <div
               className="popup-form w-full"
               style={{ maxHeight: "90vh", overflowY: "auto" }}

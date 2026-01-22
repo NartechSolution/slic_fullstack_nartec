@@ -27,6 +27,8 @@ import GTINBarcodePrint from "./GTINBarcodePrint";
 import { RolesContext } from "../../../Contexts/FetchRolesContext";
 import { useNavigate } from "react-router-dom";
 import UpdateImagesPopUp from "./UpdateImagesPopUp";
+import CreateControlSerials from "./CreateControlSerials";
+import AddControlSerialPopup from "../DigitalLinks/AddControlSerialPopup";
 
 const GTIN = () => {
   const { t, i18n } = useTranslation();
@@ -117,9 +119,24 @@ const GTIN = () => {
   };
 
   const handleDigitalLinks = (row) => {
-    navigate(`/po-number/${row?.GTIN}`, { 
+    navigate(`/po-number`, { 
       state: { rowData: row } 
     });
+  };
+
+  // Create Control Serials Popup Logic
+  const [isCreateControlSerialsPopupVisible, setCreateControlSerialsPopupVisibility] = useState(false);
+  const [isAddControlSerialPopupVisible, setAddControlSerialPopupVisibility] = useState(false);
+  const [selectedItemForControlSerial, setSelectedItemForControlSerial] = useState(null);
+
+  const handleShowCreateControlSerialsPopup = () => {
+    setCreateControlSerialsPopupVisibility(true);
+  };
+
+  const handleContinueToControlSerial = (item) => {
+    setSelectedItemForControlSerial(item);
+    setCreateControlSerialsPopupVisibility(false);
+    setAddControlSerialPopupVisibility(true);
   };
 
   // FG Barcode Print Handler
@@ -230,6 +247,24 @@ const GTIN = () => {
                 >
                   <RefreshIcon className={isFetching ? 'animate-spin' : ''} />
                 </IconButton>
+              </Tooltip>
+
+              {/* Create Control Serials Button - New */}
+              <Tooltip title={t("Create Control Serials")}>
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleShowCreateControlSerialsPopup}
+                    style={{ 
+                      backgroundColor: "#CFDDE0", 
+                      color: "#1D2F90",
+                      marginRight: '8px'
+                    }}
+                    startIcon={<PiBarcodeDuotone />}
+                  >
+                    {t("Create Control Serials")}
+                  </Button>
+                </span>
               </Tooltip>
 
               <Tooltip title={!canGenerateBarcode ? "You don't have permission to generate barcodes" : ""}>
@@ -376,6 +411,25 @@ const GTIN = () => {
               isVisible={isCreatePopupVisible}
               setVisibility={setCreatePopupVisibility}
               refreshGTINData={refreshGTINData}
+            />
+          )}
+
+          {isCreateControlSerialsPopupVisible && (
+            <CreateControlSerials
+              isVisible={isCreateControlSerialsPopupVisible}
+              setVisibility={setCreateControlSerialsPopupVisibility}
+              onContinue={handleContinueToControlSerial}
+            />
+          )}
+
+          {isAddControlSerialPopupVisible && (
+            <AddControlSerialPopup
+              isVisible={isAddControlSerialPopupVisible}
+              setVisibility={setAddControlSerialPopupVisibility}
+              refreshData={() => {
+                // Determine what data to refresh, maybe not needed here or use a generic refresh
+              }}
+              itemCode={selectedItemForControlSerial?.itemCode}
             />
           )}
 

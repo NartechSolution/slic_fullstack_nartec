@@ -72,7 +72,7 @@ const App = () => {
                         </ProtectedRoute>
                       }
                     /> */}
-                      <Route path="po-number/:Id" element={<PoNumberTable />} />
+                      <Route path="po-number" element={<PoNumberTable />} />
                       <Route path="controlled-serials/:Id" element={<DigitalLinks />} />
                       {/* <Route path="gtin" element={<GTIN />} /> */}
                       <Route

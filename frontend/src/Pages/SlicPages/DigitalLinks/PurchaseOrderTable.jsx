@@ -1,11 +1,7 @@
 import React, { useState } from "react";
 import { Button, CircularProgress } from "@mui/material";
 import { HiRefresh } from "react-icons/hi";
-import { IoSend } from "react-icons/io5";
 import { FaCheckCircle, FaTimesCircle } from "react-icons/fa";
-import Swal from "sweetalert2";
-import { toast } from "react-toastify";
-import newRequest from "../../../utils/userRequest";
 
 const PurchaseOrderTable = ({ 
   orders, 
@@ -19,7 +15,6 @@ const PurchaseOrderTable = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [sendingPO, setSendingPO] = useState(false);
   const itemsPerPage = 5;
 
   const ordersArray = Array.isArray(orders) ? orders : [];
@@ -36,75 +31,6 @@ const PurchaseOrderTable = ({
     setSelectedOrder(order);
     if (onViewOrder) {
       onViewOrder(order);
-    }
-  };
-
-  // Handle send by PO
-  const handleSendByPO = async () => {
-    if (!selectedOrder) {
-      toast.error("Please select a PO first");
-      return;
-    }
-
-    const poNumber = selectedOrder.poNumber;
-    const size = selectedOrder.size;
-
-    if (!poNumber) {
-      toast.error("PO Number is required");
-      return;
-    }
-
-    // Show confirmation dialog
-    const result = await Swal.fire({
-      title: 'Confirm Action',
-      text: `Are you sure you want to send control serials for PO: ${poNumber}?`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#1D2F90',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, send it!',
-      cancelButtonText: 'Cancel'
-    });
-
-    if (!result.isConfirmed) {
-      return;
-    }
-
-    setSendingPO(true);
-
-    try {
-      const response = await newRequest.post("/controlSerials/send-by-po", {
-        poNumber: poNumber,
-        size: size,
-      });
-
-      // Success notification
-      toast.success(response?.data?.message || "Control serials sent successfully");
-      
-      // Show success Swal
-      await Swal.fire({
-        title: 'Success!',
-        text: response?.data?.message || 'Control serials have been sent successfully.',
-        icon: 'success',
-        confirmButtonColor: '#1D2F90'
-      });
-
-      // Refresh the orders list
-      if (refetchOrders) {
-        await refetchOrders();
-      }
-    } catch (err) {
-      const errorMessage = err?.response?.data?.message || "Error sending control serials";
-      
-      // Show error Swal
-      await Swal.fire({
-        title: 'Error!',
-        text: errorMessage,
-        icon: 'error',
-        confirmButtonColor: '#1D2F90'
-      });
-    } finally {
-      setSendingPO(false);
     }
   };
 
@@ -204,29 +130,7 @@ const PurchaseOrderTable = ({
             }}
             className="px-4 py-2 border border-gray-300 rounded-md text-sm flex-1 sm:w-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
-          <Button 
-            onClick={handleSendByPO}
-            variant="contained"
-            disabled={!selectedOrder || sendingPO}
-            sx={{
-              backgroundColor: '#1D2F90',
-              '&:hover': {
-                backgroundColor: '#162561',
-              },
-              '&:disabled': {
-                backgroundColor: '#ccc',
-              },
-            }}
-            startIcon={
-              sendingPO ? (
-                <CircularProgress size={20} color="inherit" />
-              ) : (
-                <IoSend className="text-lg" />
-              )
-            }
-          >
-            {sendingPO ? "Sending..." : "Send Supplier"}
-          </Button>
+
           <Button 
             onClick={handleRefresh}
             variant="contained"

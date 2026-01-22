@@ -2,24 +2,25 @@ import React, { useState } from 'react';
 import { IoIosArrowBack } from "react-icons/io";
 import { useQuery } from 'react-query';
 import { toast } from 'react-toastify';
-import ProductCard from './ProductCard';
-import CodesSection from './CodesSection';
-import AddControlSerialPopup from './AddControlSerialPopup';
+// import AddControlSerialPopup from './AddControlSerialPopup';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SideNav from '../../../components/Sidebar/SideNav';
-import imageLiveUrl from '../../../utils/urlConverter/imageLiveUrl';
 import newRequest from '../../../utils/userRequest';
 import { Button, CircularProgress } from '@mui/material';
 import { HiRefresh } from 'react-icons/hi';
-import { FiPlus } from 'react-icons/fi';
+import { IoSend } from "react-icons/io5";
+import { FaEye } from "react-icons/fa";
+import Swal from "sweetalert2";
 
 const PoNumberTable = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [isAddPopupVisible, setIsAddPopupVisible] = useState(false);
+    // const [isAddPopupVisible, setIsAddPopupVisible] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
+    const [selectedPO, setSelectedPO] = useState(null);
+    const [sendingPO, setSendingPO] = useState(false);
     const itemsPerPage = 10;
 
     const rowData = location.state?.rowData;
@@ -67,6 +68,74 @@ const PoNumberTable = () => {
                 poData: poData
             }
         });
+    };
+
+    const handleSendByPO = async () => {
+        if (!selectedPO) {
+            toast.error("Please select a PO first");
+            return;
+        }
+
+        const poNumber = selectedPO.poNumber;
+        const size = rowData?.ProductSize;
+
+        if (!poNumber) {
+            toast.error("PO Number is required");
+            return;
+        }
+
+        // Show confirmation dialog
+        const result = await Swal.fire({
+            title: 'Confirm Action',
+            text: `Are you sure you want to send control serials for PO: ${poNumber}?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#1D2F90',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, send it!',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        setSendingPO(true);
+
+        try {
+            const response = await newRequest.post("/controlSerials/send-by-po", {
+                poNumber: poNumber,
+                size: size,
+            });
+
+            // Success notification
+            toast.success(response?.data?.message || "Control serials sent successfully");
+            
+            // Show success Swal
+            await Swal.fire({
+                title: 'Success!',
+                text: response?.data?.message || 'Control serials have been sent successfully.',
+                icon: 'success',
+                confirmButtonColor: '#1D2F90'
+            });
+
+            // Refresh the orders list
+            await refetch();
+            setSelectedPO(null);
+            
+        } catch (err) {
+            const errorMessage = err?.response?.data?.message || "Error sending control serials";
+            
+            // Show error Swal
+            await Swal.fire({
+                title: 'Error!',
+                text: errorMessage,
+                icon: 'error',
+                confirmButtonColor: '#1D2F90'
+            });
+        } finally {
+            setSendingPO(false);
+        }
     };
 
     // Filtering
@@ -147,8 +216,7 @@ const PoNumberTable = () => {
 
                 <div className="p-6 bg-gray-50 min-h-screen">
                     <div className="max-w-7xl mx-auto space-y-6">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Left Column - Product Card */}
+                        {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div>
                                 <ProductCard
                                     imageUrl={imageLiveUrl(rowData?.image)}
@@ -160,11 +228,10 @@ const PoNumberTable = () => {
                                 />
                             </div>
 
-                            {/* Right Column - QR Code and Barcode Stacked */}
                             <div>
                                 <CodesSection gtin={rowData?.GTIN || ""} />
                             </div>
-                        </div>
+                        </div> */}
 
                         {/* PO Table Section */}
                         <div className="bg-white rounded-lg shadow-sm">
@@ -187,6 +254,29 @@ const PoNumberTable = () => {
                                         className="px-4 py-2 border border-gray-300 rounded-md text-sm flex-1 sm:w-80 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                     <Button 
+                                        onClick={handleSendByPO}
+                                        variant="contained"
+                                        disabled={!selectedPO || sendingPO}
+                                        sx={{
+                                            backgroundColor: '#1D2F90',
+                                            '&:hover': {
+                                                backgroundColor: '#162561',
+                                            },
+                                            '&:disabled': {
+                                                backgroundColor: '#ccc',
+                                            },
+                                        }}
+                                        startIcon={
+                                            sendingPO ? (
+                                                <CircularProgress size={20} color="inherit" />
+                                            ) : (
+                                                <IoSend className="text-lg" />
+                                            )
+                                        }
+                                    >
+                                        {sendingPO ? "Sending..." : "Send Supplier"}
+                                    </Button>
+                                    {/* <Button 
                                         onClick={() => setIsAddPopupVisible(true)}
                                         variant="contained"
                                         sx={{
@@ -201,7 +291,7 @@ const PoNumberTable = () => {
                                         endIcon={<FiPlus className="w-4 h-4" />}
                                       >
                                         Add Serial
-                                    </Button>
+                                    </Button> */}
                                     <Button 
                                       onClick={handleRefresh}
                                       variant="contained"
@@ -246,6 +336,7 @@ const PoNumberTable = () => {
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Code</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
@@ -259,23 +350,39 @@ const PoNumberTable = () => {
                                             currentPOs.map((po) => (
                                                 <tr
                                                     key={po.id}
-                                                    onClick={() => handleNavigateToDigitalLinks(po)}
-                                                    className="hover:bg-blue-50 cursor-pointer transition-colors"
+                                                    onClick={() => setSelectedPO(po)}
+                                                    className={`cursor-pointer transition-colors ${
+                                                        selectedPO?.id === po.id 
+                                                            ? 'bg-blue-100 border-l-4 border-l-blue-600' 
+                                                            : 'hover:bg-blue-50'
+                                                    }`}
                                                 >
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                                                         {po.poNumber}
                                                     </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {po.totalQty}
                                                     </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {po.product?.ItemCode || "N/A"}
                                                     </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {po.supplier?.name || "N/A"}
                                                     </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {new Date(po.createdAt).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleNavigateToDigitalLinks(po);
+                                                            }}
+                                                            className="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50 transition-colors"
+                                                            title="View"
+                                                        >
+                                                            <FaEye className="w-5 h-5" />
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))
@@ -329,13 +436,13 @@ const PoNumberTable = () => {
                 </div>
 
                 {/* Add Control Serial Popup */}
-                <AddControlSerialPopup
+                {/* <AddControlSerialPopup
                     isVisible={isAddPopupVisible}
                     setVisibility={setIsAddPopupVisible}
                     itemCode={rowData?.ItemCode}
                     size={rowData?.ProductSize}
                     refreshData={refetch}
-                />
+                /> */}
             </SideNav>
         </div>
     );
