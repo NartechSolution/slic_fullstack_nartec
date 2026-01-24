@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { Button, CircularProgress } from "@mui/material";
-import { HiRefresh } from "react-icons/hi";
+import { HiRefresh, HiTrash } from "react-icons/hi";
+import Swal from 'sweetalert2';
+import { toast } from 'react-toastify';
+import newRequest from '../../../utils/userRequest';
 
 const PurchaseOrderTable = ({ 
   orders, 
@@ -30,6 +33,39 @@ const PurchaseOrderTable = ({
     setSelectedOrder(order);
     if (onViewOrder) {
       onViewOrder(order);
+    }
+  };
+
+  const handleDelete = async (poNumber) => {
+    try {
+      const result = await Swal.fire({
+        title: 'Are you sure?',
+        text: `You want to delete all serials for PO: ${poNumber}?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete it!'
+      });
+
+      if (result.isConfirmed) {
+        await newRequest.delete('/controlSerials/bulk/by-po', { 
+            data: { poNumber } 
+        });
+        
+        // Show success message
+        Swal.fire(
+          'Deleted!',
+          `All serials for PO ${poNumber} have been deleted.`,
+          'success'
+        );
+        
+        // Refresh the table
+        handleRefresh();
+      }
+    } catch (err) {
+      // console.error(err);
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || "Failed to delete serials");
     }
   };
 
@@ -156,7 +192,7 @@ const PurchaseOrderTable = ({
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">PO Number</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Qty</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created Serials</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ItemCode</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
@@ -201,6 +237,22 @@ const PurchaseOrderTable = ({
                           }}
                         >
                           Update
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color="error"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(order.poNumber);
+                          }}
+                          sx={{
+                            ml: 1, // Add margin left
+                            minWidth: '40px',
+                            padding: '4px 8px'
+                          }}
+                        >
+                          <HiTrash className="text-lg" />
                         </Button>
                       </td>
                     </tr>
