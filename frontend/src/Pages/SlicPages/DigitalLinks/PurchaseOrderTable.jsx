@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Button, CircularProgress } from "@mui/material";
-import { HiRefresh, HiTrash } from "react-icons/hi";
+import { HiRefresh } from "react-icons/hi";
+import { FiEdit2, FiTrash2 } from "react-icons/fi";
 import Swal from 'sweetalert2';
 import { toast } from 'react-toastify';
 import newRequest from '../../../utils/userRequest';
@@ -17,6 +18,7 @@ const PurchaseOrderTable = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const itemsPerPage = 5;
 
   const ordersArray = Array.isArray(orders) ? orders : [];
@@ -36,11 +38,12 @@ const PurchaseOrderTable = ({
     }
   };
 
-  const handleDelete = async (poNumber) => {
+  const handleDelete = async (item) => {
+    setDeletingId(item.poNumber);
     try {
       const result = await Swal.fire({
         title: 'Are you sure?',
-        text: `You want to delete all serials for PO: ${poNumber}?`,
+        text: `You want to delete all serials for PO: ${item?.poNumber}?`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#3085d6',
@@ -50,13 +53,16 @@ const PurchaseOrderTable = ({
 
       if (result.isConfirmed) {
         await newRequest.delete('/controlSerials/bulk/by-po', { 
-            data: { poNumber } 
+          data: { 
+            poNumber: item?.poNumber,
+            size: item?.size
+          } 
         });
         
         // Show success message
         Swal.fire(
           'Deleted!',
-          `All serials for PO ${poNumber} have been deleted.`,
+          `All serials for PO ${item?.poNumber} have been deleted.`,
           'success'
         );
         
@@ -64,8 +70,9 @@ const PurchaseOrderTable = ({
         handleRefresh();
       }
     } catch (err) {
-      // console.error(err);
       toast.error(err?.response?.data?.message || err?.response?.data?.error || "Failed to delete serials");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -195,13 +202,13 @@ const PurchaseOrderTable = ({
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created Serials</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ItemCode</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {currentOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
                       No Records found
                     </td>
                   </tr>
@@ -220,40 +227,33 @@ const PurchaseOrderTable = ({
                       <td className="px-4 py-3 text-sm text-gray-600">{order.ItemCode || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{order.supplierName || 'N/A'}</td>
                       <td className="px-4 py-3">
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if(onUpdateSerial) onUpdateSerial(order);
-                          }}
-                          sx={{
-                            color: '#1D2F90',
-                            borderColor: '#1D2F90',
-                            '&:hover': {
-                              borderColor: '#162561',
-                              backgroundColor: 'rgba(29, 47, 144, 0.04)',
-                            }
-                          }}
-                        >
-                          Update
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          color="error"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(order.poNumber);
-                          }}
-                          sx={{
-                            ml: 1, // Add margin left
-                            minWidth: '40px',
-                            padding: '4px 8px'
-                          }}
-                        >
-                          <HiTrash className="text-lg" />
-                        </Button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if(onUpdateSerial) onUpdateSerial(order);
+                            }}
+                            className="p-1.5 text-secondary hover:bg-blue-50 rounded-md transition-colors"
+                            title="Update"
+                          >
+                            <FiEdit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(order);
+                            }}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Delete"
+                            disabled={deletingId === order.poNumber}
+                          >
+                            {deletingId === order.poNumber ? (
+                              <CircularProgress size={16} sx={{ color: '#dc2626' }} />
+                            ) : (
+                              <FiTrash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
