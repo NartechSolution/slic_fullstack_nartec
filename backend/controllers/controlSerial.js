@@ -1060,10 +1060,12 @@ exports.getUniquePONumbersWithTotalQty = async (req, res, next) => {
       req.query.isArchived !== undefined
         ? req.query.isArchived === "true"
         : null;
+    const supplierId = req.query.supplierId || null;
 
     // Get unique PO numbers with totalQty and isSentToSupplier (optimized single query)
     const posWithDetails = await ControlSerialModel.getUniquePONumbersWithTotalQty(
-      isArchived
+      isArchived,
+      supplierId
     );
 
     if (!posWithDetails || posWithDetails.length === 0) {
