@@ -653,12 +653,12 @@ exports.updateSizeByPO = async (req, res, next) => {
 };
 
 /**
- * DELETE - Bulk delete all control serials by PO number
- * Body: { poNumber: string }
+ * DELETE - Bulk delete control serials by PO number and optional size
+ * Body: { poNumber: string, size?: string }
  */
 exports.bulkDeleteByPoNumber = async (req, res, next) => {
   try {
-    const { poNumber } = req.body;
+    const { poNumber, size } = req.body;
 
     if (!poNumber) {
       const error = new CustomError("PO number is required");
@@ -666,31 +666,38 @@ exports.bulkDeleteByPoNumber = async (req, res, next) => {
       throw error;
     }
 
-    // Check if any control serials exist for this PO number
+    // Check if any control serials exist for this PO number and size
     const existingSerials = await ControlSerialModel.findByPoNumber(
       poNumber,
       true, // include archived
-      null  // all sizes
+      size || null  // filter by size if provided
     );
 
     if (!existingSerials || existingSerials.length === 0) {
       const error = new CustomError(
-        "No control serials found for the given PO number"
+        size
+          ? `No control serials found for PO number: ${poNumber} and size: ${size}`
+          : `No control serials found for PO number: ${poNumber}`
       );
       error.statusCode = 404;
       throw error;
     }
 
-    // Delete all control serials for this PO number
-    const result = await ControlSerialModel.deleteByPoNumber(poNumber);
+    // Delete control serials for this PO number (and size if provided)
+    const result = await ControlSerialModel.deleteByPoNumberAndSize(poNumber, size || null);
+
+    const message = size
+      ? `${result.count} control serial(s) deleted successfully for PO number: ${poNumber} and size: ${size}`
+      : `${result.count} control serial(s) deleted successfully for PO number: ${poNumber}`;
 
     res.status(200).json(
       generateResponse(
         200,
         true,
-        `${result.count} control serial(s) deleted successfully for PO number: ${poNumber}`,
+        message,
         {
           poNumber,
+          size: size || null,
           deletedCount: result.count,
         }
       )
