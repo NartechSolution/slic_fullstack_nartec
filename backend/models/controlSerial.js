@@ -541,13 +541,18 @@ class ControlSerialModel {
    * Get unique PO numbers with combined total qty, isSentToSupplier status
    * Optimized: Uses groupBy for aggregation and fetches details in parallel
    * @param {boolean} isArchived - Filter by archived status (optional)
+   * @param {string} supplierId - Filter by supplier ID (optional)
    * @returns {Promise<Array>} - Array of unique PO numbers with details, totalQty, isSentToSupplier
    */
-  static async getUniquePONumbersWithTotalQty(isArchived = null) {
+  static async getUniquePONumbersWithTotalQty(isArchived = null, supplierId = null) {
     const where = {};
 
     if (isArchived !== null && typeof isArchived === "boolean") {
       where.isArchived = isArchived;
+    }
+
+    if (supplierId) {
+      where.supplierId = supplierId;
     }
 
     // Step 1: Get aggregated data per PO number (totalQty and sent counts)
