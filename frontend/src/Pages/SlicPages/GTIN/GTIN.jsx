@@ -367,17 +367,17 @@ const GTIN = () => {
                     ),
                     action: handleShowUpdatePopup,
                   },
-                  {
-                    label: t("Digital Links"),
-                    icon: (
-                      <LinkIcon
-                        fontSize="small"
-                        color="action"
-                        style={{ color: "rgb(37 99 235)" }}
-                      />
-                    ),
-                    action: handleDigitalLinks,
-                  },
+                  // {
+                  //   label: t("Digital Links"),
+                  //   icon: (
+                  //     <LinkIcon
+                  //       fontSize="small"
+                  //       color="action"
+                  //       style={{ color: "rgb(37 99 235)" }}
+                  //     />
+                  //   ),
+                  //   action: handleDigitalLinks,
+                  // },
                   {
                     label: t("Delete"),
                     icon: (
