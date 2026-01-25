@@ -666,17 +666,20 @@ exports.bulkDeleteByPoNumber = async (req, res, next) => {
       throw error;
     }
 
+    // Normalize size - treat empty string as null
+    const normalizedSize = size && size.trim() !== "" ? size.trim() : null;
+
     // Check if any control serials exist for this PO number and size
     const existingSerials = await ControlSerialModel.findByPoNumber(
       poNumber,
       true, // include archived
-      size || null  // filter by size if provided
+      normalizedSize
     );
 
     if (!existingSerials || existingSerials.length === 0) {
       const error = new CustomError(
-        size
-          ? `No control serials found for PO number: ${poNumber} and size: ${size}`
+        normalizedSize
+          ? `No control serials found for PO number: ${poNumber} and size: ${normalizedSize}`
           : `No control serials found for PO number: ${poNumber}`
       );
       error.statusCode = 404;
@@ -684,10 +687,10 @@ exports.bulkDeleteByPoNumber = async (req, res, next) => {
     }
 
     // Delete control serials for this PO number (and size if provided)
-    const result = await ControlSerialModel.deleteByPoNumberAndSize(poNumber, size || null);
+    const result = await ControlSerialModel.deleteByPoNumberAndSize(poNumber, normalizedSize);
 
-    const message = size
-      ? `${result.count} control serial(s) deleted successfully for PO number: ${poNumber} and size: ${size}`
+    const message = normalizedSize
+      ? `${result.count} control serial(s) deleted successfully for PO number: ${poNumber} and size: ${normalizedSize}`
       : `${result.count} control serial(s) deleted successfully for PO number: ${poNumber}`;
 
     res.status(200).json(
@@ -697,7 +700,7 @@ exports.bulkDeleteByPoNumber = async (req, res, next) => {
         message,
         {
           poNumber,
-          size: size || null,
+          size: normalizedSize,
           deletedCount: result.count,
         }
       )
