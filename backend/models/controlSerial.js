@@ -806,9 +806,12 @@ class ControlSerialModel {
   static async deleteByPoNumberAndSize(poNumber, size = null) {
     const where = { poNumber: poNumber };
 
-    if (size) {
+    // Only add size filter if size is provided and not empty
+    if (size !== null && size !== undefined && size !== "") {
       where.size = size;
     }
+
+    console.log("Deleting with where:", JSON.stringify(where));
 
     return await prisma.controlSerial.deleteMany({
       where: where,
