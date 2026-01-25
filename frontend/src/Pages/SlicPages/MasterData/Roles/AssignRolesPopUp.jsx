@@ -17,12 +17,12 @@ const AssignRolesPopUp = ({ isVisible, setVisibility, refreshRolesData }) => {
   const [loading, setLoading] = useState(false);
   const memberDataString = sessionStorage.getItem('slicUserData');
   const memberData = JSON.parse(memberDataString);
-  // console.log(memberData)
-    const hasFetchedRef = useRef(false);
+  const hasFetchedRef = useRef(false);
   
   const handleCloseCreatePopup = () => {
     setVisibility(false);
   };
+  
   // get this session data
   const updateProductsData = JSON.parse(sessionStorage.getItem("updateUserData"));
 
@@ -31,41 +31,56 @@ const AssignRolesPopUp = ({ isVisible, setVisibility, refreshRolesData }) => {
     try {
       const response = await newRequest.get("/roles/v1/get-all-roles");
       if (response?.data?.success) {
-        setRolesTypes(response?.data?.data); // Set roles to state
+        setRolesTypes(response?.data?.data);
       } else {
         toast.error("Failed to fetch roles");
       }
     } catch (err) {
-      // console.error("Error fetching roles:", error);
       toast.error(err?.response?.data?.message || err?.response?.data?.error || "Error fetching roles");
     }
   };
 
+  // Fetch user's assigned roles from the API
+  const fetchAssignedRoles = async (email) => {
+    try {
+      const response = await newRequest.get(`/roles/v1/user-roles/${email}`);
+      if (response?.data?.success) {
+        setSelectedRoles(response?.data?.data);
+      } else {
+        toast.info(response?.data?.message || "No roles assigned to this user");
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Error fetching user's assigned roles");
+    }
+  };
 
   useEffect(() => {
     setEmail(updateProductsData?.UserLoginID);
     
     if (!hasFetchedRef.current) {
       fetchRoles();
+      if (updateProductsData?.UserLoginID) {
+        fetchAssignedRoles(updateProductsData?.UserLoginID);
+      }
       hasFetchedRef.current = true;
     }
   }, []);
 
+  // Filter out already assigned roles from the dropdown
+  const availableRoles = rolesTypes.filter(
+    (role) => !selectedRoles.some((selectedRole) => selectedRole.RoleID === role.RoleID)
+  );
 
   const handleRolesTypesChange = (event, value) => {
     setSelectedRoles(value);
-    // console.log(value);
-    setSelectAll(false); // Uncheck "Select All" when individual options are selected/deselected
+    setSelectAll(false);
   };
 
- 
   const handleSelectAllChange = (event) => {
     const isChecked = event.target.checked;
-    // If "Select All" is checked, set all options as selected; otherwise, clear selections
-    setSelectedRoles(isChecked ? rolesTypes : []);
+    setSelectedRoles(isChecked ? availableRoles : []);
     setSelectAll(isChecked);
   };
-
 
   const handleAddRoles = async (e) => {
     e.preventDefault();
@@ -74,27 +89,23 @@ const AssignRolesPopUp = ({ isVisible, setVisibility, refreshRolesData }) => {
       const requestBody = {
         userLoginID: email,
         roleNames: selectedRoles.map((role) => role.RoleName),
-        // roleName: selectedRoles?.RoleName,
       };
-        // console.log(requestBody);
 
       const response = await newRequest.post('roles/v1/assign-roles', requestBody, {
         headers: {
           Authorization: `Bearer ${memberData?.data?.token}`,
         }
       });
-      // console.log(response?.data);
       toast.success(response?.data?.message || "Role Assigned successfully");
       setLoading(false);
       handleCloseCreatePopup();
       refreshRolesData();
+      fetchAssignedRoles(email);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Error in adding User");
-      // console.log(error);
       setLoading(false);
     }
   };
-
 
   return (
     <div>
@@ -142,50 +153,49 @@ const AssignRolesPopUp = ({ isVisible, setVisibility, refreshRolesData }) => {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder={t("Enter your Email")}
-                           className={`border w-full rounded-md border-secondary placeholder:text-secondary p-2 mb-3  ${
+                          className={`border w-full rounded-md border-secondary placeholder:text-secondary p-2 mb-3  ${
                             i18n.language === "ar" ? "text-end" : "text-start"
                           }`}
                           required
                         />
                       </div>
                     </div>
-                      <div className="w-full font-body sm:text-base text-sm flex flex-col gap-0">
-                        <label htmlFor="SelectRoles" className={`text-secondary ${
-                            i18n.language === "ar" ? "text-end" : "text-start"
-                          }`}>
-                          {t("User Roles")} 
+                    <div className="w-full font-body sm:text-base text-sm flex flex-col gap-0">
+                      <label htmlFor="SelectRoles" className={`text-secondary ${
+                          i18n.language === "ar" ? "text-end" : "text-start"
+                        }`}>
+                        {t("User Roles")} 
+                      </label>
+                      <Autocomplete
+                        multiple
+                        id='SelectRoles'
+                        options={availableRoles}
+                        getOptionLabel={(option) => option.RoleName}
+                        value={selectedRoles}
+                        onChange={handleRolesTypesChange}
+                        filterSelectedOptions
+                        renderInput={(params) => (
+                          <TextField
+                            autoComplete="off"
+                            {...params}
+                            label={t('Select Roles')}
+                            placeholder={'Select Roles'}
+                            variant='outlined'
+                          />
+                        )}
+                        required
+                      />
+                      <div className={`${i18n.language === "ar" ? "direction-rtl" : "direction-ltr" }`}>
+                        <label>
+                          <input
+                            type='checkbox'
+                            checked={selectAll}
+                            onChange={handleSelectAllChange}
+                          />
+                          {t("Select All")}
                         </label>
-                        <Autocomplete
-                            multiple
-                            id='SelectRoles'
-                            options={rolesTypes}
-                            getOptionLabel={(option) => option.RoleName}
-                            value={selectedRoles}
-                            onChange={handleRolesTypesChange}
-                            filterSelectedOptions
-                            renderInput={(params) => (
-                            <TextField
-                                autoComplete="off"
-                                {...params}
-                                label={t('Select Roles')}
-                                placeholder={'Select Roles'}
-                                variant='outlined'
-                                
-                            />
-                            )}
-                            required
-                        />
-                        <div className={`${i18n.language === "ar" ? "direction-rtl" : "direction-ltr" }`}>
-                            <label>
-                            <input
-                                type='checkbox'
-                                checked={selectAll}
-                                onChange={handleSelectAllChange}
-                            />
-                            {t("Select All")}
-                            </label>
-                        </div>
                       </div>
+                    </div>
 
                     <div className="mt-5">
                       <Button

@@ -97,6 +97,7 @@ const DigitalLinks = () => {
     color: serial.product?.color || 'N/A',
     status: 'Available',
     product: serial.product,
+    isSentToSupplier: serial.isSentToSupplier || 'N/A',
     supplierName: serial.supplier?.name || 'N/A',
     supplierEmail: serial.supplier?.email || 'N/A',
   }));

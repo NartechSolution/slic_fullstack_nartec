@@ -1,8 +1,8 @@
 import React, { useState, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { FiEdit2, FiTrash2, FiPlus, FiPrinter } from "react-icons/fi";
+import { FiEdit2, FiTrash2, FiPlus, FiPrinter, FiLock } from "react-icons/fi";
 import { HiRefresh } from "react-icons/hi";
-import { Button, CircularProgress } from "@mui/material";
+import { Button, CircularProgress, Tooltip } from "@mui/material";
 import { toast } from "react-toastify";
 import newRequest from "../../../utils/userRequest";
 import EditControlSerialPopup from "./EditControlSerialPopup";
@@ -43,9 +43,15 @@ const DigitalLinkTable = ({
   };
 
   const handleDelete = async (serial) => {
+    // Check if already sent to supplier
+    if (serial.isSentToSupplier) {
+      toast.warning('Cannot delete: This serial has already been sent to supplier');
+      return;
+    }
+
     setDeletingId(serial.id);
     try {
-     const res = await newRequest.delete(`/controlSerials/${serial.id}`);
+      const res = await newRequest.delete(`/controlSerials/${serial.id}`);
       toast.success(res?.data?.message || "Control serial deleted successfully");
       refetchSerials();
     } catch (err) {
@@ -56,6 +62,12 @@ const DigitalLinkTable = ({
   };
 
   const handleEdit = (serial) => {
+    // Check if already sent to supplier
+    if (serial.isSentToSupplier) {
+      toast.warning('Cannot edit: This serial has already been sent to supplier');
+      return;
+    }
+
     setSelectedSerial(serial);
     setIsEditPopupVisible(true);
   };
@@ -183,22 +195,6 @@ const DigitalLinkTable = ({
               Print Labels ({selectedRows.length})
             </Button>
           )}
-          {/* <Button 
-            onClick={onAddSerial}
-            variant="contained"
-            sx={{
-              backgroundColor: '#008000',
-              '&:hover': {
-                backgroundColor: '#006600',
-              },
-              '&:disabled': {
-                backgroundColor: '#ccc',
-              },
-            }}
-            endIcon={<FiPlus className="w-4 h-4" />}
-          >
-            Add Serial
-          </Button> */}
           <Button 
             onClick={handleRefresh}
             variant="contained"
@@ -252,19 +248,17 @@ const DigitalLinkTable = ({
                       />
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">PO Number</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier Name</th>
-                  {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier Email</th> */}
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Serial Number</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Item Code</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Item Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">GTIN</th>
-                  {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">upper</th> */}
-                  {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">sole</th> */}
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">width</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">color</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">QR Code</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">PO Number</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Supplier Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Serial Number</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Item Code</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Item Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">GTIN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Width</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Color</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">QR Code</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
@@ -291,7 +285,7 @@ const DigitalLinkTable = ({
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium truncate ${
                           serial.poNumber === 'Available' 
                             ? 'bg-gray-100 text-green-800' 
                             : 'bg-green-100 text-gray-800'
@@ -299,42 +293,74 @@ const DigitalLinkTable = ({
                           {serial.poNumber || 'N/A'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 font-medium">{serial.supplierName || 'N/A'}</td>
-                      {/* <td className="px-4 py-3 text-sm text-gray-900 font-medium">{serial.supplierEmail || 'N/A'}</td> */}
-                      <td className="px-4 py-3 text-sm text-gray-900 font-medium">{serial.serialNumber || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{serial.ItemCode || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{serial.itemName || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{serial.gtin || 'N/A'}</td>
-                      {/* <td className="px-4 py-3 text-sm text-gray-600">{serial.upper || 'N/A'}</td> */}
-                      {/* <td className="px-4 py-3 text-sm text-gray-600">{serial.sole || 'N/A'}</td> */}
-                      <td className="px-4 py-3 text-sm text-gray-600">{serial.width || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{serial.color || ''}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-sm text-gray-900 font-medium truncate">{serial.supplierName || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 font-medium truncate">{serial.serialNumber || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 truncate">{serial.ItemCode || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 truncate">{serial.itemName || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 truncate">{serial.gtin || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 truncate">{serial.width || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 truncate">{serial.color || ''}</td>
+                      <td className="px-4 py-3 truncate">
+                        {serial.isSentToSupplier ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <FiLock className="w-3 h-3" />
+                            Sent
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Draft
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 truncate">
                         {serial.serialNumber && (
                           <QRCodeSVG value={serial.serialNumber} size={32} />
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 truncate">
                         <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleEdit(serial)}
-                            className="p-1.5 text-secondary hover:bg-blue-50 rounded-md transition-colors"
-                            title="Edit"
+                          <Tooltip 
+                            title={serial.isSentToSupplier ? "Cannot edit: Already sent to supplier" : "Edit"} 
+                            arrow
                           >
-                            <FiEdit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(serial)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Delete"
-                            disabled={deletingId === serial.id}
+                            <span>
+                              <button
+                                onClick={() => handleEdit(serial)}
+                                disabled={serial.isSentToSupplier}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                  serial.isSentToSupplier 
+                                    ? 'text-gray-400 cursor-not-allowed opacity-50' 
+                                    : 'text-secondary hover:bg-blue-50'
+                                }`}
+                                title={serial.isSentToSupplier ? "Cannot edit: Already sent to supplier" : "Edit"}
+                              >
+                                <FiEdit2 className="w-4 h-4" />
+                              </button>
+                            </span>
+                          </Tooltip>
+                          <Tooltip 
+                            title={serial.isSentToSupplier ? "Cannot delete: Already sent to supplier" : "Delete"} 
+                            arrow
                           >
-                            {deletingId === serial.id ? (
-                              <CircularProgress size={16} sx={{ color: '#dc2626' }} />
-                            ) : (
-                              <FiTrash2 className="w-4 h-4" />
-                            )}
-                          </button>
+                            <span>
+                              <button
+                                onClick={() => handleDelete(serial)}
+                                disabled={serial.isSentToSupplier || deletingId === serial.id}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                  serial.isSentToSupplier 
+                                    ? 'text-gray-400 cursor-not-allowed opacity-50' 
+                                    : 'text-red-600 hover:bg-red-50'
+                                }`}
+                                title={serial.isSentToSupplier ? "Cannot delete: Already sent to supplier" : "Delete"}
+                              >
+                                {deletingId === serial.id ? (
+                                  <CircularProgress size={16} sx={{ color: '#dc2626' }} />
+                                ) : (
+                                  <FiTrash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </span>
+                          </Tooltip>
                         </div>
                       </td>
                     </tr>

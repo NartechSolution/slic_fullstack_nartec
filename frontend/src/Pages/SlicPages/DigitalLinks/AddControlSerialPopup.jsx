@@ -26,10 +26,10 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     { id: 1, size: "", qty: 10 }
   ]);
 
-  // Generate size options from 31 to 49
-  const sizeOptions = Array.from({ length: 19 }, (_, i) => ({
-    label: `${31 + i}`,
-    value: `${31 + i}`
+  // Generate size options from 30 to 49
+  const sizeOptions = Array.from({ length: 21 }, (_, i) => ({
+    label: `${30 + i}`,
+    value: `${30 + i}`
   }));
 
   const handleClosePopup = () => {
