@@ -75,7 +75,7 @@ const App = () => {
                       <Route
                         path="po-number"
                         element={
-                          <ProtectedRoute requiredRoles="po_number">
+                          <ProtectedRoute requiredRoles="create_serial">
                             <PoNumberTable />
                           </ProtectedRoute>
                         }
