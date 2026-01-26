@@ -660,6 +660,11 @@ exports.bulkDeleteByPoNumber = async (req, res, next) => {
   try {
     const { poNumber, size } = req.body;
 
+    console.log("=== BULK DELETE DEBUG ===");
+    console.log("req.body:", JSON.stringify(req.body));
+    console.log("poNumber:", poNumber, "type:", typeof poNumber);
+    console.log("size:", size, "type:", typeof size);
+
     if (!poNumber) {
       const error = new CustomError("PO number is required");
       error.statusCode = 400;
@@ -668,6 +673,7 @@ exports.bulkDeleteByPoNumber = async (req, res, next) => {
 
     // Normalize size - treat empty string as null
     const normalizedSize = size && size.trim() !== "" ? size.trim() : null;
+    console.log("normalizedSize:", normalizedSize);
 
     // Check if any control serials exist for this PO number and size
     const existingSerials = await ControlSerialModel.findByPoNumber(
