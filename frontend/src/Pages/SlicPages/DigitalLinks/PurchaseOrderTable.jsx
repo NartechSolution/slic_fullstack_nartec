@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Button, CircularProgress } from "@mui/material";
+import { Button, CircularProgress, Tooltip } from "@mui/material";
 import { HiRefresh } from "react-icons/hi";
-import { FiEdit2, FiTrash2 } from "react-icons/fi";
+import { FiEdit2, FiTrash2, FiLock } from "react-icons/fi";
 import Swal from 'sweetalert2';
 import { toast } from 'react-toastify';
 import newRequest from '../../../utils/userRequest';
@@ -39,6 +39,12 @@ const PurchaseOrderTable = ({
   };
 
   const handleDelete = async (item) => {
+    // Check if already sent to supplier
+    if (item.isSentToSupplier) {
+      toast.warning('Cannot delete: This PO has already been sent to supplier');
+      return;
+    }
+
     setDeletingId(item.poNumber);
     try {
       const result = await Swal.fire({
@@ -73,6 +79,20 @@ const PurchaseOrderTable = ({
       toast.error(err?.response?.data?.message || err?.response?.data?.error || "Failed to delete serials");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleEdit = (e, order) => {
+    e.stopPropagation();
+    
+    // Check if already sent to supplier
+    if (order.isSentToSupplier) {
+      toast.warning('Cannot edit: This PO has already been sent to supplier');
+      return;
+    }
+    
+    if (onUpdateSerial) {
+      onUpdateSerial(order);
     }
   };
 
@@ -194,7 +214,7 @@ const PurchaseOrderTable = ({
       {!isLoading && (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full truncate">
               <thead className="bg-gray-50 border-y border-gray-200">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">PO Number</th>
@@ -202,13 +222,14 @@ const PurchaseOrderTable = ({
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created Serials</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ItemCode</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {currentOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
                       No Records found
                     </td>
                   </tr>
@@ -227,32 +248,64 @@ const PurchaseOrderTable = ({
                       <td className="px-4 py-3 text-sm text-gray-600">{order.ItemCode || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{order.supplierName || 'N/A'}</td>
                       <td className="px-4 py-3">
+                        {order.isSentToSupplier ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <FiLock className="w-3 h-3" />
+                            Sent to Supplier
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Draft
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if(onUpdateSerial) onUpdateSerial(order);
-                            }}
-                            className="p-1.5 text-secondary hover:bg-blue-50 rounded-md transition-colors"
-                            title="Update"
+                          <Tooltip 
+                            title={order.isSentToSupplier ? "Cannot edit: Already sent to supplier" : "Edit"} 
+                            arrow
                           >
-                            <FiEdit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(order);
-                            }}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Delete"
-                            disabled={deletingId === order.poNumber}
+                            <span>
+                              <button
+                                onClick={(e) => handleEdit(e, order)}
+                                disabled={order.isSentToSupplier}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                  order.isSentToSupplier 
+                                    ? 'text-gray-400 cursor-not-allowed opacity-50' 
+                                    : 'text-secondary hover:bg-blue-50'
+                                }`}
+                                title={order.isSentToSupplier ? "Cannot edit: Already sent to supplier" : "Update"}
+                              >
+                                <FiEdit2 className="w-4 h-4" />
+                              </button>
+                            </span>
+                          </Tooltip>
+                          <Tooltip 
+                            title={order.isSentToSupplier ? "Cannot delete: Already sent to supplier" : "Delete"} 
+                            arrow
                           >
-                            {deletingId === order.poNumber ? (
-                              <CircularProgress size={16} sx={{ color: '#dc2626' }} />
-                            ) : (
-                              <FiTrash2 className="w-4 h-4" />
-                            )}
-                          </button>
+                            <span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(order);
+                                }}
+                                disabled={order.isSentToSupplier || deletingId === order.poNumber}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                  order.isSentToSupplier 
+                                    ? 'text-gray-400 cursor-not-allowed opacity-50' 
+                                    : 'text-red-600 hover:bg-red-50'
+                                }`}
+                                title={order.isSentToSupplier ? "Cannot delete: Already sent to supplier" : "Delete"}
+                              >
+                                {deletingId === order.poNumber ? (
+                                  <CircularProgress size={16} sx={{ color: '#dc2626' }} />
+                                ) : (
+                                  <FiTrash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </span>
+                          </Tooltip>
                         </div>
                       </td>
                     </tr>
