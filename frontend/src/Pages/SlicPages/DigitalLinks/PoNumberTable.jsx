@@ -42,7 +42,7 @@ const PoNumberTable = () => {
         refetchOnWindowFocus: false,
         retry: false,
         onError: (err) => {
-            toast.error(err?.response?.data?.error || err?.response?.data?.message || "Failed to load PO numbers");
+            toast.error(err?.response?.data?.message || err?.response?.data?.error || "NO PO available yet");
         },
     });
 

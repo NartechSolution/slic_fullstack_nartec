@@ -69,7 +69,7 @@ const DigitalLinks = () => {
     refetchOnWindowFocus: false,
     retry: false,
     onError: (err) => {
-      toast.error(err?.response?.data?.error || err?.response?.data?.message || "Failed to load control serials");
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || "Failed to load control serials");
     },
   });
 
