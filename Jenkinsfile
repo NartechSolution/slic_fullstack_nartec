@@ -45,6 +45,20 @@ pipeline {
             }
         }
 
+        stage('🛑 Stop Existing Backend') {
+            steps {
+                script {
+                    echo "🛑 Stopping PM2 process: ${env.APP_NAME}"
+                    bat(script: "pm2 stop ${env.APP_NAME}", returnStatus: true)
+                    bat(script: "pm2 delete ${env.APP_NAME}", returnStatus: true)
+                    
+                    // Give PM2 time to fully release file locks
+                    echo "⏳ Waiting for PM2 to fully stop and release file locks..."
+                    sleep(time: 5, unit: 'SECONDS')
+                }
+            }
+        }
+
         stage('💾 Preserve WhatsApp Session') {
             steps {
                 script {
@@ -66,11 +80,40 @@ pipeline {
 
         stage('📂 Copy to Target Directory') {
             steps {
-                bat """
-                    if exist "${env.TARGET_PROJECT_PATH}" rmdir /s /q "${env.TARGET_PROJECT_PATH}"
-                    mkdir "${env.TARGET_PROJECT_PATH}"
-                    xcopy /E /I /H /Y "%WORKSPACE%\\*" "${env.TARGET_PROJECT_PATH}"
-                """
+                script {
+                    echo "📂 Copying new code to target directory..."
+                    bat """
+                        @echo off
+                        REM Try to delete target directory with retry
+                        if exist "${env.TARGET_PROJECT_PATH}" (
+                            echo Attempting to delete target directory...
+                            rmdir /s /q "${env.TARGET_PROJECT_PATH}" 2>nul
+                            
+                            REM Wait a bit if deletion failed
+                            if exist "${env.TARGET_PROJECT_PATH}" (
+                                echo Waiting for file locks to release...
+                                timeout /t 3 /nobreak >nul
+                                rmdir /s /q "${env.TARGET_PROJECT_PATH}" 2>nul
+                            )
+                            
+                            REM Force delete any remaining files
+                            if exist "${env.TARGET_PROJECT_PATH}" (
+                                echo Force deleting remaining files...
+                                del /f /s /q "${env.TARGET_PROJECT_PATH}\\*.*" 2>nul
+                                rmdir /s /q "${env.TARGET_PROJECT_PATH}" 2>nul
+                            )
+                        )
+                        
+                        REM Create fresh directory
+                        mkdir "${env.TARGET_PROJECT_PATH}"
+                        
+                        REM Copy workspace to target (includes preserved .baileys_auth)
+                        echo Copying files from workspace to target...
+                        xcopy /E /I /H /Y "%WORKSPACE%\\*" "${env.TARGET_PROJECT_PATH}"
+                        
+                        echo ✅ Files copied successfully
+                    """
+                }
             }
         }
 
@@ -122,19 +165,7 @@ pipeline {
 
         /* ================= BACKEND ================= */
 
-        stage('🛑 Stop Existing Backend') {
-            steps {
-                script {
-                    echo "🛑 Stopping PM2 process: ${env.APP_NAME}"
-                    bat(script: "pm2 stop ${env.APP_NAME}", returnStatus: true)
-                    bat(script: "pm2 delete ${env.APP_NAME}", returnStatus: true)
-                    
-                    // Give PM2 a moment to fully stop
-                    echo "⏳ Waiting for PM2 to fully stop..."
-                    sleep(time: 3, unit: 'SECONDS')
-                }
-            }
-        }
+
 
         stage('📁 Install Dependencies - Backend') {
             steps {
@@ -230,7 +261,15 @@ pipeline {
         failure {
             echo "❌ DEPLOYMENT FAILED – CHECK LOGS"
             script {
-                echo "❌ Deployment failed - check logs above"
+                echo "❌ Deployment failed - attempting to restore WhatsApp session..."
+                bat(script: """
+                    @echo off
+                    REM Try to restore .baileys_auth from workspace if it exists
+                    if exist "%WORKSPACE%\\backend\\.baileys_auth" (
+                        echo Restoring .baileys_auth from workspace...
+                        xcopy /E /I /H /Y /Q "%WORKSPACE%\\backend\\.baileys_auth" "${env.TARGET_PROJECT_PATH}\\backend\\.baileys_auth"
+                    )
+                """, returnStatus: true)
             }
         }
         always {
