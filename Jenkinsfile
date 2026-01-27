@@ -45,32 +45,20 @@ pipeline {
             }
         }
 
-        stage('💾 Backup WhatsApp Session') {
+        stage('💾 Preserve WhatsApp Session') {
             steps {
                 script {
-                    echo "💾 Backing up WhatsApp session data..."
+                    echo "💾 Preserving WhatsApp session from target to workspace..."
                     bat """
                         @echo off
-                        REM Create backup directory if it doesn't exist
-                        if not exist "${env.WHATSAPP_BACKUP_PATH}" mkdir "${env.WHATSAPP_BACKUP_PATH}"
-                        
-                        REM Backup .wwebjs_auth if it exists
-                        if exist "${env.TARGET_PROJECT_PATH}\\.wwebjs_auth" (
-                            echo Backing up .wwebjs_auth...
-                            xcopy /E /I /H /Y /Q "${env.TARGET_PROJECT_PATH}\\.wwebjs_auth" "${env.WHATSAPP_BACKUP_PATH}\\.wwebjs_auth"
+                        REM Copy .baileys_auth from target to workspace if it exists
+                        if exist "${env.TARGET_PROJECT_PATH}\\backend\\.baileys_auth" (
+                            echo Found existing .baileys_auth session, copying to workspace...
+                            xcopy /E /I /H /Y /Q "${env.TARGET_PROJECT_PATH}\\backend\\.baileys_auth" "%WORKSPACE%\\backend\\.baileys_auth"
+                            echo ✅ WhatsApp session preserved in workspace
                         ) else (
-                            echo No .wwebjs_auth directory found to backup
+                            echo ⚠️ No existing .baileys_auth found - will need fresh QR scan after deployment
                         )
-                        
-                        REM Backup .wwebjs_cache if it exists
-                        if exist "${env.TARGET_PROJECT_PATH}\\.wwebjs_cache" (
-                            echo Backing up .wwebjs_cache...
-                            xcopy /E /I /H /Y /Q "${env.TARGET_PROJECT_PATH}\\.wwebjs_cache" "${env.WHATSAPP_BACKUP_PATH}\\.wwebjs_cache"
-                        ) else (
-                            echo No .wwebjs_cache directory found to backup
-                        )
-                        
-                        echo ✅ WhatsApp session backup completed
                     """
                 }
             }
@@ -86,35 +74,7 @@ pipeline {
             }
         }
 
-        stage('🔄 Restore WhatsApp Session') {
-            steps {
-                script {
-                    echo "🔄 Restoring WhatsApp session data..."
-                    bat """
-                        @echo off
-                        REM Restore .wwebjs_auth if backup exists
-                        if exist "${env.WHATSAPP_BACKUP_PATH}\\.wwebjs_auth" (
-                            echo Restoring .wwebjs_auth...
-                            xcopy /E /I /H /Y /Q "${env.WHATSAPP_BACKUP_PATH}\\.wwebjs_auth" "${env.TARGET_PROJECT_PATH}\\.wwebjs_auth"
-                            echo ✅ .wwebjs_auth restored
-                        ) else (
-                            echo ⚠️ No .wwebjs_auth backup found - will need fresh QR scan
-                        )
-                        
-                        REM Restore .wwebjs_cache if backup exists
-                        if exist "${env.WHATSAPP_BACKUP_PATH}\\.wwebjs_cache" (
-                            echo Restoring .wwebjs_cache...
-                            xcopy /E /I /H /Y /Q "${env.WHATSAPP_BACKUP_PATH}\\.wwebjs_cache" "${env.TARGET_PROJECT_PATH}\\.wwebjs_cache"
-                            echo ✅ .wwebjs_cache restored
-                        ) else (
-                            echo ⚠️ No .wwebjs_cache backup found
-                        )
-                        
-                        echo ✅ WhatsApp session restoration completed
-                    """
-                }
-            }
-        }
+
 
         /* ================= FRONTEND ================= */
 
@@ -251,10 +211,10 @@ pipeline {
                     echo "📱 WhatsApp Session Status:"
                     bat """
                         @echo off
-                        if exist "${env.TARGET_PROJECT_PATH}\\.wwebjs_auth" (
-                            echo ✅ WhatsApp auth directory exists
+                        if exist "${env.TARGET_PROJECT_PATH}\\backend\\.baileys_auth" (
+                            echo ✅ WhatsApp .baileys_auth directory exists
                         ) else (
-                            echo ⚠️ WhatsApp auth directory NOT found - will need QR scan
+                            echo ⚠️ WhatsApp .baileys_auth directory NOT found - will need QR scan
                         )
                     """
                 }
@@ -270,12 +230,7 @@ pipeline {
         failure {
             echo "❌ DEPLOYMENT FAILED – CHECK LOGS"
             script {
-                // On failure, try to restore session anyway
-                bat(script: """
-                    if exist "${env.WHATSAPP_BACKUP_PATH}\\.wwebjs_auth" (
-                        xcopy /E /I /H /Y /Q "${env.WHATSAPP_BACKUP_PATH}\\.wwebjs_auth" "${env.TARGET_PROJECT_PATH}\\.wwebjs_auth"
-                    )
-                """, returnStatus: true)
+                echo "❌ Deployment failed - check logs above"
             }
         }
         always {

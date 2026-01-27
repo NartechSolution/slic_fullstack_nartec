@@ -31,10 +31,10 @@ const QRCodePopup = ({ qrCode, onClose }) => {
         ) : (
           <p className={`text-gray-500 ${i18n.language === "ar" ? "text-end"  : "text-start" }`}>{t("Generating QR Code..")}.</p>
         )}
-        {/* Assuming some logic to detect successful scan */}
+        {/* Button to confirm QR scan */}
         <button
           onClick={handleScanSuccess}
-          className={`mt-4 w-full bg-green-500 text-white py-2 rounded ${i18n.language === "ar" ? "text-end"  : "text-start" }`}
+          className="mt-4 w-full bg-green-500 text-white py-2 px-4 rounded text-center font-medium hover:bg-green-600 transition-colors"
         >
           {t("I have scanned the QR Code")}
         </button>
