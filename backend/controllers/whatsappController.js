@@ -109,14 +109,6 @@ async function initializeConnection(forceNew = false) {
 
     console.log("Creating WhatsApp socket...");
 
-    // Detect platform for browser configuration
-    const platform = os.platform();
-    const browserConfig = platform === 'win32'
-      ? Browsers.windows("Desktop")
-      : Browsers.macOS("Desktop");
-
-    console.log(`Using browser config for platform: ${platform}`);
-
     return new Promise((resolve) => {
       let resolved = false;
       let qrCount = 0;
@@ -128,10 +120,13 @@ async function initializeConnection(forceNew = false) {
           creds: state.creds,
           keys: makeCacheableSignalKeyStore(state.keys, logger),
         },
-        browser: browserConfig,
+        browser: Browsers.appropriate("Chrome"),
         generateHighQualityLinkPreview: false,
         syncFullHistory: false,
         markOnlineOnConnect: false,
+        defaultQueryTimeoutMs: 60000,
+        connectTimeoutMs: 60000,
+        keepAliveIntervalMs: 30000,
         getMessage: async (key) => {
           return { conversation: "" };
         },
@@ -194,15 +189,39 @@ async function initializeConnection(forceNew = false) {
               resolve({ status: "logged_out", needsQR: true });
             }
           } else if (statusCode === DisconnectReason.restartRequired) {
-            // Restart required - clean session and start fresh
-            console.log("Restart required - cleaning session...");
-            await quickDisconnect();
-            cleanupAuthFolder();
-            reconnectAttempts = 0;
-            if (!resolved) {
-              resolved = true;
-              initializationInProgress = false;
-              resolve({ status: "logged_out", needsQR: true });
+            // Restart required - try to reconnect with existing session first
+            console.log("Restart required - attempting reconnection...");
+            reconnectAttempts++;
+
+            if (reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
+              await quickDisconnect();
+              setTimeout(async () => {
+                try {
+                  initializationInProgress = false;
+                  const result = await initializeConnection(false);
+                  if (!resolved && result.status === "ready") {
+                    resolved = true;
+                    resolve(result);
+                  }
+                } catch (e) {
+                  console.error("Reconnect failed:", e);
+                  if (!resolved) {
+                    resolved = true;
+                    initializationInProgress = false;
+                    resolve({ status: "connection_failed", needsQR: true });
+                  }
+                }
+              }, 3000);
+            } else {
+              console.log("Max reconnect attempts reached - cleaning session");
+              await quickDisconnect();
+              cleanupAuthFolder();
+              reconnectAttempts = 0;
+              if (!resolved) {
+                resolved = true;
+                initializationInProgress = false;
+                resolve({ status: "logged_out", needsQR: true });
+              }
             }
           } else if (statusCode === DisconnectReason.connectionReplaced) {
             console.log("Connection replaced by another session");
@@ -246,12 +265,35 @@ async function initializeConnection(forceNew = false) {
           reconnectAttempts = 0;
 
           if (sock.user) {
+            const phoneNumber = sock.user.id.split(":")[0].split("@")[0];
+
+            // Try multiple fields for the name
+            let profileName = sock.user.verifiedName ||
+              sock.user.notify ||
+              sock.user.name ||
+              "WhatsApp User";
+
             userInfo = {
               id: sock.user.id,
-              name: sock.user.name || "Unknown",
-              number: sock.user.id.split(":")[0].split("@")[0],
+              name: profileName,
+              number: phoneNumber,
             };
             console.log(`Connected as: ${userInfo.name} (${userInfo.number})`);
+
+            // Try to fetch updated profile info after a short delay
+            setTimeout(async () => {
+              try {
+                if (sock.user && (sock.user.verifiedName || sock.user.notify)) {
+                  const updatedName = sock.user.verifiedName || sock.user.notify || sock.user.name;
+                  if (updatedName && updatedName !== "WhatsApp User") {
+                    userInfo.name = updatedName;
+                    console.log(`Profile name updated to: ${userInfo.name}`);
+                  }
+                }
+              } catch (e) {
+                // Ignore errors
+              }
+            }, 2000);
           }
 
           if (!resolved) {
@@ -503,6 +545,8 @@ exports.getUserProfile = async (req, res) => {
 
     // Get profile picture URL
     let profilePicUrl = null;
+    let actualName = userInfo?.name || "WhatsApp User";
+
     try {
       if (userInfo && userInfo.id) {
         profilePicUrl = await sock.profilePictureUrl(userInfo.id, "image");
@@ -511,10 +555,28 @@ exports.getUserProfile = async (req, res) => {
       profilePicUrl = null;
     }
 
+    // Try to fetch actual profile name from WhatsApp
+    try {
+      if (userInfo && userInfo.id) {
+        const status = await sock.fetchStatus(userInfo.id);
+        if (status && status.status) {
+          // Sometimes the name is in the status
+          actualName = userInfo.name || status.status || "WhatsApp User";
+        }
+      }
+    } catch (e) {
+      // Ignore if can't fetch status
+    }
+
+    // Update userInfo if we got a better name
+    if (actualName !== "WhatsApp User" && actualName !== "Unknown") {
+      userInfo.name = actualName;
+    }
+
     res.json({
       status: "success",
       data: {
-        name: userInfo?.name || "Unknown",
+        name: userInfo?.name || "WhatsApp User",
         number: userInfo?.number || "",
         profilePicUrl: profilePicUrl,
       },
