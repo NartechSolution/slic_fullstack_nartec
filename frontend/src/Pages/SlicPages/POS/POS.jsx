@@ -882,6 +882,8 @@ const POS = () => {
               ];
             }
           });
+          // clear the barcode
+          setBarcode("");
         } catch (secondApiError) {
           const errorMessage =
             secondApiError?.response?.data ||
