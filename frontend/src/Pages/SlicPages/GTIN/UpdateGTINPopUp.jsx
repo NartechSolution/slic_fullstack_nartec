@@ -470,12 +470,14 @@ const UpdateGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
                   <div className="sm:w-1/3 w-full flex flex-col justify-start items-center lg:mt-3 md:mt-3 gap-3">
                     <Barcode
                       value={barcode}
+                      format="EAN13"
                       height={75}
-                      width={1.3}
+                      width={1.5}
                       background="transparent"
                     />
 
-                    <QRCodeSVG value={`${barcode}, ${itemCode}, ${quantity}, ${description}, ${startSize}`} height={120} width={150} />
+                    {/* <QRCodeSVG value={`${barcode}, ${itemCode}, ${quantity}, ${description}, ${startSize}`} height={120} width={150} /> */}
+                    <QRCodeSVG value={`${barcode}`} height={120} width={150} />
                   </div>
                 </div>
               </form>
