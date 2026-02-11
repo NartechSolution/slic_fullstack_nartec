@@ -451,21 +451,34 @@ class ControlSerialModel {
 
   /**
    * Mark multiple control serials as sent using their IDs
+   * Processes in batches to avoid SQL Server's 2100 parameter limit
    * @param {Array<string>} ids - Array of control serial IDs to mark as sent
-   * @returns {Promise<Object>} - Result of updateMany
+   * @returns {Promise<Object>} - Result with total count of updated records
    */
   static async markAsSentByIds(ids) {
     if (!ids || ids.length === 0) return { count: 0 };
 
-    return await prisma.controlSerial.updateMany({
-      where: {
-        id: { in: ids },
-      },
-      data: {
-        isSentToSupplier: true,
-        binLocationId: null,
-      },
-    });
+    const BATCH_SIZE = 2000; // SQL Server has a 2100 parameter limit
+    let totalCount = 0;
+
+    // Process IDs in batches
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batch = ids.slice(i, i + BATCH_SIZE);
+
+      const result = await prisma.controlSerial.updateMany({
+        where: {
+          id: { in: batch },
+        },
+        data: {
+          isSentToSupplier: true,
+          binLocationId: null,
+        },
+      });
+
+      totalCount += result.count;
+    }
+
+    return { count: totalCount };
   }
 
   /**
