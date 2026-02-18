@@ -12,11 +12,11 @@ const LanguageSwitcher = () => {
     // setSelectedLanguage(language);// context update to change language
   };
 
-  // on page load, check if a language is stored in sessionStorage
+  // on page load, check if a language is stored in localStorage
 
-  const storedLanguage = sessionStorage.getItem("selectedLanguaged");
-  const initialLanguage = storedLanguage || "en"; // Default to Arabic if no language is stored
-  sessionStorage.setItem("selectedLanguaged", initialLanguage);
+  const storedLanguage = localStorage.getItem("selectedLanguage");
+  const initialLanguage = storedLanguage || "ar"; // Default to Arabic if no language is stored
+  localStorage.setItem("selectedLanguage", initialLanguage);
   // console.log('initialLanguage', initialLanguage);
 
   const [isActive, setIsActive] = useState(false);
@@ -31,7 +31,7 @@ const LanguageSwitcher = () => {
     setIsActive(false);
     // Update i18n language if needed
     changeLanguage(option);
-    sessionStorage.setItem("selectedLanguaged", option);
+    localStorage.setItem("selectedLanguage", option);
   };
 
   return (
@@ -56,9 +56,8 @@ const LanguageSwitcher = () => {
             </li>
           </ul>
           <ul
-            className={`select_ul absolute top-9  items-center  justify-center w-50 ml-12 bg-gray-200 rounded-md ${
-              isActive ? "block" : "hidden"
-            }`}
+            className={`select_ul absolute top-9  items-center  justify-center w-50 ml-12 bg-gray-200 rounded-md ${isActive ? "block" : "hidden"
+              }`}
             style={{ zIndex: "12" }}
           >
             <li

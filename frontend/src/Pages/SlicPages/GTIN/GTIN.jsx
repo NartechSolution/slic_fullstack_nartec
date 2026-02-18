@@ -29,6 +29,11 @@ import { useNavigate } from "react-router-dom";
 import UpdateImagesPopUp from "./UpdateImagesPopUp";
 import CreateControlSerials from "./CreateControlSerials";
 import AddControlSerialPopup from "../DigitalLinks/AddControlSerialPopup";
+import { CircularProgress } from "@mui/material";
+import { saveAs } from "file-saver";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import GetAppIcon from "@mui/icons-material/GetApp";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 
 const GTIN = () => {
   const { t, i18n } = useTranslation();
@@ -41,7 +46,7 @@ const GTIN = () => {
   const canGenerateBarcode = userRoles?.some(
     role => role.RoleName?.toLowerCase() === 'generate_new_barcode'
   );
-  
+
   const canPrintProducts = userRoles?.some(
     role => role.RoleName?.toLowerCase() === 'print_products'
   );
@@ -119,8 +124,8 @@ const GTIN = () => {
   };
 
   const handleDigitalLinks = (row) => {
-    navigate(`/po-number`, { 
-      state: { rowData: row } 
+    navigate(`/po-number`, {
+      state: { rowData: row }
     });
   };
 
@@ -163,6 +168,66 @@ const GTIN = () => {
     setRowSelectionModel([]);
   };
 
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleBulkUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("image", file); // Multer expects 'image' field based on route config, but for file upload it might be expecting 'file' or 'image'. 
+    // The route uses `upload` middleware which is `uploadSingle({ destination: PATH, filename: "image" })`. 
+    // So the field name must be "image".
+
+    try {
+      setIsUploading(true);
+      const response = await newRequest.post(
+        "/itemCodes/v1/bulk-import",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${memberData?.data?.token}`,
+          },
+        }
+      );
+      toast.success(response?.data?.message || "Products uploaded successfully");
+      refreshGTINData();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.response?.data?.message || "Failed to upload products");
+    } finally {
+      setIsUploading(false);
+      e.target.value = null; // Reset input
+    }
+  };
+
+  const handleDownloadProducts = async () => {
+    try {
+      const response = await newRequest.get("/itemCodes/v1/download-products", {
+        headers: {
+          Authorization: `Bearer ${memberData?.data?.token}`,
+        },
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, "All_Products.xlsx");
+    } catch (err) {
+      toast.error("Failed to download products");
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    // Construct URL based on API base URL
+    // newRequest.defaults.baseURL usually contains /api
+    const baseUrl = newRequest.defaults.baseURL;
+    const rootUrl = baseUrl.includes('/api') ? baseUrl.split('/api')[0] : baseUrl;
+    const templateUrl = `${rootUrl}/uploads/templates/product_import_template.xlsx`;
+
+    // Trigger download
+    saveAs(templateUrl, "product_import_template.xlsx");
+  };
+
   const handleRowClickInParent = (item) => {
     if (!item || item?.length === 0) {
       return;
@@ -199,7 +264,7 @@ const GTIN = () => {
             reject(error);
           }
         });
-  
+
         toast.promise(
           deletePromise,
           {
@@ -232,7 +297,7 @@ const GTIN = () => {
         <div className="h-auto w-full">
           <div className="h-auto w-full p-0 bg-white shadow-xl rounded-md pb-10">
             <div
-              className={`flex items-center flex-wrap gap-2 py-7 px-5 ${i18n.language==='ar'?'justify-start':'justify-end'}`}
+              className={`flex items-center flex-wrap gap-2 py-7 px-5 ${i18n.language === 'ar' ? 'justify-start' : 'justify-end'}`}
             >
               {/* Refresh Button */}
               <Tooltip title={t("Refresh Data")}>
@@ -249,14 +314,78 @@ const GTIN = () => {
                 </IconButton>
               </Tooltip>
 
+              {/* File Input for Bulk Upload */}
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                style={{ display: "none" }}
+                id="bulk-upload-input"
+                onChange={handleBulkUpload}
+              />
+
+              {/* Bulk Upload Button */}
+              <Tooltip title="Bulk Upload">
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={() => document.getElementById('bulk-upload-input').click()}
+                    disabled={isUploading}
+                    style={{
+                      backgroundColor: "#CFDDE0",
+                      color: "#1D2F90",
+                      marginRight: '8px'
+                    }}
+                    startIcon={isUploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
+                  >
+                    {isUploading ? "Uploading..." : "Bulk Upload"}
+                  </Button>
+                </span>
+              </Tooltip>
+
+              {/* Download Products Button */}
+              <Tooltip title="Download Products">
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleDownloadProducts}
+                    style={{
+                      backgroundColor: "#CFDDE0",
+                      color: "#1D2F90",
+                      marginRight: '8px'
+                    }}
+                    startIcon={<FileDownloadIcon />}
+                  >
+                    Download Products
+                  </Button>
+                </span>
+              </Tooltip>
+
+              {/* Download Template Button */}
+              <Tooltip title="Download Template">
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleDownloadTemplate}
+                    style={{
+                      backgroundColor: "#CFDDE0",
+                      color: "#1D2F90",
+                      marginRight: '8px'
+                    }}
+                    startIcon={<GetAppIcon />}
+                  >
+                    Download Template
+                  </Button>
+                </span>
+              </Tooltip>
+
               {/* Create Control Serials Button - New */}
               <Tooltip title={t("Create Control Serials")}>
                 <span>
                   <Button
                     variant="contained"
                     onClick={handleShowCreateControlSerialsPopup}
-                    style={{ 
-                      backgroundColor: "#CFDDE0", 
+                    style={{
+                      backgroundColor: "#CFDDE0",
                       color: "#1D2F90",
                       marginRight: '8px'
                     }}
@@ -273,8 +402,8 @@ const GTIN = () => {
                     variant="contained"
                     onClick={handleShowCreatePopup}
                     disabled={!canGenerateBarcode}
-                    style={{ 
-                      backgroundColor: canGenerateBarcode ? "#CFDDE0" : "#E0E0E0", 
+                    style={{
+                      backgroundColor: canGenerateBarcode ? "#CFDDE0" : "#E0E0E0",
                       color: canGenerateBarcode ? "#1D2F90" : "#9E9E9E",
                       cursor: canGenerateBarcode ? "pointer" : "not-allowed"
                     }}
@@ -291,8 +420,8 @@ const GTIN = () => {
                   <Button
                     variant="contained"
                     onClick={handleShowUpdateImagesPopup}
-                    style={{ 
-                      backgroundColor: "#CFDDE0", 
+                    style={{
+                      backgroundColor: "#CFDDE0",
                       color: "#1D2F90"
                     }}
                     startIcon={<ImageIcon />}
@@ -334,7 +463,7 @@ const GTIN = () => {
               </Button>
             </div>
 
-            <div style={{marginTop: '-15px'}}>
+            <div style={{ marginTop: '-15px' }}>
               <DataTable
                 data={data}
                 title={t("Products List")}
@@ -395,13 +524,13 @@ const GTIN = () => {
           </div>
 
           {/* Print Components */}
-          <FGBarcodePrint 
-            selectedRows={tableSelectedRows} 
+          <FGBarcodePrint
+            selectedRows={tableSelectedRows}
             onPrintComplete={handlePrintComplete}
           />
-          
-          <GTINBarcodePrint 
-            selectedRows={tableSelectedRows} 
+
+          <GTINBarcodePrint
+            selectedRows={tableSelectedRows}
             onPrintComplete={handlePrintComplete}
           />
 

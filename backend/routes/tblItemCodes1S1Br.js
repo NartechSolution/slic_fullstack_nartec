@@ -59,6 +59,12 @@ router.get("/v2/searchByGTIN", itemCodesController.searchByGTIN);
 
 router.get("/v1/findByItemCode", itemCodesController.findByItemCode);
 
+
+router.get(
+  "/v1/download-products",
+  itemCodesController.downloadAllProducts
+);
+
 router.post(
   "/v1/bulk-import",
 

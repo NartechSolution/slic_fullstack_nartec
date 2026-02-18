@@ -3,7 +3,7 @@ import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 import newRequest from './utils/userRequest'
 
-const storedLanguage = sessionStorage.getItem('selectedLanguaged')
+const storedLanguage = localStorage.getItem('selectedLanguage')
 const initialLanguage = storedLanguage || 'ar'
 
 const dynamicTranslations = {
@@ -16,19 +16,19 @@ const fetchTranslations = async () => {
   try {
     try {
       const response = await newRequest.get('/language/translations')
-      
+
       // Check if response is ok (status 200-299)
       if (!response.ok) {
         throw new Error(`API returned status ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json()
-      
+
       // Validate response structure
       if (!data || typeof data !== 'object') {
         throw new Error('Invalid response structure received from API');
       }
-      
+
       // Check if data.data exists, is not null, and has properties
       if (!data.data || typeof data.data !== 'object' || Object.keys(data.data).length === 0) {
         throw new Error('API returned empty or null data');
@@ -42,7 +42,7 @@ const fetchTranslations = async () => {
       })
 
       // console.log(data.data, 'Language data loaded successfully');
-      
+
       // Initialize i18n with fetched translations
       i18n
         .use(LanguageDetector)
@@ -62,7 +62,7 @@ const fetchTranslations = async () => {
       // Add resource bundles after initializing i18n
       i18n.addResourceBundle('ar', 'translation', dynamicTranslations.ar)
       i18n.addResourceBundle('en', 'translation', dynamicTranslations.en)
-      
+
     } catch (apiError) {
       // console.warn('Failed to fetch translations from API:', apiError.message);
       throw apiError;
