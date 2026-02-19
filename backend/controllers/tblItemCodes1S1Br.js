@@ -802,7 +802,6 @@ exports.bulkImportFromExcel = async (req, res, next) => {
             // Use bulkUpsert for MSSQL compatibility (no skipDuplicates)
             await prisma.tblItemCodes1S1Br.createMany({
               data: batchUpsertData,
-              skipDuplicates: true, // This skips duplicates based on unique constraints (ItemCode)
             });
 
             const endTime = Date.now();
