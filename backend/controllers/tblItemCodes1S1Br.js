@@ -7,6 +7,7 @@ const BarSeriesNo = require("../models/barSeriesNo");
 const generateResponse = require("../utils/response");
 const CustomError = require("../exceptions/customError");
 const { deleteFile } = require("../utils/file");
+const prisma = require("../db");
 
 function calculateCheckDigit(gtinWithoutCheckDigit) {
   const digits = gtinWithoutCheckDigit.split("").map(Number);
