@@ -222,7 +222,7 @@ const GTIN = () => {
     // newRequest.defaults.baseURL usually contains /api
     const baseUrl = newRequest.defaults.baseURL;
     const rootUrl = baseUrl.includes('/api') ? baseUrl.split('/api')[0] : baseUrl;
-    const templateUrl = `${rootUrl}/uploads/templates/product_import_template.xlsx`;
+    const templateUrl = `${rootUrl}/templates/product_import_template.xlsx`;
 
     // Trigger download
     saveAs(templateUrl, "product_import_template.xlsx");

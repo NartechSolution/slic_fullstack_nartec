@@ -37,6 +37,7 @@ app.use(bodyParser.urlencoded({ extended: true, limit: "50mb" }));
 
 // Serve static files from the "uploads" and "public" directories
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/templates", express.static(path.join(__dirname, "templates")));
 app.use("/public", express.static(path.join(__dirname, "public")));
 app.use(express.static(path.join(__dirname, "public"))); // Serve public files at root level
 
