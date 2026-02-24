@@ -4,6 +4,7 @@ const {
   DisconnectReason,
   makeCacheableSignalKeyStore,
   Browsers,
+  fetchLatestBaileysVersion,
 } = require("@whiskeysockets/baileys");
 const fs = require("fs");
 const path = require("path");
@@ -106,21 +107,23 @@ async function initializeConnection(forceNew = false) {
     ensureAuthFolder();
 
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
+    const { version, isLatest } = await fetchLatestBaileysVersion();
 
-    console.log("Creating WhatsApp socket...");
+    console.log(`Creating WhatsApp socket... (Version: ${version.join(".")}, isLatest: ${isLatest})`);
 
     return new Promise((resolve) => {
       let resolved = false;
       let qrCount = 0;
 
       sock = makeWASocket({
+        version,
         logger,
         printQRInTerminal: false,
         auth: {
           creds: state.creds,
           keys: makeCacheableSignalKeyStore(state.keys, logger),
         },
-        browser: Browsers.appropriate("Chrome"),
+        browser: ['Ubuntu', 'Chrome', '20.0.04'],
         generateHighQualityLinkPreview: false,
         syncFullHistory: false,
         markOnlineOnConnect: false,
