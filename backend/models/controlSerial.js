@@ -9,7 +9,6 @@ class ControlSerialModel {
   static async createBulk(serials) {
     return await prisma.controlSerial.createMany({
       data: serials,
-      //   skipDuplicates: true,
     });
   }
 
@@ -27,7 +26,6 @@ class ControlSerialModel {
       const batch = serials.slice(i, i + batchSize);
       const result = await prisma.controlSerial.createMany({
         data: batch,
-        skipDuplicates: false,
       });
       totalCount += result.count;
     }
