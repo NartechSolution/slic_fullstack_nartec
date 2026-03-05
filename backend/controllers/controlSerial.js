@@ -32,29 +32,48 @@ exports.createControlSerials = async (req, res, next) => {
       return next(error);
     }
 
-    // Verify supplier exists
-    const supplier = await SupplierModel.getSupplierById(supplierId);
+    // ── Step 1: Parallel lookups ────────────────────────────────────────────
+    // Supplier + all product lookups run concurrently instead of sequentially
+    const [supplier, ...products] = await Promise.all([
+      SupplierModel.getSupplierById(supplierId),
+      ...sizeQuantities.map((item) =>
+        ItemCodeModel.findByItemCodeAndSize(ItemCode, item.size)
+      ),
+    ]);
+
     if (!supplier) {
       const error = new CustomError("Supplier not found");
       error.statusCode = 404;
       throw error;
     }
 
-    // Verify products exist for each size and collect product info
     const productsMap = new Map();
-    for (const item of sizeQuantities) {
-      const product = await ItemCodeModel.findByItemCodeAndSize(ItemCode, item.size);
+    for (let i = 0; i < sizeQuantities.length; i++) {
+      const product = products[i];
       if (!product) {
         const error = new CustomError(
-          `Product with ItemCode "${ItemCode}" and size "${item.size}" not found`
+          `Product with ItemCode "${ItemCode}" and size "${sizeQuantities[i].size}" not found`
         );
         error.statusCode = 404;
         throw error;
       }
-      productsMap.set(item.size, product);
+      productsMap.set(sizeQuantities[i].size, product);
     }
 
-    // Generate bulk serials for all sizes
+    // ── Step 2: Resolve starting series numbers in parallel ─────────────────
+    // One aggregation query (MAX) per unique product — never downloads rows
+    const uniqueProductIds = [
+      ...new Set(sizeQuantities.map((item) => productsMap.get(item.size).id)),
+    ];
+    const seriesStartMap = new Map();
+    await Promise.all(
+      uniqueProductIds.map(async (productId) => {
+        const start = await ControlSerialModel.getNextSeriesNumber(productId);
+        seriesStartMap.set(productId, start);
+      })
+    );
+
+    // ── Step 3: Build serial array in memory ────────────────────────────────
     const serials = [];
     let totalQty = 0;
 
@@ -63,34 +82,33 @@ exports.createControlSerials = async (req, res, next) => {
       const qty = item.qty;
       totalQty += qty;
 
-      // Get the starting series number for this product
-      let currentSeriesNumber = await ControlSerialModel.getNextSeriesNumber(
-        product.id
-      );
+      let currentSeriesNumber = seriesStartMap.get(product.id);
 
       for (let i = 0; i < qty; i++) {
-        // Generate serial number using the actual ItemCode string + series number
         const serialNumber = generateSerialNumber(ItemCode, currentSeriesNumber);
 
         serials.push({
           serialNumber,
-          ItemCode: product.id, // Use the product's id (foreign key reference)
-          supplierId: supplierId,
-          poNumber: poNumber,
+          ItemCode: product.id,
+          supplierId,
+          poNumber,
           size: item.size,
         });
 
-        // Increment series number for next iteration
-        const nextNum = parseInt(currentSeriesNumber) + 1;
+        const nextNum = parseInt(currentSeriesNumber, 10) + 1;
         if (nextNum > 999999) {
           throw new Error("Series number exceeds maximum value (999999)");
         }
         currentSeriesNumber = nextNum.toString().padStart(6, "0");
       }
+
+      // Advance the map so multiple sizes on the same product don't collide
+      seriesStartMap.set(product.id, currentSeriesNumber);
     }
 
-    // Create all serials
-    const result = await ControlSerialModel.createBulk(serials);
+    // ── Step 4: Batched insert ───────────────────────────────────────────────
+    // 400 rows/batch × 5 fields = 2000 SQL params — safely under SQL Server's 2100 limit
+    const result = await ControlSerialModel.createBulkBatched(serials);
 
     if (!result || result.count === 0) {
       const error = new CustomError("Failed to create control serials");
@@ -98,28 +116,28 @@ exports.createControlSerials = async (req, res, next) => {
       throw error;
     }
 
-    // Fetch created records with product details
-    const createdSerials = await Promise.all(
-      serials.map((serial) =>
-        ControlSerialModel.findBySerialNumber(serial.serialNumber)
-      )
-    );
+    // ── Step 5: Build response ───────────────────────────────────────────────
+    // For qty ≤ 1000 return full records (single IN-query).
+    // For larger batches returning 100k objects over HTTP is impractical —
+    // return a lightweight summary instead.
+    const FULL_FETCH_THRESHOLD = 1000;
+    let responseData;
 
-    // // Send email notification to supplier
-    // try {
-    //   const emailResult = await sendControlSerialNotificationEmail({
-    //     supplierEmail: supplier.email,
-    //     supplierName: supplier.name,
-    //     poNumber: poNumber,
-    //     itemCode: ItemCode,
-    //     quantity: totalQty,
-    //     size: sizeQuantities.map(s => s.size).join(", "),
-    //   });
-    //   console.log("Email notification result:", emailResult);
-    // } catch (emailError) {
-    //   console.error("Error sending email notification:", emailError);
-    //   // Don't fail the operation if email sending fails
-    // }
+    if (totalQty <= FULL_FETCH_THRESHOLD) {
+      const serialNumbers = serials.map((s) => s.serialNumber);
+      responseData = await ControlSerialModel.findManyBySerialNumbers(serialNumbers);
+    } else {
+      responseData = {
+        summary: true,
+        totalCreated: result.count,
+        poNumber,
+        ItemCode,
+        supplierId,
+        sizes: sizeQuantities.map((s) => ({ size: s.size, qty: s.qty })),
+        firstSerial: serials[0]?.serialNumber ?? null,
+        lastSerial: serials[serials.length - 1]?.serialNumber ?? null,
+      };
+    }
 
     res
       .status(201)
@@ -128,7 +146,7 @@ exports.createControlSerials = async (req, res, next) => {
           201,
           true,
           `${totalQty} control serial(s) created successfully`,
-          createdSerials
+          responseData
         )
       );
   } catch (error) {

@@ -14,6 +14,49 @@ class ControlSerialModel {
   }
 
   /**
+   * Create control serials in batches to avoid SQL Server's parameter limit (~2100)
+   * Each row has ~5 fields, so a safe batch size is 400 rows (400 * 5 = 2000 params).
+   * @param {Array} serials - Array of serial objects
+   * @param {number} batchSize - Number of rows per batch (default 400)
+   * @returns {Promise<{count: number}>} - Total inserted count
+   */
+  static async createBulkBatched(serials, batchSize = 400) {
+    if (!serials || serials.length === 0) return { count: 0 };
+    let totalCount = 0;
+    for (let i = 0; i < serials.length; i += batchSize) {
+      const batch = serials.slice(i, i + batchSize);
+      const result = await prisma.controlSerial.createMany({
+        data: batch,
+        skipDuplicates: false,
+      });
+      totalCount += result.count;
+    }
+    return { count: totalCount };
+  }
+
+  /**
+   * Fetch multiple control serials by their serial numbers in one query
+   * (replaces the N-query Promise.all pattern after bulk insert)
+   * Fetches in batches to stay within SQL Server parameter limits.
+   * @param {string[]} serialNumbers - Array of serial numbers to fetch
+   * @param {number} batchSize - Number of serial numbers per batch
+   * @returns {Promise<Array>} - Array of serial records with product/supplier
+   */
+  static async findManyBySerialNumbers(serialNumbers, batchSize = 2000) {
+    if (!serialNumbers || serialNumbers.length === 0) return [];
+    const results = [];
+    for (let i = 0; i < serialNumbers.length; i += batchSize) {
+      const batch = serialNumbers.slice(i, i + batchSize);
+      const records = await prisma.controlSerial.findMany({
+        where: { serialNumber: { in: batch } },
+        include: { product: true, supplier: true },
+      });
+      results.push(...records);
+    }
+    return results;
+  }
+
+  /**
    * Get a control serial by ID
    * @param {string} id - Serial ID
    * @returns {Promise<Object>} - Serial record with product details and supplier
@@ -286,31 +329,20 @@ class ControlSerialModel {
    * @returns {Promise<number>} - Next series number (6 digits with leading zeros)
    */
   static async getNextSeriesNumber(itemCode) {
-    // Get all serials for this ItemCode
-    const allSerials = await prisma.controlSerial.findMany({
-      where: {
-        ItemCode: itemCode,
-      },
-      select: {
-        serialNumber: true,
-      },
+    // Use a single aggregation query (MAX on serialNumber) instead of
+    // fetching every row and iterating in JS — critical for large datasets.
+    const agg = await prisma.controlSerial.aggregate({
+      where: { ItemCode: itemCode },
+      _max: { serialNumber: true },
     });
 
-    if (!allSerials || allSerials.length === 0) {
+    const maxSerial = agg._max.serialNumber;
+    if (!maxSerial || maxSerial.length < 6) {
       return "000001";
     }
 
-    // Extract all series numbers and find the maximum
-    let maxSeriesNum = 0;
-    for (const serial of allSerials) {
-      if (serial.serialNumber && serial.serialNumber.length >= 6) {
-        const seriesNum = parseInt(serial.serialNumber.slice(-6));
-        if (seriesNum > maxSeriesNum) {
-          maxSeriesNum = seriesNum;
-        }
-      }
-    }
-
+    // The last 6 characters are the numeric series portion
+    const maxSeriesNum = parseInt(maxSerial.slice(-6), 10);
     const nextNum = maxSeriesNum + 1;
 
     if (nextNum > 999999) {

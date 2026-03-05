@@ -26,7 +26,7 @@ exports.createControlSerials = [
   body("sizeQuantities.*.qty")
     .notEmpty()
     .withMessage("Each item must have a quantity.")
-    .isInt({ min: 1, max: 10000 })
+    .isInt({ min: 1, max: 1000000 })
     .withMessage("Quantity must be an integer between 1 and 10000."),
 
   body("sizeQuantities.*.size")
