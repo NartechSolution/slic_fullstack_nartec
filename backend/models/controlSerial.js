@@ -378,6 +378,7 @@ class ControlSerialModel {
       select: {
         poNumber: true,
         size: true,
+        isReceived: true,
         product: {
           select: {
             ItemCode: true,
@@ -439,6 +440,7 @@ class ControlSerialModel {
       select: {
         poNumber: true,
         size: true,
+        isReceived: true,
         isSentToSupplier: true,
         ItemCode: true,
         binLocation: {

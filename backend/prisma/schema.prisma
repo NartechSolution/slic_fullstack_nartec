@@ -34,87 +34,87 @@ model TblItemCodes1S1Br {
   color               String?
   label               String?
 
-  controlledSerials  ControlSerial[]   
+  controlledSerials ControlSerial[]
 
-  Created_at          DateTime? @default(now()) @db.DateTime
-  Updated_at          DateTime? @default(now()) @db.DateTime
+  Created_at DateTime? @default(now()) @db.DateTime
+  Updated_at DateTime? @default(now()) @db.DateTime
 }
 
-model ControlSerial{
-    id                          String    @id @default(cuid())
+model ControlSerial {
+  id String @id @default(cuid())
 
-    serialNumber                String? // unique serial number, using formula, auto generated
-    ItemCode                    String? // This is actually a productId field, its typo
-    product                     TblItemCodes1S1Br? @relation(fields: [ItemCode], references: [id])
-    size                        String?
-    poNumber                    String?
+  serialNumber String? // unique serial number, using formula, auto generated
+  ItemCode     String? // This is actually a productId field, its typo
+  product      TblItemCodes1S1Br? @relation(fields: [ItemCode], references: [id])
+  size         String?
+  poNumber     String?
 
-    isSentToSupplier            Boolean?     @default(false)
-    isArchived                  Boolean?     @default(false)
+  isSentToSupplier Boolean? @default(false)
+  isReceived       Boolean? @default(false)
+  isArchived       Boolean? @default(false)
 
-    // relation with Supplier
-    supplierId                  String?
-    supplier                    Supplier? @relation(fields: [supplierId], references: [id])
+  // relation with Supplier
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
 
-    // Bin Location relation
-    binLocationId              String?
-    binLocation                BinLocation? @relation(fields: [binLocationId], references: [id])
+  // Bin Location relation
+  binLocationId String?
+  binLocation   BinLocation? @relation(fields: [binLocationId], references: [id])
 
-    createdAt                   DateTime @default(now())
-    updatedAt                   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Supplier {
-    id              String   @id @default(cuid())
+  id String @id @default(cuid())
 
-    name            String?
-    email           String?
-    password        String?
-    status          String? // pending, approved, rejected
+  name     String?
+  email    String?
+  password String?
+  status   String? // pending, approved, rejected
 
-    controlSerials  ControlSerial[]
+  controlSerials ControlSerial[]
 
-
-    createdAt       DateTime @default(now())
-    updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model BinLocation {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // General Information
-  groupWarehouse  String?   
-  zoneCode        String?   
-  zones           String?   
-  zoneName        String?   
-  binNumber       String?   
-  zoned           String?   
-  zoneType        String?   
-  binType         String?   
+  groupWarehouse String?
+  zoneCode       String?
+  zones          String?
+  zoneName       String?
+  binNumber      String?
+  zoned          String?
+  zoneType       String?
+  binType        String?
 
   // Measurements
-  binHeight       Float?
-  binRow          String?   
-  binWidth        Float?
-  binTotalSize    Float?
+  binHeight    Float?
+  binRow       String?
+  binWidth     Float?
+  binTotalSize Float?
 
   // Identification
-  gln             String?   
-  longitude       Float?
-  latitude        Float?
-  sgln            String?   
-  mapLocation     String?   
+  gln         String?
+  longitude   Float?
+  latitude    Float?
+  sgln        String?
+  mapLocation String?
 
   // Capacity
-  minQuantity     Int?
-  availableQty    Int?
-  maxQuantity     Int?
-  capacityUsage   Float?    @default(0)
+  minQuantity   Int?
+  availableQty  Int?
+  maxQuantity   Int?
+  capacityUsage Float? @default(0)
 
-  controlSerials  ControlSerial[]
+  controlSerials ControlSerial[]
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model TblBarSeriesNo {

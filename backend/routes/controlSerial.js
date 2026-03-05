@@ -162,6 +162,17 @@ router.put(
 );
 
 /**
+ * PUT /api/controlSerials/receive-po
+ * Body: { poNumber: string, size?: string, isReceived?: boolean }
+ * Mark control serials as received by PO number (and optionally size)
+ */
+router.put(
+  "/receive-po",
+  isAuth,
+  controlSerialController.markAsReceived,
+);
+
+/**
  * PUT /api/controlSerials/:id
  * Update control serial
  * Body: { ItemCode: string }

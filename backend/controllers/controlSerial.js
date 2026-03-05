@@ -817,6 +817,59 @@ exports.putAway = async (req, res, next) => {
 };
 
 /**
+ * PUT - Mark control serials as received by PO number and optionally size
+ * @param {*} req
+ * @param {*} res
+ * @param {*} next
+ */
+exports.markAsReceived = async (req, res, next) => {
+  try {
+    const { poNumber, size, isReceived } = req.body;
+
+    if (!poNumber) {
+      const error = new CustomError("PO number is required");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Default to true if not provided
+    const receivedStatus = isReceived !== undefined ? isReceived : true;
+
+    // Build update data object
+    const updateData = {
+      isReceived: receivedStatus
+    };
+
+    const result = await ControlSerialModel.updateByPoNumberAndSize(
+      poNumber,
+      size,
+      updateData
+    );
+
+    if (result.count === 0) {
+      const error = new CustomError(
+        "No control serials found for the given PO number" + (size ? " and size" : "")
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    res
+      .status(200)
+      .json(
+        generateResponse(
+          200,
+          true,
+          `${result.count} control serial(s) marked as received successfully`,
+          result
+        )
+      );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * DELETE - Delete control serial
  */
 exports.deleteControlSerial = async (req, res, next) => {
