@@ -19,16 +19,30 @@ class ControlSerialModel {
    * @param {number} batchSize - Number of rows per batch (default 400)
    * @returns {Promise<{count: number}>} - Total inserted count
    */
-  static async createBulkBatched(serials, batchSize = 400) {
+  static async createBulkBatched(serials, batchSize = 400, concurrency = 30) {
     if (!serials || serials.length === 0) return { count: 0 };
-    let totalCount = 0;
+
+    // Split into fixed-size batches
+    const batches = [];
     for (let i = 0; i < serials.length; i += batchSize) {
-      const batch = serials.slice(i, i + batchSize);
-      const result = await prisma.controlSerial.createMany({
-        data: batch,
-      });
-      totalCount += result.count;
+      batches.push(serials.slice(i, i + batchSize));
     }
+
+    let totalCount = 0;
+
+    // Process batches in parallel windows of `concurrency` at a time.
+    // 100k rows / 400 per batch = 250 batches.
+    // At concurrency=20: 250/20 = ~13 rounds × ~300ms = ~4 seconds.
+    for (let i = 0; i < batches.length; i += concurrency) {
+      const window = batches.slice(i, i + concurrency);
+      const results = await Promise.all(
+        window.map((batch) =>
+          prisma.controlSerial.createMany({ data: batch })
+        )
+      );
+      totalCount += results.reduce((sum, r) => sum + r.count, 0);
+    }
+
     return { count: totalCount };
   }
 
