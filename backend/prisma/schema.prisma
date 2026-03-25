@@ -35,27 +35,63 @@ model TblItemCodes1S1Br {
   label               String?
 
   controlledSerials ControlSerial[]
+  controlSerialMasters ControlSerialMaster[]
 
   Created_at DateTime? @default(now()) @db.DateTime
   Updated_at DateTime? @default(now()) @db.DateTime
 }
 
+/// Master record — one per PO + ItemCode + Supplier combination.
+/// Holds PO-level metadata and aggregated status flags.
+model ControlSerialMaster {
+  id String @id @default(cuid())
+
+  // Product relation (productId stores TblItemCodes1S1Br.id)
+  productId String? // FK -> TblItemCodes1S1Br.id
+  product   TblItemCodes1S1Br? @relation(fields: [productId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+
+  poNumber String? // PO number
+
+  // Supplier relation
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+
+  // PO-level status flags
+  isSentToSupplier Boolean @default(false)
+  // "pending" | "partial" | "received"
+  receivedStatus   String  @default("pending")
+
+  isArchived Boolean @default(false)
+
+  // Children — individual serial numbers
+  serials ControlSerial[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Child record — one row per individual serial number.
+/// References its ControlSerialMaster for PO-level context.
 model ControlSerial {
   id String @id @default(cuid())
 
   serialNumber String? // unique serial number, using formula, auto generated
-  ItemCode     String? // This is actually a productId field, its typo
-  product      TblItemCodes1S1Br? @relation(fields: [ItemCode], references: [id])
+  ItemCode     String? // This is actually a productId field (legacy field kept for compat)
+  product      TblItemCodes1S1Br? @relation(fields: [ItemCode], references: [id], onUpdate: NoAction, onDelete: NoAction)
   size         String?
-  poNumber     String?
+  poNumber     String? // Kept for backward compat / direct queries
 
   isSentToSupplier Boolean? @default(false)
   isReceived       Boolean? @default(false)
   isArchived       Boolean? @default(false)
 
-  // relation with Supplier
+  // FK -> ControlSerialMaster
+  masterId String?
+  master   ControlSerialMaster? @relation(fields: [masterId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+
+  // relation with Supplier (kept for backward compat)
   supplierId String?
-  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onUpdate: NoAction, onDelete: NoAction)
 
   // Bin Location relation
   binLocationId String?
@@ -73,7 +109,8 @@ model Supplier {
   password String?
   status   String? // pending, approved, rejected
 
-  controlSerials ControlSerial[]
+  controlSerials       ControlSerial[]
+  controlSerialMasters ControlSerialMaster[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

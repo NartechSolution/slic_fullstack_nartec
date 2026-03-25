@@ -25,6 +25,7 @@ const languageRoutes = require("./routes/languageRoute.js");
 const controlSerialRoutes = require("./routes/controlSerial");
 const supplierRoutes = require("./routes/supplierRoute");
 const binLocationRoutes = require("./routes/binLocation");
+const migrationRoutes = require("./routes/migration");
 const path = require("path");
 const prisma = require("./db");
 const app = express();
@@ -61,6 +62,7 @@ app.use("/api/language", languageRoutes);
 app.use("/api/controlSerials", controlSerialRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/binLocations", binLocationRoutes);
+app.use("/api/admin/migrate", migrationRoutes);
 
 app.get("/test", (req, res) => {
   function calculateCheckDigit(gtinWithoutCheckDigit) {

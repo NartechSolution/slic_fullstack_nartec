@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { IoIosArrowBack } from "react-icons/io";
 import { useQuery } from 'react-query';
 import { toast } from 'react-toastify';
-// import AddControlSerialPopup from './AddControlSerialPopup';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SideNav from '../../../components/Sidebar/SideNav';
 import newRequest from '../../../utils/userRequest';
 import { Button, CircularProgress } from '@mui/material';
 import { HiRefresh } from 'react-icons/hi';
 import { IoSend } from "react-icons/io5";
-import { FaCheckCircle, FaTimesCircle, FaEye } from "react-icons/fa";
+import { FaCheckCircle, FaTimesCircle, FaEye, FaBoxOpen, FaHourglassHalf } from "react-icons/fa";
 import Swal from "sweetalert2";
 
 const PoNumberTable = () => {
@@ -194,6 +193,32 @@ const PoNumberTable = () => {
         }
     };
 
+    // Get received status badge
+    const getReceivedStatusBadge = (status) => {
+        if (status === 'received') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <FaBoxOpen className="text-green-600" />
+                    Received
+                </span>
+            );
+        } else if (status === 'partial') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    <FaHourglassHalf className="text-yellow-600" />
+                    Partial
+                </span>
+            );
+        } else {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                    <FaHourglassHalf className="text-gray-500" />
+                    Pending
+                </span>
+            );
+        }
+    };
+
     return (
         <div>
             <SideNav>
@@ -327,6 +352,7 @@ const PoNumberTable = () => {
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Code</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent To Supplier</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Received Status</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                                         </tr>
@@ -334,7 +360,7 @@ const PoNumberTable = () => {
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {currentPOs.length === 0 ? (
                                             <tr>
-                                                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                                                <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
                                                     No POs found.
                                                 </td>
                                             </tr>
@@ -363,6 +389,9 @@ const PoNumberTable = () => {
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         {getSentToSupplierBadge(po.isSentToSupplier)}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {getReceivedStatusBadge(po.receivedStatus)}
                                                     </td>
                                                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {new Date(po.createdAt).toLocaleDateString()}

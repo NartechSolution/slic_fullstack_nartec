@@ -7,9 +7,29 @@ const isAuth = require("../middleware/is-auth");
 const isSupplierAuth = require("../middleware/is-supplier-auth");
 
 /**
+ * GET /api/controlSerials/masters
+ * Get all ControlSerialMaster records (paginated)
+ * Query: ?page=1&limit=10&search&isArchived&isSentToSupplier&supplierId&itemCode
+ */
+router.get("/masters", isAuth, controlSerialController.getMasters);
+
+/**
+ * GET /api/controlSerials/masters/:id
+ * Get single master with all children
+ */
+router.get("/masters/:id", isAuth, controlSerialController.getMasterById);
+
+/**
+ * PUT /api/controlSerials/masters/:id/receive
+ * Receive serials with per-size quantities (partial/full)
+ * Body: { sizeReceived: [{size: string, receivedQty: number}] }
+ */
+router.put("/masters/:id/receive", isAuth, controlSerialController.receiveWithQty);
+
+/**
  * POST /api/controlSerials
- * Create bulk control serials
- * Body: { ItemCode: string, qty: number, supplierId: string, poNumber: string, size?: string }
+ * Create bulk control serials (now creates master + children)
+ * Body: { ItemCode: string, supplierId: string, poNumber: string, sizeQuantities: [{size, qty}] }
  */
 router.post(
   "/",
