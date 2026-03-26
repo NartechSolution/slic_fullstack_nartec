@@ -204,11 +204,11 @@ const PoNumberTable = () => {
                     Received
                 </span>
             );
-        } else if (status === 'partial') {
+        } else if (status === 'partially_received' || status === 'partial') {
             return (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                     <FaHourglassHalf className="text-yellow-600" />
-                    Partial
+                    Partially Received
                 </span>
             );
         } else {

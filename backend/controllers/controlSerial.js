@@ -44,18 +44,36 @@ exports.createControlSerials = async (req, res, next) => {
     const start = Date.now();
     const { ItemCode, supplierId, poNumber, sizeQuantities } = req.body;
 
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      const error = new CustomError(errors.errors[0].msg);
-      error.statusCode = 422;
-      error.data = errors;
-      return next(error);
+    // ── Step 0: Validate & Consolidate Input ────────────────────────────
+    if (!sizeQuantities || !Array.isArray(sizeQuantities)) {
+      const error = new CustomError("sizeQuantities array is required");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Filter out 0/negative and consolidate same sizes
+    const consolidatedMap = new Map();
+    for (const item of sizeQuantities) {
+      if (!item.size || item.qty <= 0) continue; 
+      const existing = consolidatedMap.get(item.size) || 0;
+      consolidatedMap.set(item.size, existing + item.qty);
+    }
+
+    const validSizeQuantities = Array.from(consolidatedMap.entries()).map(([size, qty]) => ({
+      size,
+      qty,
+    }));
+
+    if (validSizeQuantities.length === 0) {
+      const error = new CustomError("No valid size/quantity found (Quantities must be > 0)");
+      error.statusCode = 400;
+      throw error;
     }
 
     // ── Step 1: Parallel lookups (supplier + all products at once) ─────────
     const [supplier, ...products] = await Promise.all([
       SupplierModel.getSupplierById(supplierId),
-      ...sizeQuantities.map((item) => ItemCodeModel.findByItemCodeAndSize(ItemCode, item.size)),
+      ...validSizeQuantities.map((item) => ItemCodeModel.findByItemCodeAndSize(ItemCode, item.size)),
     ]);
 
     if (!supplier) {
@@ -66,19 +84,19 @@ exports.createControlSerials = async (req, res, next) => {
 
     // Map size → product, validate all found
     const sizeProductMap = new Map();
-    for (let i = 0; i < sizeQuantities.length; i++) {
+    for (let i = 0; i < validSizeQuantities.length; i++) {
       const product = products[i];
       if (!product) {
         const error = new CustomError(
-          `Product with ItemCode "${ItemCode}" and size "${sizeQuantities[i].size}" not found`
+          `Product with ItemCode "${ItemCode}" and size "${validSizeQuantities[i].size}" not found`
         );
         error.statusCode = 404;
         throw error;
       }
-      sizeProductMap.set(sizeQuantities[i].size, product);
+      sizeProductMap.set(validSizeQuantities[i].size, product);
     }
 
-    const primaryProduct = sizeProductMap.get(sizeQuantities[0].size);
+    const primaryProduct = sizeProductMap.get(validSizeQuantities[0].size);
 
     // ── Step 2: Create master record ────────────────────────────────────────
     const masterPromise = ControlSerialMasterModel.create({
@@ -95,11 +113,10 @@ exports.createControlSerials = async (req, res, next) => {
 
     // ── Step 4: Generate ALL serial objects in memory (pure JS, no await) ──
     const serials = [];
-    // Track running counters per product so sizes don't collide
     const counterMap = new Map(seriesStartMap);
 
     let totalQty = 0;
-    for (const { size, qty } of sizeQuantities) {
+    for (const { size, qty } of validSizeQuantities) {
       const product = sizeProductMap.get(size);
       let currentNum = parseInt(counterMap.get(product.id), 10);
       totalQty += qty;
@@ -416,21 +433,28 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
       throw error;
     }
 
-    // Find master for this PO
-    const master = await ControlSerialMasterModel.findByPoNumber(poNumber);
-    if (!master) {
+    // Find ALL masters for this PO to handle consolidated sending
+    const masters = await prisma.controlSerialMaster.findMany({
+      where: { poNumber },
+      include: { product: true, supplier: true, serials: true },
+    });
+
+    if (!masters || masters.length === 0) {
       const error = new CustomError("No control serial master found for this PO number");
       error.statusCode = 404;
       throw error;
     }
 
-    if (master.isSentToSupplier) {
+    // Check if at least one master is unsent
+    const unsentMasters = masters.filter(m => !m.isSentToSupplier);
+    if (unsentMasters.length === 0) {
       const error = new CustomError("Already sent all control serials to supplier for this PO number");
       error.statusCode = 400;
       throw error;
     }
 
-    const supplier = master.supplier;
+    // Use the first master to get supplier info (assuming one supplier per PO)
+    const supplier = masters[0].supplier;
     if (!supplier) {
       const error = new CustomError("Supplier not found for this PO");
       error.statusCode = 404;
@@ -438,9 +462,12 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
     }
 
     const baseUrl = process.env.FRONTEND_URL;
-    const uniqueItemCodes = master.product ? [master.product.ItemCode] : [];
-    const sizeSummary = buildSizeSummaryFromSerials(master.serials || []);
-    const totalQty = master.serials?.length || 0;
+    
+    // Consolidate serials from all masters for this PO
+    const allSerials = masters.flatMap(m => m.serials || []);
+    const uniqueItemCodes = [...new Set(masters.map(m => m.product?.ItemCode).filter(Boolean))];
+    const sizeSummary = buildSizeSummaryFromSerials(allSerials);
+    const totalQty = allSerials.length;
 
     await sendControlSerialNotificationEmail({
       supplierEmail: supplier.email,
@@ -452,10 +479,14 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
       baseUrl,
     });
 
-    // Mark all children + master as sent
-    const serialIds = (master.serials || []).map((s) => s.id);
+    // Mark all children + ALL masters for this PO as sent
+    const serialIds = allSerials.map((s) => s.id);
     await ControlSerialModel.markAsSentByIds(serialIds);
-    await ControlSerialMasterModel.update(master.id, { isSentToSupplier: true });
+    
+    await prisma.controlSerialMaster.updateMany({
+      where: { poNumber },
+      data: { isSentToSupplier: true }
+    });
 
     res.status(200).json(
       generateResponse(200, true, "Control serials sent to supplier successfully", {
@@ -463,6 +494,7 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
         supplierId: supplier.id,
         supplierEmail: supplier.email,
         quantity: totalQty,
+        mastersUpdated: masters.length
       })
     );
   } catch (error) {

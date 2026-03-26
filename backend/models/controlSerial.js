@@ -80,32 +80,81 @@ class ControlSerialMasterModel {
       where.product = { ItemCode: itemCode };
     }
 
-    const [masters, total] = await Promise.all([
+    // 1. Get unique PO numbers with pagination
+    const uniquePosRaw = await prisma.controlSerialMaster.groupBy({
+      by: ["poNumber"],
+      where,
+      orderBy: { _max: { createdAt: "desc" } },
+      skip,
+      take: limit,
+    });
+
+    if (uniquePosRaw.length === 0) {
+      return { masters: [], pagination: { total: 0, page, limit, totalPages: 0 } };
+    }
+
+    const poNumbers = uniquePosRaw.map(p => p.poNumber);
+
+    // 2. Fetch full metadata and aggregate metrics
+    const [allMastersForPos, serialCounts] = await Promise.all([
       prisma.controlSerialMaster.findMany({
-        where,
-        skip,
-        take: limit,
+        where: { poNumber: { in: poNumbers } },
         include: {
           product: { select: { id: true, ItemCode: true, ProductSize: true, EnglishName: true } },
           supplier: { select: { id: true, name: true, email: true } },
-          serials: {
-            select: { id: true, size: true, isReceived: true, isSentToSupplier: true, isArchived: true },
-          },
         },
         orderBy: { createdAt: "desc" },
       }),
-      prisma.controlSerialMaster.count({ where }),
+      prisma.controlSerial.groupBy({
+        by: ["poNumber", "size", "isReceived", "isSentToSupplier"],
+        where: { poNumber: { in: poNumbers } },
+        _count: { id: true },
+      })
     ]);
 
-    // Annotate each master with size summary
-    const enriched = masters.map((m) => ({
-      ...m,
-      totalQty: m.serials.length,
-      sizeSummary: buildSizeSummary(m.serials),
-      serials: undefined, // don't leak full list in list view
-    }));
+    // 3. Consolidate: one entry per PO
+    const enriched = poNumbers.map(po => {
+      const mastersForPo = allMastersForPos.filter(m => m.poNumber === po);
+      const latestMaster = mastersForPo[0];
+      
+      const poSerials = serialCounts.filter(s => s.poNumber === po);
+      const totalQty = poSerials.reduce((sum, s) => sum + s._count.id, 0);
+      
+      // Aggregates
+      const isSentToSupplierAgg = mastersForPo.every(m => m.isSentToSupplier);
+      
+      const receivedCount = poSerials.filter(s => s.isReceived).reduce((sum, s) => sum + s._count.id, 0);
+      let receivedStatus;
+      if (receivedCount === 0) receivedStatus = "pending";
+      else if (receivedCount >= totalQty) receivedStatus = "received";
+      else receivedStatus = "partially_received";
 
+      return {
+        id: latestMaster.id,
+        poNumber: po,
+        productId: latestMaster.productId,
+        supplierId: latestMaster.supplierId,
+        product: latestMaster.product,
+        supplier: latestMaster.supplier,
+        isSentToSupplier: isSentToSupplierAgg,
+        receivedStatus,
+        isArchived: latestMaster.isArchived,
+        createdAt: latestMaster.createdAt,
+        totalQty,
+        totalCount: totalQty, // For frontend compatibility
+        receivedQty: receivedCount, // For frontend compatibility
+        sizeSummary: buildSizeSummaryFromSerialsConsolidated(poSerials)
+      };
+    });
+
+    // 4. Total unique POs count for pagination
+    const totalCountResult = await prisma.controlSerialMaster.groupBy({
+      by: ["poNumber"],
+      where,
+    });
+    const total = totalCountResult.length;
     const totalPages = Math.ceil(total / limit);
+
     return {
       masters: enriched,
       pagination: { total, page, limit, totalPages, hasNextPage: page < totalPages, hasPrevPage: page > 1 },
@@ -232,7 +281,7 @@ class ControlSerialMasterModel {
     let receivedStatus;
     if (receivedCount === 0) receivedStatus = "pending";
     else if (receivedCount >= total) receivedStatus = "received";
-    else receivedStatus = "partial";
+    else receivedStatus = "partially_received";
 
     return await prisma.controlSerialMaster.update({
       where: { id: masterId },
@@ -628,43 +677,80 @@ class ControlSerialModel {
     if (isArchived !== null && typeof isArchived === "boolean") where.isArchived = isArchived;
     if (supplierId) where.supplierId = supplierId;
 
-    const masters = await prisma.controlSerialMaster.findMany({
+    // 1. Get unique PO numbers with pagination
+    const uniquePosRaw = await prisma.controlSerialMaster.groupBy({
+      by: ["poNumber"],
       where,
-      include: {
-        product: { select: { id: true, ItemCode: true, ProductSize: true } },
-        supplier: { select: { id: true, name: true, email: true } },
-      },
-      orderBy: { createdAt: "desc" },
+      orderBy: { _max: { createdAt: "desc" } },
       skip,
       take: limit,
     });
 
-    const masterIds = masters.map((m) => m.id);
-    const summaries = await prisma.controlSerial.groupBy({
-      by: ["masterId", "isReceived"],
-      where: { masterId: { in: masterIds } },
-      _count: { id: true },
+    if (uniquePosRaw.length === 0) return { masters: [], total: 0 };
+
+    const poNumbers = uniquePosRaw.map(p => p.poNumber);
+
+    // 2. Fetch full metadata and aggregate metrics
+    const [masters, allSerialsForPos] = await Promise.all([
+      prisma.controlSerialMaster.findMany({
+        where: { poNumber: { in: poNumbers } },
+        include: {
+          product: { select: { id: true, ItemCode: true, ProductSize: true } },
+          supplier: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.controlSerial.groupBy({
+        by: ["poNumber", "size", "isReceived"],
+        where: { poNumber: { in: poNumbers } },
+        _count: { id: true },
+      })
+    ]);
+
+    // 3. Consolidate: one entry per PO
+    const consolidated = poNumbers.map(po => {
+      // Find the latest master for metadata
+      const latestMaster = masters.find(m => m.poNumber === po);
+      const poSerialsSummary = allSerialsForPos.filter(s => s.poNumber === po);
+      const totalQty = poSerialsSummary.reduce((sum, s) => sum + s._count.id, 0);
+      const receivedQty = poSerialsSummary.filter(s => s.isReceived).reduce((sum, s) => sum + s._count.id, 0);
+      
+      // A PO is considered 'sent' if ALL its masters are marked as sent
+      const allMastersForPo = masters.filter(m => m.poNumber === po);
+      const isSentToSupplier = allMastersForPo.every(m => m.isSentToSupplier);
+
+      let receivedStatus;
+      if (receivedQty === 0) receivedStatus = "pending";
+      else if (receivedQty >= totalQty) receivedStatus = "received";
+      else receivedStatus = "partially_received";
+      
+      return {
+        id: latestMaster.id,
+        poNumber: po,
+        ItemCode: latestMaster.productId,
+        product: latestMaster.product,
+        supplier: latestMaster.supplier,
+        isSentToSupplier,
+        receivedStatus,
+        isArchived: latestMaster.isArchived,
+        createdAt: latestMaster.createdAt,
+        updatedAt: latestMaster.updatedAt,
+        totalQty,
+        totalCount: totalQty, // For frontend compatibility
+        receivedQty,        // For frontend compatibility
+        sizeSummary: buildSizeSummaryFromSerialsConsolidated(poSerialsSummary)
+      };
+    });
+
+    // 4. Get total count of unique POs
+    const totalCountResult = await prisma.controlSerialMaster.groupBy({
+      by: ["poNumber"],
+      where,
     });
 
     return {
-      masters: masters.map((m) => {
-        const totalQty = summaries
-          .filter((s) => s.masterId === m.id)
-          .reduce((sum, s) => sum + s._count.id, 0);
-
-        return {
-          id: m.id,
-          poNumber: m.poNumber,
-          ItemCode: m.productId,
-          product: m.product,
-          supplier: m.supplier,
-          totalQty,
-          isSentToSupplier: m.isSentToSupplier,
-          receivedStatus: m.receivedStatus,
-          createdAt: m.createdAt,
-        };
-      }),
-      total: await prisma.controlSerialMaster.count({ where }),
+      masters: consolidated,
+      total: totalCountResult.length
     };
   }
 
@@ -824,6 +910,23 @@ function buildSizeSummary(serials = []) {
     if (s.isReceived) map[sz].received += 1;
     else map[sz].pending += 1;
     if (s.binLocationId) map[sz].hasPutAway = true;
+  }
+  return Object.values(map).sort((a, b) => a.size.localeCompare(b.size, undefined, { numeric: true }));
+}
+
+/**
+ * Build a per-size summary from a summarized (groupBy) array of serial objects
+ * @param {Array<{size, isReceived, isSentToSupplier, _count: {id: number}}>} summaries
+ */
+function buildSizeSummaryFromSerialsConsolidated(summaries = []) {
+  const map = {};
+  for (const s of summaries) {
+    const sz = String(s.size || "unknown").trim();
+    if (!map[sz]) map[sz] = { size: sz, total: 0, received: 0, pending: 0 };
+    const count = s._count.id;
+    map[sz].total += count;
+    if (s.isReceived) map[sz].received += count;
+    else map[sz].pending += count;
   }
   return Object.values(map).sort((a, b) => a.size.localeCompare(b.size, undefined, { numeric: true }));
 }
