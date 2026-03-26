@@ -617,7 +617,11 @@ class ControlSerialModel {
   /**
    * Get unique PO numbers with total qty — now backed by ControlSerialMaster for efficiency
    */
-  static async getUniquePONumbersWithTotalQty(isArchived = null, supplierId = null) {
+  /**
+   * Get unique PO numbers with total qty with pagination
+   */
+  static async getUniquePONumbersWithTotalQty(isArchived = null, supplierId = null, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
     const where = {};
     if (isArchived !== null && typeof isArchived === "boolean") where.isArchived = isArchived;
     if (supplierId) where.supplierId = supplierId;
@@ -630,26 +634,35 @@ class ControlSerialModel {
         serials: { select: { id: true, serialNumber: true, isReceived: true, isSentToSupplier: true } },
       },
       orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
     });
 
-    return masters.map((m) => ({
-      id: m.id,
-      poNumber: m.poNumber,
-      serialNumber: m.serials[0]?.serialNumber ?? null,
-      ItemCode: m.productId,
-      product: m.product,
-      supplier: m.supplier,
-      totalQty: m.serials.length,
-      isSentToSupplier: m.isSentToSupplier,
-      receivedStatus: m.receivedStatus,
-      createdAt: m.createdAt,
-    }));
+    return {
+      masters: masters.map((m) => ({
+        id: m.id,
+        poNumber: m.poNumber,
+        serialNumber: m.serials[0]?.serialNumber ?? null,
+        ItemCode: m.productId,
+        product: m.product,
+        supplier: m.supplier,
+        totalQty: m.serials.length,
+        isSentToSupplier: m.isSentToSupplier,
+        receivedStatus: m.receivedStatus,
+        createdAt: m.createdAt,
+      })),
+      total: await prisma.controlSerialMaster.count({ where }),
+    };
   }
 
   /**
    * Get PO numbers with supplier details (for po-numbers endpoint, SLIC admin)
    */
-  static async getPoNumbersWithSupplierDetails(itemCode, size = null, isArchived = null, hasPutAway = null) {
+  /**
+   * Get PO numbers with supplier details with pagination
+   */
+  static async getPoNumbersWithSupplierDetails(itemCode, size = null, isArchived = null, hasPutAway = null, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
     const where = {};
     if (itemCode) where.product = { ItemCode: itemCode };
     if (isArchived !== null && typeof isArchived === "boolean") where.isArchived = isArchived;
@@ -670,18 +683,25 @@ class ControlSerialModel {
           : { select: { size: true, isReceived: true, isSentToSupplier: true } },
       },
       orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
     });
 
-    return masters.map((m) => ({
-      poNumber: m.poNumber,
-      product: m.product,
-      supplier: m.supplier,
-      isSentToSupplier: m.isSentToSupplier,
-      receivedStatus: m.receivedStatus,
-      isArchived: m.isArchived,
-      createdAt: m.createdAt,
-      updatedAt: m.updatedAt,
-    }));
+    return {
+      masters: masters.map((m) => ({
+        poNumber: m.poNumber,
+        product: m.product,
+        supplier: m.supplier,
+        isSentToSupplier: m.isSentToSupplier,
+        receivedStatus: m.receivedStatus,
+        sizeSummary: buildSizeSummary(m.serials),
+        isArchived: m.isArchived,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+        totalCount: m.serials.length, // Already have them in memory
+      })),
+      total: await prisma.controlSerialMaster.count({ where }),
+    };
   }
 
   /**

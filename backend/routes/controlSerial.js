@@ -27,6 +27,13 @@ router.get("/masters/:id", isAuth, controlSerialController.getMasterById);
 router.put("/masters/:id/receive", isAuth, controlSerialController.receiveWithQty);
 
 /**
+ * POST /api/controlSerials/generate-ssccs
+ * Body: { count: number }
+ * Atomically generates `count` unique GS1 SSCC-18 strings using TblBarSeriesNo counter
+ */
+router.post("/generate-ssccs", isAuth, controlSerialController.generateSSCCsForPrint);
+
+/**
  * POST /api/controlSerials
  * Create bulk control serials (now creates master + children)
  * Body: { ItemCode: string, supplierId: string, poNumber: string, sizeQuantities: [{size, qty}] }

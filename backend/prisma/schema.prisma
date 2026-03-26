@@ -155,8 +155,9 @@ model BinLocation {
 }
 
 model TblBarSeriesNo {
-  TblSysNoID  Int     @id @default(autoincrement())
-  BarSeriesNo String? @db.VarChar(10)
+  TblSysNoID   Int     @id @default(autoincrement())
+  BarSeriesNo  String? @db.VarChar(10)
+  ssccSeriesNo Int?    // GS1 SSCC serial counter — auto-incremented on each label print batch
 }
 
 model TblUsers {

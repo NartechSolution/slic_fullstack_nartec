@@ -6,6 +6,26 @@ const BinLocationModel = require("../models/binLocation");
 const { sendControlSerialNotificationEmail } = require("../utils/emailManager");
 const generateResponse = require("../utils/response");
 const CustomError = require("../exceptions/customError");
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
+
+// ── GS1 SSCC-18 generator ────────────────────────────────────────────────────
+const GS1_COMPANY_PREFIX = "6284141"; // SLIC KSA registered company prefix (starts with 628)
+const SSCC_EXTENSION_DIGIT = "0";     // Extension digit
+
+function calcMod10CheckDigit(digits17) {
+  let sum = 0;
+  for (let i = 0; i < 17; i++) {
+    sum += parseInt(digits17[i]) * (i % 2 === 0 ? 3 : 1);
+  }
+  return (10 - (sum % 10)) % 10;
+}
+
+function buildSSCC(serialRef) {
+  // serialRef: 9-digit string
+  const raw = SSCC_EXTENSION_DIGIT + GS1_COMPANY_PREFIX + serialRef; // 17 digits
+  return raw + calcMod10CheckDigit(raw);                              // 18 digits
+}
 
 /**
  * Generate serial number using formula: ItemCode + 6-digit series number
@@ -773,20 +793,29 @@ exports.unarchiveControlSerialsByPoNumber = async (req, res, next) => {
  */
 exports.getUniquePONumbersWithTotalQty = async (req, res, next) => {
   try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
     const isArchived =
       req.query.isArchived !== undefined ? req.query.isArchived === "true" : null;
     const supplierId = req.query.supplierId || null;
 
-    const posWithDetails = await ControlSerialModel.getUniquePONumbersWithTotalQty(isArchived, supplierId);
-
-    if (!posWithDetails || posWithDetails.length === 0) {
-      const error = new CustomError("No PO numbers found");
-      error.statusCode = 404;
-      throw error;
-    }
+    const result = await ControlSerialModel.getUniquePONumbersWithTotalQty(
+      isArchived,
+      supplierId,
+      page,
+      limit
+    );
 
     res.status(200).json(
-      generateResponse(200, true, "Unique PO numbers with total quantities retrieved successfully", posWithDetails)
+      generateResponse(200, true, "Unique PO numbers with total quantities retrieved successfully", {
+        data: result.masters,
+        pagination: {
+          total: result.total,
+          page,
+          limit,
+          totalPages: Math.ceil(result.total / limit),
+        },
+      })
     );
   } catch (error) {
     next(error);
@@ -799,21 +828,32 @@ exports.getUniquePONumbersWithTotalQty = async (req, res, next) => {
  */
 exports.getPoNumbersWithSupplierDetails = async (req, res, next) => {
   try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
     const itemCode = req.query.itemCode || null;
     const size = req.query.size || null;
     const isArchived = req.query.isArchived !== undefined ? req.query.isArchived === "true" : null;
     const hasPutAway = req.query.hasPutAway !== undefined ? req.query.hasPutAway === "true" : null;
 
-    const poNumbersWithSupplier = await ControlSerialModel.getPoNumbersWithSupplierDetails(itemCode, size, isArchived, hasPutAway);
-    const poNumbersWithCount = await Promise.all(
-      poNumbersWithSupplier.map(async (po) => {
-        const count = await ControlSerialModel.countByPoNumber(po.poNumber, size);
-        return { ...po, totalCount: count };
-      })
+    const result = await ControlSerialModel.getPoNumbersWithSupplierDetails(
+      itemCode,
+      size,
+      isArchived,
+      hasPutAway,
+      page,
+      limit
     );
 
     res.status(200).json(
-      generateResponse(200, true, "PO numbers with supplier details retrieved successfully", poNumbersWithCount)
+      generateResponse(200, true, "PO numbers with details retrieved successfully", {
+        data: result.masters,
+        pagination: {
+          total: result.total,
+          page,
+          limit,
+          totalPages: Math.ceil(result.total / limit),
+        },
+      })
     );
   } catch (error) {
     next(error);
@@ -904,3 +944,59 @@ function buildSizeSummaryFromSerials(serials = []) {
   }
   return Object.values(map);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GENERATE SSCCs FOR PRINT — POST /api/controlSerials/generate-ssccs
+// Body: { count: number }
+// Returns an array of `count` unique GS1 SSCC-18 strings.
+// Uses TblBarSeriesNo row 1 as the persistent sequential counter.
+// ═══════════════════════════════════════════════════════════════════════════
+exports.generateSSCCsForPrint = async (req, res, next) => {
+  try {
+    const count = parseInt(req.body.count, 10);
+    if (!count || count <= 0 || count > 1000) {
+      const error = new CustomError("count must be a positive integer (max 1000)");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Atomically fetch-and-increment the counter using a transaction
+    const ssccs = await prisma.$transaction(async (tx) => {
+      // Upsert row 1 — seed to 1 if it doesn't exist or ssccSeriesNo is null
+      let row = await tx.tblBarSeriesNo.findUnique({ where: { TblSysNoID: 1 } });
+
+      if (!row) {
+        row = await tx.tblBarSeriesNo.create({
+          data: { TblSysNoID: 1, BarSeriesNo: "1", ssccSeriesNo: 1 },
+        });
+      } else if (row.ssccSeriesNo === null || row.ssccSeriesNo === undefined) {
+        row = await tx.tblBarSeriesNo.update({
+          where: { TblSysNoID: 1 },
+          data: { ssccSeriesNo: 1 },
+        });
+      }
+
+      const startSeq = row.ssccSeriesNo;
+
+      // Increment by count
+      await tx.tblBarSeriesNo.update({
+        where: { TblSysNoID: 1 },
+        data: { ssccSeriesNo: { increment: count } },
+      });
+
+      // Build the SSCCs
+      const result = [];
+      for (let i = 0; i < count; i++) {
+        const seq = String(startSeq + i).padStart(9, "0");
+        result.push(buildSSCC(seq));
+      }
+      return result;
+    });
+
+    return res.status(200).json(
+      generateResponse(200, true, `${count} SSCC(s) generated`, { ssccs, count })
+    );
+  } catch (error) {
+    next(error);
+  }
+};
