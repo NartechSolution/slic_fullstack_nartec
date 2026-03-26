@@ -631,26 +631,37 @@ class ControlSerialModel {
       include: {
         product: { select: { id: true, ItemCode: true, ProductSize: true } },
         supplier: { select: { id: true, name: true, email: true } },
-        serials: { select: { id: true, serialNumber: true, isReceived: true, isSentToSupplier: true } },
       },
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
     });
 
+    const masterIds = masters.map((m) => m.id);
+    const summaries = await prisma.controlSerial.groupBy({
+      by: ["masterId", "isReceived"],
+      where: { masterId: { in: masterIds } },
+      _count: { id: true },
+    });
+
     return {
-      masters: masters.map((m) => ({
-        id: m.id,
-        poNumber: m.poNumber,
-        serialNumber: m.serials[0]?.serialNumber ?? null,
-        ItemCode: m.productId,
-        product: m.product,
-        supplier: m.supplier,
-        totalQty: m.serials.length,
-        isSentToSupplier: m.isSentToSupplier,
-        receivedStatus: m.receivedStatus,
-        createdAt: m.createdAt,
-      })),
+      masters: masters.map((m) => {
+        const totalQty = summaries
+          .filter((s) => s.masterId === m.id)
+          .reduce((sum, s) => sum + s._count.id, 0);
+
+        return {
+          id: m.id,
+          poNumber: m.poNumber,
+          ItemCode: m.productId,
+          product: m.product,
+          supplier: m.supplier,
+          totalQty,
+          isSentToSupplier: m.isSentToSupplier,
+          receivedStatus: m.receivedStatus,
+          createdAt: m.createdAt,
+        };
+      }),
       total: await prisma.controlSerialMaster.count({ where }),
     };
   }
@@ -667,39 +678,56 @@ class ControlSerialModel {
     if (itemCode) where.product = { ItemCode: itemCode };
     if (isArchived !== null && typeof isArchived === "boolean") where.isArchived = isArchived;
 
-    let serialWhere = {};
-    if (size) serialWhere.size = size;
-    if (hasPutAway !== null) {
-      serialWhere.binLocationId = hasPutAway ? { not: null } : null;
-    }
-
     const masters = await prisma.controlSerialMaster.findMany({
       where,
       include: {
         product: { select: { ItemCode: true, ProductSize: true } },
         supplier: { select: { id: true, name: true, email: true, status: true } },
-        serials: Object.keys(serialWhere).length > 0
-          ? { where: serialWhere, select: { size: true, isReceived: true, isSentToSupplier: true } }
-          : { select: { size: true, isReceived: true, isSentToSupplier: true } },
       },
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
     });
 
+    const masterIds = masters.map((m) => m.id);
+    const summaries = await prisma.controlSerial.groupBy({
+      by: ["masterId", "size", "isReceived"],
+      where: { masterId: { in: masterIds } },
+      _count: { id: true },
+    });
+
     return {
-      masters: masters.map((m) => ({
-        poNumber: m.poNumber,
-        product: m.product,
-        supplier: m.supplier,
-        isSentToSupplier: m.isSentToSupplier,
-        receivedStatus: m.receivedStatus,
-        sizeSummary: buildSizeSummary(m.serials),
-        isArchived: m.isArchived,
-        createdAt: m.createdAt,
-        updatedAt: m.updatedAt,
-        totalCount: m.serials.length, // Already have them in memory
-      })),
+      masters: masters.map((m) => {
+        const mSummaries = summaries.filter((s) => s.masterId === m.id);
+        const map = {};
+        let totalCount = 0;
+
+        for (const s of mSummaries) {
+          const sz = s.size || "unknown";
+          if (!map[sz]) map[sz] = { size: sz, total: 0, received: 0, pending: 0 };
+          map[sz].total += s._count.id;
+          if (s.isReceived) map[sz].received += s._count.id;
+          else map[sz].pending += s._count.id;
+          totalCount += s._count.id;
+        }
+
+        const sizeSummary = Object.values(map).sort((a, b) =>
+          a.size.localeCompare(b.size, undefined, { numeric: true })
+        );
+
+        return {
+          poNumber: m.poNumber,
+          product: m.product,
+          supplier: m.supplier,
+          isSentToSupplier: m.isSentToSupplier,
+          receivedStatus: m.receivedStatus,
+          sizeSummary,
+          isArchived: m.isArchived,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+          totalCount,
+        };
+      }),
       total: await prisma.controlSerialMaster.count({ where }),
     };
   }
