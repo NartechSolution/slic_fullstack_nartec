@@ -87,7 +87,7 @@ pipeline {
         stage('📁 Install Dependencies - Frontend') {
             steps {
                 dir("${env.TARGET_PROJECT_PATH}\\frontend") {
-                    bat 'npm install --prefer-offline --no-audit --progress=false'
+                    bat 'npm install --prefer-offline --no-audit --progress=false --legacy-peer-deps'
                 }
             }
         }
