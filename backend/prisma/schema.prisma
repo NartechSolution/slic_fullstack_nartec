@@ -686,3 +686,41 @@ model languages {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }
+
+/// Tracks lifecycle events per serial number for the Digital Link traceability page.
+/// Events are fired automatically when a serial is created, sent, received, put away, or merged.
+model SerialEvent {
+  id           String   @id @default(cuid())
+  serialNumber String   @db.VarChar(150) // references ControlSerial.serialNumber
+  eventType    String   @db.VarChar(50)
+  // CREATED | SENT_TO_SUPPLIER | RECEIVED | PUT_AWAY | MERGED
+  description  String?  @db.NVarChar(500)
+  metadata     String?  @db.NVarChar(Max) // JSON blob for extra context (PO#, supplier, etc.)
+  performedBy  String?  @db.NVarChar(255) // user/system that triggered the event
+  occurredAt   DateTime @default(now())
+
+  @@index([serialNumber], map: "IDX_SerialEvent_serialNumber")
+  @@index([eventType],    map: "IDX_SerialEvent_eventType")
+  @@index([occurredAt],   map: "IDX_SerialEvent_occurredAt")
+}
+
+/// Stores the pairing of two shoe serials (left + right) into a Finished Good barcode.
+model MergeRecord {
+  id        String   @id @default(cuid())
+  serial1   String   @db.VarChar(150) // left shoe serial
+  serial2   String   @db.VarChar(150) // right shoe serial
+  fgSerial  String   @unique @db.VarChar(200) // generated FG serial (e.g. FG-PO567890-36-1743012345)
+  poNumber  String?  @db.VarChar(50)
+  itemCode  String?  @db.NVarChar(20)
+  size      String?  @db.NVarChar(50)
+  gtin      String?  @db.VarChar(50)
+  mergedBy  String?  @db.NVarChar(255) // username/user ID
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([serial1],  map: "IDX_MergeRecord_serial1")
+  @@index([serial2],  map: "IDX_MergeRecord_serial2")
+  @@index([fgSerial], map: "IDX_MergeRecord_fgSerial")
+  @@index([poNumber], map: "IDX_MergeRecord_poNumber")
+}
+

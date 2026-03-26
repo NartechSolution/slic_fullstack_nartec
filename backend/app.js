@@ -26,6 +26,8 @@ const controlSerialRoutes = require("./routes/controlSerial");
 const supplierRoutes = require("./routes/supplierRoute");
 const binLocationRoutes = require("./routes/binLocation");
 const migrationRoutes = require("./routes/migration");
+const digitalLinkRoutes = require("./routes/digitalLink");
+const mergeSerialRoutes = require("./routes/mergeSerial");
 const path = require("path");
 const prisma = require("./db");
 const app = express();
@@ -63,6 +65,10 @@ app.use("/api/controlSerials", controlSerialRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/binLocations", binLocationRoutes);
 app.use("/api/admin/migrate", migrationRoutes);
+// Digital Link — public (no auth), accessible via QR scan
+app.use("/api/digital-link", digitalLinkRoutes);
+// Merge Serial — protected endpoints
+app.use("/api/merge-serial", mergeSerialRoutes);
 
 app.get("/test", (req, res) => {
   function calculateCheckDigit(gtinWithoutCheckDigit) {

@@ -9,6 +9,34 @@ const CustomError = require("../exceptions/customError");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
+/**
+ * Fire lifecycle events for a list of serial numbers.
+ * Uses createMany for performance. Fire-and-forget (do not await in hot paths).
+ * @param {string[]} serialNumbers
+ * @param {string} eventType  CREATED | SENT_TO_SUPPLIER | RECEIVED | PUT_AWAY | MERGED
+ * @param {string} description
+ * @param {object} [metadata]
+ */
+async function fireSerialEvents(serialNumbers, eventType, description, metadata = null) {
+  if (!serialNumbers || serialNumbers.length === 0) return;
+  const metaStr = metadata ? JSON.stringify(metadata) : null;
+  try {
+    await prisma.serialEvent.createMany({
+      data: serialNumbers.map((sn) => ({
+        serialNumber: sn,
+        eventType,
+        description,
+        metadata: metaStr,
+        performedBy: "System",
+      })),
+      skipDuplicates: false,
+    });
+  } catch (err) {
+    // Non-critical — do not crash the main flow
+    console.error(`[SerialEvent] Failed to fire ${eventType} events:`, err.message);
+  }
+}
+
 // ── GS1 SSCC-18 generator ────────────────────────────────────────────────────
 const GS1_COMPANY_PREFIX = "6284141"; // SLIC KSA registered company prefix (starts with 628)
 const SSCC_EXTENSION_DIGIT = "0";     // Extension digit
@@ -144,6 +172,16 @@ exports.createControlSerials = async (req, res, next) => {
       error.statusCode = 500;
       throw error;
     }
+
+    // ── Step 6: Fire CREATED events (async, non-blocking) ────────────────────
+    const serialNumbers = serials.map((s) => s.serialNumber);
+    const product = sizeProductMap.get(validSizeQuantities[0].size);
+    fireSerialEvents(
+      serialNumbers,
+      "CREATED",
+      `Serial created for PO ${poNumber}`,
+      { poNumber, itemCode: product?.ItemCode, totalQty }
+    ); // intentionally not awaited
 
     const durationMs = Date.now() - start;
 
@@ -488,6 +526,15 @@ exports.sendControlSerialsByPoNumber = async (req, res, next) => {
       data: { isSentToSupplier: true }
     });
 
+    // Fire SENT_TO_SUPPLIER events (non-blocking)
+    const sentSerialNumbers = allSerials.map((s) => s.serialNumber).filter(Boolean);
+    fireSerialEvents(
+      sentSerialNumbers,
+      "SENT_TO_SUPPLIER",
+      `Sent to supplier: ${supplier.name} (${supplier.email})`,
+      { poNumber, supplierName: supplier.name, supplierEmail: supplier.email }
+    ); // intentionally not awaited
+
     res.status(200).json(
       generateResponse(200, true, "Control serials sent to supplier successfully", {
         poNumber,
@@ -730,6 +777,19 @@ exports.markAsReceived = async (req, res, next) => {
       const received = allSerials.filter((s) => s.isReceived).length;
       const newStatus = received === 0 ? "pending" : received >= total ? "received" : "partial";
       await ControlSerialMasterModel.update(master.id, { receivedStatus: newStatus });
+
+      // Fire RECEIVED events (non-blocking) for serials that are now received
+      const nowReceivedSerials = allSerials
+        .filter((s) => s.isReceived && s.serialNumber)
+        .map((s) => s.serialNumber);
+      if (nowReceivedSerials.length > 0) {
+        fireSerialEvents(
+          nowReceivedSerials,
+          "RECEIVED",
+          `Received at warehouse for PO ${poNumber}`,
+          { poNumber, size: size || null }
+        ); // intentionally not awaited
+      }
     }
 
     res.status(200).json(
