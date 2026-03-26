@@ -1,4 +1,5 @@
 const prisma = require("../db");
+const { v4: uuidv4 } = require("uuid");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ControlSerialMasterModel — Master-level operations (one row per PO+product+supplier)
@@ -315,14 +316,15 @@ class ControlSerialModel {
           // Build VALUES list: each row is one comma-separated tuple
           const rows = chunk
             .map(({ serialNumber, ItemCode, supplierId, poNumber, size, masterId }) => {
+              const id = uuidv4();
               const esc = (v) => (v == null ? "NULL" : `'${String(v).replace(/'/g, "''")}'`);
-              return `(${esc(serialNumber)},${esc(ItemCode)},${esc(supplierId)},${esc(poNumber)},${esc(size)},${esc(masterId)},0,0,0,NULL,'${now}','${now}')`;
+              return `(${esc(id)},${esc(serialNumber)},${esc(ItemCode)},${esc(supplierId)},${esc(poNumber)},${esc(size)},${esc(masterId)},0,0,0,NULL,'${now}','${now}')`;
             })
             .join(",\n");
 
           const sql = `
             INSERT INTO [dbo].[ControlSerial]
-              (serialNumber, ItemCode, supplierId, poNumber, size, masterId,
+              (id, serialNumber, ItemCode, supplierId, poNumber, size, masterId,
                isSentToSupplier, isReceived, isArchived, binLocationId, createdAt, updatedAt)
             VALUES ${rows}
           `;
