@@ -22,12 +22,18 @@ const PoNumberTable = () => {
     const [sendingPO, setSendingPO] = useState(false);
     const itemsPerPage = 10;
 
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+
     const rowData = location.state?.rowData;
 
     // Fetch PO Numbers
     const fetchPoNumbers = async () => {
-        const response = await newRequest.get(`/controlSerials/po-numbers-with-total-qty`);
-        return response?.data?.data || [];
+        const response = await newRequest.get(`/controlSerials/po-numbers-with-total-qty?page=${currentPage}&limit=${itemsPerPage}`);
+        const result = response?.data?.data || { data: [], pagination: {} };
+        setTotalPages(result.pagination?.totalPages || 1);
+        setTotalItems(result.pagination?.total || 0);
+        return Array.isArray(result.data) ? result.data : [];
     };
 
     const {
@@ -35,11 +41,12 @@ const PoNumberTable = () => {
         isLoading,
         refetch,
     } = useQuery({
-        queryKey: ['poNumbersWithQty'],
+        queryKey: ['poNumbersWithQty', currentPage],
         queryFn: fetchPoNumbers,
         staleTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
         retry: false,
+        keepPreviousData: true,
         onError: (err) => {
             toast.error(err?.response?.data?.message || err?.response?.data?.error || "NO PO available yet");
         },
@@ -128,18 +135,13 @@ const PoNumberTable = () => {
         }
     };
     
-    const filteredPOs = poList.filter(po =>
+    const filteredPOs = Array.isArray(poList) ? poList.filter(po =>
         po.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        po.product.ItemCode?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+        (po.product && po.product.ItemCode?.toLowerCase().includes(searchTerm.toLowerCase()))
+    ) : [];
 
-    // Pagination
-    const totalPages = Math.ceil(filteredPOs.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const currentPOs = filteredPOs.slice(startIndex, endIndex);
-
+    // Pagination - Use server-side values directly
     const handlePageChange = (page) => {
         if (page >= 1 && page <= totalPages) {
             setCurrentPage(page);
@@ -255,7 +257,7 @@ const PoNumberTable = () => {
                                 <div>
                                     <h3 className="font-bold text-gray-900 text-lg mb-1">PO Numbers List</h3>
                                     <p className="text-sm text-gray-500">
-                                        Total {filteredPOs.length} PO Numbers
+                                        Total {totalItems} PO Numbers
                                     </p>
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
@@ -292,22 +294,6 @@ const PoNumberTable = () => {
                                     >
                                         {sendingPO ? "Sending..." : "Send Supplier"}
                                     </Button>
-                                    {/* <Button 
-                                        onClick={() => setIsAddPopupVisible(true)}
-                                        variant="contained"
-                                        sx={{
-                                            backgroundColor: '#008000',
-                                            '&:hover': {
-                                            backgroundColor: '#006600',
-                                          },
-                                          '&:disabled': {
-                                            backgroundColor: '#ccc',
-                                          },
-                                        }}
-                                        endIcon={<FiPlus className="w-4 h-4" />}
-                                      >
-                                        Add Serial
-                                    </Button> */}
                                     <Button 
                                       onClick={handleRefresh}
                                       variant="contained"
@@ -358,14 +344,14 @@ const PoNumberTable = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {currentPOs.length === 0 ? (
+                                        {filteredPOs.length === 0 ? (
                                             <tr>
                                                 <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
                                                     No POs found.
                                                 </td>
                                             </tr>
                                         ) : (
-                                            currentPOs.map((po) => (
+                                            filteredPOs.map((po) => (
                                                 <tr
                                                     key={po.id}
                                                     onClick={() => setSelectedPO(po)}
@@ -419,7 +405,7 @@ const PoNumberTable = () => {
                             {/* Enhanced Pagination */}
                             <div className="px-4 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
                                 <div className="text-sm text-gray-600">
-                                    Showing {startIndex + 1} to {Math.min(endIndex, filteredPOs.length)} of {filteredPOs.length} entries
+                                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} entries
                                 </div>
                                 <div className="flex flex-wrap gap-1 justify-center">
                                     <button
@@ -429,20 +415,20 @@ const PoNumberTable = () => {
                                     >
                                         Previous
                                     </button>
-                                    {getPageNumbers().map((page, idx) => (
-                                        page === '...' ? (
+                                    {getPageNumbers().map((pageNum, idx) => (
+                                        pageNum === '...' ? (
                                             <span key={idx} className="px-3 py-1">...</span>
                                         ) : (
                                             <button
                                                 key={idx}
-                                                onClick={() => handlePageChange(page)}
+                                                onClick={() => handlePageChange(pageNum)}
                                                 className={`px-3 py-1 border rounded text-sm ${
-                                                    currentPage === page
+                                                    currentPage === pageNum
                                                         ? 'bg-secondary text-white border-secondary'
                                                         : 'border-gray-300 hover:bg-gray-50'
                                                 }`}
                                             >
-                                                {page}
+                                                {pageNum}
                                             </button>
                                         )
                                     ))}
