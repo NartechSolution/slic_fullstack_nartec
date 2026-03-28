@@ -778,11 +778,19 @@ class ControlSerialModel {
     });
 
     const masterIds = masters.map((m) => m.id);
-    const summaries = await prisma.controlSerial.groupBy({
-      by: ["masterId", "size", "isReceived"],
-      where: { masterId: { in: masterIds } },
-      _count: { id: true },
-    });
+    const itemCodes = [...new Set(masters.map((m) => m.product?.ItemCode).filter(Boolean))];
+
+    const [summaries, products] = await Promise.all([
+      prisma.controlSerial.groupBy({
+        by: ["masterId", "size", "isReceived"],
+        where: { masterId: { in: masterIds } },
+        _count: { id: true },
+      }),
+      prisma.tblItemCodes1S1Br.findMany({
+        where: { ItemCode: { in: itemCodes } },
+        select: { ItemCode: true, ProductSize: true, GTIN: true }
+      })
+    ]);
 
     return {
       masters: masters.map((m) => {
@@ -792,7 +800,10 @@ class ControlSerialModel {
 
         for (const s of mSummaries) {
           const sz = s.size || "unknown";
-          if (!map[sz]) map[sz] = { size: sz, total: 0, received: 0, pending: 0 };
+          if (!map[sz]) {
+            const matchingProduct = products.find(p => p.ItemCode === m.product?.ItemCode && p.ProductSize === sz);
+            map[sz] = { size: sz, total: 0, received: 0, pending: 0, gtin: matchingProduct?.GTIN || null };
+          }
           map[sz].total += s._count.id;
           if (s.isReceived) map[sz].received += s._count.id;
           else map[sz].pending += s._count.id;
