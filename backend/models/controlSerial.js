@@ -695,7 +695,7 @@ class ControlSerialModel {
       prisma.controlSerialMaster.findMany({
         where: { poNumber: { in: poNumbers } },
         include: {
-          product: { select: { id: true, ItemCode: true, ProductSize: true } },
+          product: { select: { id: true, ItemCode: true, ProductSize: true, GTIN: true } },
           supplier: { select: { id: true, name: true, email: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -769,7 +769,7 @@ class ControlSerialModel {
     const masters = await prisma.controlSerialMaster.findMany({
       where,
       include: {
-        product: { select: { ItemCode: true, ProductSize: true } },
+        product: { select: { ItemCode: true, ProductSize: true, GTIN: true } },
         supplier: { select: { id: true, name: true, email: true, status: true } },
       },
       orderBy: { createdAt: "desc" },

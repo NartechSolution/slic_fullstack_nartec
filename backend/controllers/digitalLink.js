@@ -35,9 +35,54 @@ exports.getDigitalLink = async (req, res, next) => {
     });
 
     if (!serial) {
-      const err = new CustomError(`No serial found for: ${serialNumber}`);
-      err.statusCode = 404;
-      throw err;
+      // It might be a product barcode (GTIN) or ItemCode instead of a serial number
+      const productFound = await prisma.tblItemCodes1S1Br.findFirst({
+        where: {
+          OR: [
+            { GTIN: serialNumber.trim() },
+            { ItemCode: serialNumber.trim() }
+          ]
+        }
+      });
+
+      if (!productFound) {
+        const err = new CustomError(`No serial or product found for: ${serialNumber}`);
+        err.statusCode = 404;
+        throw err;
+      }
+
+      // Return product-only response without timeline
+      const productResponse = {
+        serialNumber: serialNumber,
+        isProductLevel: true, // Help frontend distinguish
+        product: {
+          itemCode: productFound.ItemCode || null,
+          englishName: productFound.EnglishName || null,
+          arabicName: productFound.ArabicName || null,
+          gtin: productFound.GTIN || null,
+          size: productFound.ProductSize || null,
+          brandName: productFound.BrandName || null,
+          modelName: productFound.ModelName || null,
+          color: productFound.color || null,
+          upper: productFound.upper || null,
+          sole: productFound.sole || null,
+          width: productFound.width || null,
+          packagingType: productFound.PackagingType || null,
+          productType: productFound.ProductType || null,
+          image: productFound.image || null,
+          productionDate: productFound.ProductionDate || null,
+        },
+        po: null,
+        location: null,
+        merge: null,
+        timeline: [], // No timeline for a generic product
+        createdAt: productFound.Created_at,
+        updatedAt: productFound.Updated_at,
+      };
+
+      return res.status(200).json(
+        generateResponse(200, true, "Product information retrieved successfully", productResponse)
+      );
     }
 
     // 2. Fetch all lifecycle events for this serial (oldest → newest)
