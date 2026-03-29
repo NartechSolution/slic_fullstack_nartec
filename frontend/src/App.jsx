@@ -34,6 +34,7 @@ import SupplierList from "./Pages/SlicPages/SupplierList/SupplierList.jsx";
 import ArchivedPO from "./Pages/SlicPages/MasterData/ArchivedPO/ArchivedPO.jsx";
 import { SlicTokenProvider } from "./Contexts/SlicTokenContext.jsx";
 import PoNumberTable from "./Pages/SlicPages/DigitalLinks/PoNumberTable.jsx";
+import DigitalLinkLandingPage from "./Pages/SlicPages/DigitalLinks/DigitalLinkLandingPage.jsx";
 
 const queryClient = new QueryClient();
 
@@ -224,6 +225,7 @@ const App = () => {
                           </ProtectedRoute>
                         }
                       />
+                      <Route path="/product-info" element={<DigitalLinkLandingPage />} />
                     </Routes>
                   </QueryClientProvider>
                 </BrowserRouter>

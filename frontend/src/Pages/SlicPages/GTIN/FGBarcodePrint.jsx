@@ -5,7 +5,7 @@ import imageLiveUrl from "../../../utils/urlConverter/imageLiveUrl";
 
 const FGBarcodePrint = ({ selectedRows, onPrintComplete }) => {
   const handlePrint = () => {
-    console.log('Selected Rows for Printing:', selectedRows);
+    // console.log('Selected Rows for Printing:', selectedRows);
     if (selectedRows.length === 0) {
       return;
     }
@@ -88,10 +88,9 @@ const FGBarcodePrint = ({ selectedRows, onPrintComplete }) => {
       <div id="fg-barcode-container">
         {selectedRows.map((barcode, index) => (
           <div className="label-container hidden" key={index}>
-            {/* QR Code */}
             <div className="qr-code">
               <QRCodeSVG
-                value={barcode?.GTIN || '6287898001805'}
+                value={`https://uat.slicapp.online/product-info?id=${barcode?.id}`}
                 size={45}
                 level="M"
               />
