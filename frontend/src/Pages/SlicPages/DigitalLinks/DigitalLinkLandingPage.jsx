@@ -15,15 +15,14 @@ import {
 } from "react-icons/md";
 import { useTranslation } from "react-i18next";
 import SideNav from "../../../components/Sidebar/SideNav";
+import { toast } from "react-toastify";
 
 const DigitalLinkLandingPage = () => {
   // Always call useTranslation at the very top
   const { t } = useTranslation();
-  
-  const { id: pathId } = useParams();
   const [searchParams] = useSearchParams();
-  const queryId = searchParams.get("id");
-  const id = pathId || queryId;
+  const gtin = searchParams.get("gtin");
+  const id = gtin;
 
   // Fetch product data using react-query for stable data management
   const { data: pageData, isLoading, isError } = useQuery({
@@ -34,12 +33,14 @@ const DigitalLinkLandingPage = () => {
         const response = await newRequest.get(`/digital-link/${id}`);
         return response?.data?.data || null;
       } catch (err) {
+        toast.error(err?.response?.data?.error || "Something Went Wrong!")
         console.error("Fetch error:", err);
         throw err;
       }
     },
     enabled: !!id,
     staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 
   if (isLoading) {
@@ -85,13 +86,13 @@ const DigitalLinkLandingPage = () => {
       
       <div className={`container mx-auto px-4 py-8 relative z-10 ${isInternal ? 'max-w-6xl' : 'max-w-5xl'}`}>
         {/* Header */}
-        <header className="bg-[#0a192f] text-white rounded-2xl p-6 md:p-8 mb-8 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <header className="bg-primary text-secondary rounded-2xl p-6 md:p-8 mb-8 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-4">
-              <MdQrCodeScanner className="text-blue-400" />
+              <MdQrCodeScanner className="text-secondary" />
               {t("SLIC Digital Link")}
             </h1>
-            <p className="mt-2 text-sm md:text-base tracking-wide text-gray-300">
+            <p className="mt-2 text-sm md:text-base tracking-wide text-secondary">
               {t("Product Information & Supply Chain Tracking System")}
             </p>
           </div>
@@ -109,7 +110,7 @@ const DigitalLinkLandingPage = () => {
           {/* Product Information Card */}
           <div className="bg-white border-2 border-blue-50 rounded-2xl p-6 md:p-8 shadow-lg hover:shadow-xl duration-300 group">
             <h2 className="text-2xl font-bold text-[#0a192f] mb-6 flex items-center gap-3 pb-4 border-b-2 border-blue-50">
-              <MdInventory2 className="text-blue-600" />
+              <MdInventory2 className="text-secondary" />
               {t("Product Identity")}
             </h2>
             
@@ -143,7 +144,7 @@ const DigitalLinkLandingPage = () => {
               
               {!isProductLevel && pageData.serialNumber && (
                 <div className="bg-blue-50 border-2 border-blue-100 rounded-xl p-5 shadow-inner">
-                  <div className="text-xs text-blue-600 font-bold uppercase tracking-widest mb-1 flex items-center gap-2">
+                  <div className="text-xs text-secondary font-bold uppercase tracking-widest mb-1 flex items-center gap-2">
                     <MdInfoOutline /> {t("Unique Serial Number")}
                   </div>
                   <div className="text-xl font-mono font-bold text-blue-900 tracking-wider">
@@ -157,7 +158,7 @@ const DigitalLinkLandingPage = () => {
           {/* Timeline & Stats Card */}
           <div className="bg-white border-2 border-blue-50 rounded-2xl p-6 md:p-8 shadow-lg hover:shadow-xl duration-300">
             <h2 className="text-2xl font-bold text-[#0a192f] mb-6 flex items-center gap-3 pb-4 border-b-2 border-blue-50">
-              <MdTimeline className="text-blue-600" />
+              <MdTimeline className="text-secondary" />
               {t("Supply Chain History")}
             </h2>
             
@@ -197,7 +198,7 @@ const DigitalLinkLandingPage = () => {
           {/* Raw Materials Section */}
           <div className="bg-white border-2 border-blue-50 rounded-2xl p-6 md:p-8 shadow-lg hover:shadow-xl duration-300">
             <h2 className="text-2xl font-bold text-[#0a192f] mb-6 flex items-center gap-3 pb-4 border-b-2 border-blue-50">
-              <MdCategory className="text-blue-600" />
+              <MdCategory className="text-secondary" />
               {t("Material Composition")}
             </h2>
             
@@ -212,7 +213,7 @@ const DigitalLinkLandingPage = () => {
           {/* Vendor & Sales Info */}
           <div className="bg-white border-2 border-blue-50 rounded-2xl p-6 md:p-8 shadow-lg hover:shadow-xl duration-300">
             <h2 className="text-2xl font-bold text-[#0a192f] mb-6 flex items-center gap-3 pb-4 border-b-2 border-blue-50">
-              <MdShoppingCart className="text-blue-600" />
+              <MdShoppingCart className="text-secondary" />
               {t("Sourcing & Distribution")}
             </h2>
             
@@ -276,7 +277,7 @@ const DetailRow = ({ label, value }) => (
 const TimelineItem = ({ date, time, title, description, isLast }) => (
   <div className="relative group">
     <div className={`absolute -left-[27px] top-[4px] w-[18px] h-[18px] rounded-full border-4 border-white z-10 transition-all duration-300
-      ${isLast ? 'bg-blue-600 ring-4 ring-blue-50 shadow-md' : 'bg-gray-300'}`}>
+      ${isLast ? 'bg-secondary ring-4 ring-blue-50 shadow-md' : 'bg-gray-300'}`}>
     </div>
     <div className="bg-gray-50 hover:bg-white hover:shadow-xl p-4 rounded-2xl border border-transparent hover:border-blue-100 transition-all duration-300 shadow-sm">
       <div className="flex justify-between items-start mb-1">

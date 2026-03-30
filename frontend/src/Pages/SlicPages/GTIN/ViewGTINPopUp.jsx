@@ -237,7 +237,7 @@ const ViewGTINPopUp = ({ isVisible, setVisibility }) => {
                     
                     <button
                       onClick={() => {
-                        window.open(`/product-info?id=${updateProductsData?.id}`, "_blank");
+                        window.open(`/product-info?gtin=${updateProductsData?.GTIN}`, "_blank");
                       }}
                       className="mt-4 px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary/80 transition-all text-sm font-semibold flex items-center gap-2"
                     >
