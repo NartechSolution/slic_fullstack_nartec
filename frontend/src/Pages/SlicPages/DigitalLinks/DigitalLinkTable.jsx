@@ -1,6 +1,8 @@
 import React, { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { FiEdit2, FiTrash2, FiPlus, FiPrinter, FiLock } from "react-icons/fi";
+import { MdVisibility } from "react-icons/md";
 import { HiRefresh } from "react-icons/hi";
 import { Button, CircularProgress, Tooltip } from "@mui/material";
 import { toast } from "react-toastify";
@@ -18,6 +20,7 @@ const DigitalLinkTable = ({
   pagination,
   onPageChange,
 }) => {
+  const navigate = useNavigate();
   const [isEditPopupVisible, setIsEditPopupVisible] = useState(false);
   const [selectedSerial, setSelectedSerial] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -317,8 +320,16 @@ const DigitalLinkTable = ({
                           <QRCodeSVG value={serial.serialNumber} size={32} />
                         )}
                       </td>
-                      <td className="px-4 py-3 truncate">
+                      <td className="px-4 py-3 truncate text-center">
                         <div className="flex items-center justify-center gap-2">
+                          <Tooltip title="View Traceability Dashboard" arrow>
+                            <button
+                              onClick={() => navigate(`/digital-link/${serial.serialNumber}`)}
+                              className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors"
+                            >
+                              <MdVisibility className="w-5 h-5" />
+                            </button>
+                          </Tooltip>
                           <Tooltip 
                             title={serial.isSentToSupplier ? "Cannot edit: Already sent to supplier" : "Edit"} 
                             arrow

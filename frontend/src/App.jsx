@@ -226,6 +226,7 @@ const App = () => {
                         }
                       />
                       <Route path="/product-info" element={<DigitalLinkLandingPage />} />
+                      <Route path="/digital-link/:id" element={<DigitalLinkLandingPage />} />
                     </Routes>
                   </QueryClientProvider>
                 </BrowserRouter>

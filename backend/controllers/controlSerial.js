@@ -38,7 +38,7 @@ async function fireSerialEvents(serialNumbers, eventType, description, metadata 
 }
 
 // ── GS1 SSCC-18 generator ────────────────────────────────────────────────────
-const GS1_COMPANY_PREFIX = "6284141"; // SLIC KSA registered company prefix (starts with 628)
+const GS1_COMPANY_PREFIX = "6287898"; // SLIC KSA registered company prefix (starts with 628)
 const SSCC_EXTENSION_DIGIT = "0";     // Extension digit
 
 function calcMod10CheckDigit(digits17) {
