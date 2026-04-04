@@ -110,6 +110,8 @@ const F3TenderCashPopUp = ({
   // console.log(examptReason)
 
   const EX_TRANSACTION_CODES = ["EXIN", "AXIN", "EXSR", "AXSR"];
+  // Sales Return types that must NOT auto-generate BRV receipts
+  const SALES_RETURN_CODES = ["DCSR", "KCSR", "JCSR", "RCSR"];
   // Function to determine the correct customer code based on transaction type
   const getCustomerCode = () => {
     // If the transaction code belongs to the EX/AX group, use selectedCustomerCode (fetched based on location and transaction)
@@ -657,8 +659,9 @@ const F3TenderCashPopUp = ({
         await handleArchiveInvoice();
 
         // Call Bank API if paymentModes.code is 4 or 5
+        // BRV auto-generation is disabled for DCSR, KCSR, JCSR, RCSR
         let bankHeadSysId = "";
-        if (paymentModes.code === "4" || paymentModes.code === "5") {
+        if ((paymentModes.code === "4" || paymentModes.code === "5") && !SALES_RETURN_CODES.includes(selectTransactionCode)) {
           const bankReceiptDI = {
             _keyword_: "BANKRCPTDI",
             "_secret-key_": "2bf52be7-9f68-4d52-9523-53f7f267153b",
@@ -672,10 +675,6 @@ const F3TenderCashPopUp = ({
                 BankApproverCode: bankApprovedCode,
                 CashCardFlag: "CARD",
                 ReceiptAmt: totolAmountWithoutExchange,
-                // CustomerId:
-                //   selectedSalesReturnType === "DIRECT RETURN"
-                //     ? selectedCustomeNameWithDirectInvoice?.CUST_CODE
-                //     : selectedCustomerCode?.CUSTOMERCODE,
                 CustomerId: customerCode,
                 MatchingTransactions: [
                   {
@@ -705,7 +704,6 @@ const F3TenderCashPopUp = ({
             "Bank Receipt processed for Direct Sales Return Debit/Credit"
           );
           const bankDocumentNo = bankRes?.data?.message?.["Document No"];
-          // bankHeadSysId = bankRes?.data?.message?.["Ref-No/SysID"];
           bankHeadSysId = bankRes?.data?.message?.["Document No"];
 
           if (!bankDocumentNo) {
@@ -714,7 +712,11 @@ const F3TenderCashPopUp = ({
             return;
           }
         } else {
-          console.log("Direct Sales Return - Cash (No Bank API Call)");
+          if (SALES_RETURN_CODES.includes(selectTransactionCode)) {
+            console.log(`BRV auto-generation skipped for Sales Return type: ${selectTransactionCode}`);
+          } else {
+            console.log("Direct Sales Return - Cash (No Bank API Call)");
+          }
         }
 
         // Save the sales return record with the Bank reference ID if applicable
@@ -1033,8 +1035,9 @@ const F3TenderCashPopUp = ({
         handleDocumentNoUpdate(documentNo, headSysId, transactionCode);
 
         // Call Bank API if paymentModes.code is 4 or 5
+        // BRV auto-generation is disabled for DCSR, KCSR, JCSR, RCSR
         let bankHeadSysId = "";
-        if (paymentModes.code === "4" || paymentModes.code === "5") {
+        if ((paymentModes.code === "4" || paymentModes.code === "5") && !SALES_RETURN_CODES.includes(transactionCode)) {
           const bankReceiptDI = {
             _keyword_: "BANKRCPTDI",
             "_secret-key_": "2bf52be7-9f68-4d52-9523-53f7f267153b",
@@ -1048,10 +1051,6 @@ const F3TenderCashPopUp = ({
                 BankApproverCode: bankApprovedCode,
                 CashCardFlag: "CARD",
                 ReceiptAmt: totolAmountWithoutVatDSalesNoInvoice,
-                // CustomerId:
-                //   selectedSalesReturnType === "DIRECT RETURN"
-                //     ? selectedCustomeNameWithDirectInvoice?.CUST_CODE
-                //     : selectedCustomerCode?.CUSTOMERCODE,
                 CustomerId: customerCode,
                 MatchingTransactions: [
                   {
@@ -1081,7 +1080,6 @@ const F3TenderCashPopUp = ({
             "Bank Receipt processed for Direct Sales Return Debit/Credit"
           );
           const bankDocumentNo = bankApiRes?.data?.message?.["Document No"];
-          // bankHeadSysId = bankApiRes?.data?.message?.["Ref-No/SysID"];
           bankHeadSysId = bankApiRes?.data?.message?.["Document No"];
 
           if (!bankDocumentNo) {
@@ -1090,7 +1088,11 @@ const F3TenderCashPopUp = ({
             return;
           }
         } else {
-          console.log("Direct Sales Return - Cash (No Bank API Call)");
+          if (SALES_RETURN_CODES.includes(transactionCode)) {
+            console.log(`BRV auto-generation skipped for Sales Return type: ${transactionCode}`);
+          } else {
+            console.log("Direct Sales Return - Cash (No Bank API Call)");
+          }
         }
 
         // Save the sales return record with the Bank reference ID if applicable
