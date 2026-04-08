@@ -25,11 +25,11 @@ const DigitalLinks = () => {
 
   const fetchPurchaseOrders = async () => {
     const response = await newRequest.get(`/controlSerials/po-details?poNumber=${poData?.poNumber}`);
-    return response?.data?.data?.sizeSummary || [];
+    return response?.data?.data || null;
   };
 
   const { 
-    data: purchaseOrders = [], 
+    data: poDetails = null, 
     isLoading: isLoadingOrders, 
     refetch: refetchOrders,
   } = useQuery({
@@ -116,19 +116,24 @@ const DigitalLinks = () => {
     totalPages: totalPages
   };
 
-  // Transform purchase orders data (now records)
-  const ordersData = purchaseOrders.map(record => ({
-    id: record.id,
-    poNumber: record.poNumber,
-    qty: record.qty,
-    ItemCode: record.product?.ItemCode || 'N/A',
-    ProductSize: record.product?.ProductSize || 'N/A',
-    size: record.size || 'N/A',
-    isSentToSupplier: record.isSentToSupplier,
-    supplierName: record.supplier?.name || 'N/A', // Added
-    createdAt: record.createdAt ? new Date(record.createdAt).toLocaleString() : 'N/A',
-    updatedAt: record.updatedAt ? new Date(record.updatedAt).toLocaleString() : 'N/A'
-  }));
+  // Transform purchase orders data (enriched size summary)
+  const ordersData = (poDetails?.sizeSummary || []).map((summaryItem, index) => {
+    // Find a representative record for this size to get other details
+    const representativeRecord = poDetails.records?.find(r => r.size === summaryItem.size);
+    
+    return {
+      id: representativeRecord?.id || `summary-${index}`,
+      poNumber: poDetails.poNumber || 'N/A',
+      qty: summaryItem.qty,
+      ItemCode: representativeRecord?.product?.ItemCode || 'N/A',
+      ProductSize: summaryItem.size || 'N/A',
+      size: summaryItem.size || 'N/A',
+      isSentToSupplier: poDetails.master?.isSentToSupplier,
+      supplierName: representativeRecord?.supplier?.name || 'N/A',
+      createdAt: representativeRecord?.createdAt ? new Date(representativeRecord.createdAt).toLocaleString() : 'N/A',
+      updatedAt: representativeRecord?.updatedAt ? new Date(representativeRecord.updatedAt).toLocaleString() : 'N/A'
+    };
+  });
 
   return (
     <div>
