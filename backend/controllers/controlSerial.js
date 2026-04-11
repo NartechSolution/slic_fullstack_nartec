@@ -79,17 +79,25 @@ exports.createControlSerials = async (req, res, next) => {
       throw error;
     }
 
-    // Filter out 0/negative and consolidate same sizes
+    // Validate and consolidate sizes — now supports rightQty/leftQty
     const consolidatedMap = new Map();
     for (const item of sizeQuantities) {
-      if (!item.size || item.qty <= 0) continue; 
-      const existing = consolidatedMap.get(item.size) || 0;
-      consolidatedMap.set(item.size, existing + item.qty);
+      if (!item.size) continue;
+      const rQty = Number(item.rightQty) || Number(item.qty) || 0;
+      const lQty = Number(item.leftQty) || 0;
+      if (rQty <= 0 && lQty <= 0) continue;
+
+      const existing = consolidatedMap.get(item.size) || { rightQty: 0, leftQty: 0 };
+      consolidatedMap.set(item.size, {
+        rightQty: existing.rightQty + rQty,
+        leftQty: existing.leftQty + lQty,
+      });
     }
 
-    const validSizeQuantities = Array.from(consolidatedMap.entries()).map(([size, qty]) => ({
+    const validSizeQuantities = Array.from(consolidatedMap.entries()).map(([size, qtys]) => ({
       size,
-      qty,
+      rightQty: qtys.rightQty,
+      leftQty: qtys.leftQty,
     }));
 
     if (validSizeQuantities.length === 0) {
@@ -139,17 +147,18 @@ exports.createControlSerials = async (req, res, next) => {
 
     const master = await masterPromise;
 
-    // ── Step 4: Generate ALL serial objects in memory (pure JS, no await) ──
+    // ── Step 4: Generate 2 serial objects per size (1 Right + 1 Left) ──
     const serials = [];
     const counterMap = new Map(seriesStartMap);
 
     let totalQty = 0;
-    for (const { size, qty } of validSizeQuantities) {
+    for (const { size, rightQty, leftQty } of validSizeQuantities) {
       const product = sizeProductMap.get(size);
       let currentNum = parseInt(counterMap.get(product.id), 10);
-      totalQty += qty;
+      totalQty += rightQty + leftQty;
 
-      for (let i = 0; i < qty; i++) {
+      // Right serial
+      if (rightQty > 0) {
         if (currentNum > 999999) throw new Error("Series number exceeds maximum value (999999)");
         serials.push({
           serialNumber: `${ItemCode}${currentNum.toString().padStart(6, "0")}`,
@@ -158,9 +167,28 @@ exports.createControlSerials = async (req, res, next) => {
           poNumber,
           size,
           masterId: master.id,
+          side: "R",
+          sideQty: rightQty,
         });
         currentNum++;
       }
+
+      // Left serial
+      if (leftQty > 0) {
+        if (currentNum > 999999) throw new Error("Series number exceeds maximum value (999999)");
+        serials.push({
+          serialNumber: `${ItemCode}${currentNum.toString().padStart(6, "0")}`,
+          ItemCode: product.id,
+          supplierId,
+          poNumber,
+          size,
+          masterId: master.id,
+          side: "L",
+          sideQty: leftQty,
+        });
+        currentNum++;
+      }
+
       counterMap.set(product.id, currentNum.toString().padStart(6, "0"));
     }
 

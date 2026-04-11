@@ -254,6 +254,8 @@ const DigitalLinkTable = ({
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">PO Number</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Supplier Name</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Serial Number</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Side</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Side Qty</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Item Code</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">Item Name</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider truncate">GTIN</th>
@@ -298,6 +300,14 @@ const DigitalLinkTable = ({
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 font-medium truncate">{serial.supplierName || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-900 font-medium truncate">{serial.serialNumber || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm font-semibold truncate">
+                        {serial.side ? (
+                          <span className={`px-2 py-0.5 rounded text-xs ${serial.side === 'R' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                            {serial.side === 'R' ? 'Right' : 'Left'}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 truncate">{serial.sideQty ?? '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600 truncate">{serial.ItemCode || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600 truncate">{serial.itemName || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600 truncate">{serial.gtin || 'N/A'}</td>

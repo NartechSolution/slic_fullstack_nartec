@@ -100,6 +100,8 @@ const DigitalLinks = () => {
     isSentToSupplier: serial.isSentToSupplier || 'N/A',
     supplierName: serial.supplier?.name || 'N/A',
     supplierEmail: serial.supplier?.email || 'N/A',
+    side: serial.side || null,
+    sideQty: serial.sideQty || null,
   }));
 
   // Calculate pagination on frontend

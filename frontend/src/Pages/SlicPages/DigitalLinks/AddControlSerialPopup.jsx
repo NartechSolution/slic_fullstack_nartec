@@ -21,9 +21,9 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   
-  // Array to store multiple qty-size pairs
+  // Array to store multiple size-qty pairs with left/right
   const [sizeQuantities, setSizeQuantities] = useState([
-    { id: 1, size: "", qty: 10 }
+    { id: 1, size: "", rightQty: 10, leftQty: 10 }
   ]);
 
   // Generate size options from 30 to 49
@@ -36,7 +36,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     setVisibility(false);
     setPoNumber("");
     setSelectedSupplier(null);
-    setSizeQuantities([{ id: 1, size: "", qty: 10 }]);
+    setSizeQuantities([{ id: 1, size: "", rightQty: 10, leftQty: 10 }]);
   };
 
   const fetchAllSupplierData = async () => {
@@ -72,7 +72,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
   const handleAddSizeQty = () => {
     setSizeQuantities([
       ...sizeQuantities,
-      { id: Date.now(), size: "", qty: 10 }
+      { id: Date.now(), size: "", rightQty: 10, leftQty: 10 }
     ]);
   };
 
@@ -90,10 +90,10 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     ));
   };
 
-  // Update qty for a specific pair
-  const handleQtyChange = (id, value) => {
+  // Update field for a specific pair
+  const handleFieldChange = (id, field, value) => {
     setSizeQuantities(sizeQuantities.map(item =>
-      item.id === id ? { ...item, qty: Number(value) } : item
+      item.id === id ? { ...item, [field]: Number(value) } : item
     ));
   };
 
@@ -116,9 +116,9 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     }
 
     // Validate all quantities
-    const invalidQty = sizeQuantities.some(item => item.qty <= 0);
+    const invalidQty = sizeQuantities.some(item => item.rightQty <= 0 && item.leftQty <= 0);
     if (invalidQty) {
-      toast.error(t("All quantities must be greater than 0"));
+      toast.error(t("Right or Left quantity must be greater than 0 for each size"));
       return;
     }
 
@@ -137,7 +137,8 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
         supplierId: selectedSupplier.id,
         poNumber: poNumber,
         sizeQuantities: sizeQuantities.map(item => ({
-          qty: item.qty,
+          rightQty: item.rightQty,
+          leftQty: item.leftQty,
           size: item.size
         }))
       });
@@ -153,7 +154,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     }
   };
 
-  const totalQuantity = sizeQuantities.reduce((sum, item) => sum + item.qty, 0);
+  const totalQuantity = sizeQuantities.reduce((sum, item) => sum + (item.rightQty || 0) + (item.leftQty || 0), 0);
 
   return (
     <div>
@@ -328,7 +329,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                           className="border border-gray-300 rounded-lg p-4 bg-gray-50 shadow-sm hover:shadow-md transition-shadow"
                         >
                           <div className="flex items-start gap-3">
-                            <div className="flex-1 grid grid-cols-2 gap-3">
+                            <div className="flex-1 grid grid-cols-3 gap-3">
                               <div className="flex flex-col gap-1">
                                 <label className="text-xs font-semibold text-gray-700">
                                   {t("Size")}
@@ -367,14 +368,28 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                               </div>
                               <div className="flex flex-col gap-1">
                                 <label className="text-xs font-semibold text-gray-700">
-                                  {t("Quantity")}
+                                  {t("Quantity Right")}
                                 </label>
                                 <input
                                   type="number"
-                                  value={item.qty}
-                                  onChange={(e) => handleQtyChange(item.id, e.target.value)}
-                                  placeholder={t("Enter qty")}
-                                  min="1"
+                                  value={item.rightQty}
+                                  onChange={(e) => handleFieldChange(item.id, "rightQty", e.target.value)}
+                                  placeholder={t("Right")}
+                                  min="0"
+                                  className="border rounded-md border-gray-300 p-2 text-sm focus:border-secondary focus:outline-none"
+                                  required
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-gray-700">
+                                  {t("Quantity Left")}
+                                </label>
+                                <input
+                                  type="number"
+                                  value={item.leftQty}
+                                  onChange={(e) => handleFieldChange(item.id, "leftQty", e.target.value)}
+                                  placeholder={t("Left")}
+                                  min="0"
                                   className="border rounded-md border-gray-300 p-2 text-sm focus:border-secondary focus:outline-none"
                                   required
                                 />
@@ -406,9 +421,9 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                     </p>
                     {sizeQuantities.length > 0 && (
                       <div className="mt-2 text-xs text-blue-700">
-                        {sizeQuantities.map((item, idx) => (
+                        {sizeQuantities.map((item) => (
                           <div key={item.id}>
-                            • {t("Size")} <strong>{item.size || "___"}</strong>: {item.qty} {t("serials")}
+                            • {t("Size")} <strong>{item.size || "___"}</strong>: R={item.rightQty}, L={item.leftQty} ({(item.rightQty || 0) + (item.leftQty || 0)} {t("total")})
                           </div>
                         ))}
                       </div>

@@ -93,6 +93,10 @@ model ControlSerial {
   supplierId String?
   supplier   Supplier? @relation(fields: [supplierId], references: [id], onUpdate: NoAction, onDelete: NoAction)
 
+  // Left/Right shoe tracking
+  side    String? // "R" or "L"
+  sideQty Int?    // quantity this serial represents for that side
+
   // Bin Location relation
   binLocationId String?
   binLocation   BinLocation? @relation(fields: [binLocationId], references: [id])

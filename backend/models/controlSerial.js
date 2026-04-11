@@ -364,17 +364,19 @@ class ControlSerialModel {
         wave.map((chunk) => {
           // Build VALUES list: each row is one comma-separated tuple
           const rows = chunk
-            .map(({ serialNumber, ItemCode, supplierId, poNumber, size, masterId }) => {
+            .map(({ serialNumber, ItemCode, supplierId, poNumber, size, masterId, side, sideQty }) => {
               const id = uuidv4();
               const esc = (v) => (v == null ? "NULL" : `'${String(v).replace(/'/g, "''")}'`);
-              return `(${esc(id)},${esc(serialNumber)},${esc(ItemCode)},${esc(supplierId)},${esc(poNumber)},${esc(size)},${esc(masterId)},0,0,0,NULL,'${now}','${now}')`;
+              const sideVal = side ? esc(side) : "NULL";
+              const sideQtyVal = sideQty != null ? sideQty : "NULL";
+              return `(${esc(id)},${esc(serialNumber)},${esc(ItemCode)},${esc(supplierId)},${esc(poNumber)},${esc(size)},${esc(masterId)},0,0,0,NULL,${sideVal},${sideQtyVal},'${now}','${now}')`;
             })
             .join(",\n");
 
           const sql = `
             INSERT INTO [dbo].[ControlSerial]
               (id, serialNumber, ItemCode, supplierId, poNumber, size, masterId,
-               isSentToSupplier, isReceived, isArchived, binLocationId, createdAt, updatedAt)
+               isSentToSupplier, isReceived, isArchived, binLocationId, side, sideQty, createdAt, updatedAt)
             VALUES ${rows}
           `;
           return prisma.$executeRawUnsafe(sql);
@@ -701,9 +703,10 @@ class ControlSerialModel {
         orderBy: { createdAt: "desc" },
       }),
       prisma.controlSerial.groupBy({
-        by: ["poNumber", "size", "isReceived"],
+        by: ["poNumber", "size", "isReceived", "side"],
         where: { poNumber: { in: poNumbers } },
         _count: { id: true },
+        _sum: { sideQty: true },
       })
     ]);
 
@@ -712,8 +715,11 @@ class ControlSerialModel {
       // Find the latest master for metadata
       const latestMaster = masters.find(m => m.poNumber === po);
       const poSerialsSummary = allSerialsForPos.filter(s => s.poNumber === po);
-      const totalQty = poSerialsSummary.reduce((sum, s) => sum + s._count.id, 0);
-      const receivedQty = poSerialsSummary.filter(s => s.isReceived).reduce((sum, s) => sum + s._count.id, 0);
+      const totalSideQty = poSerialsSummary.reduce((sum, s) => sum + (s._sum?.sideQty || 0), 0);
+      const totalQty = totalSideQty > 0 ? totalSideQty : poSerialsSummary.reduce((sum, s) => sum + s._count.id, 0);
+      const rightQty = poSerialsSummary.filter(s => s.side === "R").reduce((sum, s) => sum + (s._sum?.sideQty || 0), 0);
+      const leftQty = poSerialsSummary.filter(s => s.side === "L").reduce((sum, s) => sum + (s._sum?.sideQty || 0), 0);
+      const receivedQty = poSerialsSummary.filter(s => s.isReceived).reduce((sum, s) => sum + (s._sum?.sideQty || s._count.id), 0);
       
       // A PO is considered 'sent' if ALL its masters are marked as sent
       const allMastersForPo = masters.filter(m => m.poNumber === po);
@@ -737,6 +743,8 @@ class ControlSerialModel {
         updatedAt: latestMaster.updatedAt,
         totalQty,
         totalCount: totalQty, // For frontend compatibility
+        rightQty,
+        leftQty,
         receivedQty,        // For frontend compatibility
         sizeSummary: buildSizeSummaryFromSerialsConsolidated(poSerialsSummary)
       };

@@ -24,6 +24,8 @@ const ExportControlSerials = ({ serials }) => {
       "S.No": index + 1,
       "Status": serial.status || "N/A",
       "Serial Number": serial.serialNumber || "N/A",
+      "Side": serial.side === "R" ? "Right" : serial.side === "L" ? "Left" : "N/A",
+      "Side Qty": serial.sideQty ?? "N/A",
       "Item Code": serial.ItemCode || "N/A",
       "Item Name": serial.itemName || serial.product?.EnglishName || "N/A",
       "GTIN": serial.gtin || serial.product?.GTIN || "N/A",
@@ -51,6 +53,8 @@ const ExportControlSerials = ({ serials }) => {
       { wch: 8 },  // S.No
       { wch: 12 }, // Status
       { wch: 18 }, // Serial Number
+      { wch: 8 },  // Side
+      { wch: 10 }, // Side Qty
       { wch: 15 }, // Item Code
       { wch: 20 }, // Item Name
       { wch: 18 }, // GTIN
