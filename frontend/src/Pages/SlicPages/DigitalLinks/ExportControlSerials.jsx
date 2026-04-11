@@ -85,43 +85,7 @@ const ExportControlSerials = ({ serials }) => {
   };
 
   // Export to Excel
-  const handleExportExcel = () => {
-    const exportData = prepareExportData();
-    
-    // Create a new workbook
-    const wb = XLSX.utils.book_new();
-    
-    // Convert data to worksheet
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    
-    // Set column widths
-    const columnWidths = [
-      { wch: 8 },  // S.No
-      { wch: 12 }, // Status
-      { wch: 18 }, // Serial Number
-      { wch: 8 },  // Side
-      { wch: 10 }, // Side Qty
-      { wch: 15 }, // Item Code
-      { wch: 20 }, // Item Name
-      { wch: 18 }, // GTIN
-      { wch: 15 }, // Upper
-      { wch: 12 }, // Sole
-      { wch: 12 }, // Width
-      { wch: 15 }, // Color
-      { wch: 10 }, // Size
-      { wch: 15 }  // Created At
-    ];
-    ws['!cols'] = columnWidths;
-    
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, "Control Serials");
-    
-    // Generate filename with current date
-    const filename = `Control_Serials_${new Date().toISOString().split('T')[0]}.xlsx`;
-    
-    // Save file
-    XLSX.writeFile(wb, filename);
-    
+  const handleExportExcel = async () => {
     handleClose();
     const exportData = prepareExportData();
     const workbook = new ExcelJS.Workbook();
@@ -132,6 +96,8 @@ const ExportControlSerials = ({ serials }) => {
       { header: "S.No",          key: "sno",          width: 8 },
       { header: "Status",        key: "status",       width: 14 },
       { header: "Serial Number", key: "serialNumber", width: 20 },
+      { header: "Side",          key: "side",         width: 10 },
+      { header: "Side Qty",      key: "sideQty",      width: 10 },
       { header: "QR Code",       key: "qr",           width: 11 },
       { header: "Item Code",     key: "itemCode",     width: 16 },
       { header: "Item Name",     key: "itemName",     width: 22 },
@@ -170,6 +136,8 @@ const ExportControlSerials = ({ serials }) => {
         sno:          item["S.No"],
         status:       item["Status"],
         serialNumber: item["Serial Number"],
+        side:         item["Side"],
+        sideQty:      item["Side Qty"],
         qr:           "",
         itemCode:     item["Item Code"],
         itemName:     item["Item Name"],
@@ -202,10 +170,10 @@ const ExportControlSerials = ({ serials }) => {
           extension: "png",
         });
 
-        // Column 4 is QR Code (0-indexed: 3)
+        // Column 6 is QR Code (0-indexed: 5)
         // Draw exact 45x45 square to prevent Excel stretching/warping
         ws.addImage(imageId, {
-          tl: { col: 3.1, row: rowIndex - 0.8 },
+          tl: { col: 5.1, row: rowIndex - 0.8 },
           ext: { width: 45, height: 45 },
           editAs: "oneCell",
         });
