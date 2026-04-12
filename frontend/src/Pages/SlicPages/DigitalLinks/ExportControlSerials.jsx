@@ -52,7 +52,7 @@ const ExportControlSerials = ({ serials }) => {
   const generateQRDataURL = async (text) => {
     try {
       return await QRCode.toDataURL(text || " ", {
-        width: 80,
+        width: 120,
         margin: 1,
         errorCorrectionLevel: "M",
       });
@@ -98,7 +98,7 @@ const ExportControlSerials = ({ serials }) => {
       { header: "Serial Number", key: "serialNumber", width: 20 },
       { header: "Side",          key: "side",         width: 10 },
       { header: "Side Qty",      key: "sideQty",      width: 10 },
-      { header: "QR Code",       key: "qr",           width: 11 },
+      { header: "QR Code",       key: "qr",           width: 14 },
       { header: "Item Code",     key: "itemCode",     width: 16 },
       { header: "Item Name",     key: "itemName",     width: 22 },
       { header: "GTIN",          key: "gtin",         width: 20 },
@@ -125,8 +125,8 @@ const ExportControlSerials = ({ serials }) => {
       };
     });
 
-    // Set row height to easily fit the QR Code
-    const QR_ROW_HEIGHT = 55; // pts
+    // Row height in pts. 90pt ≈ 120px — gives clean room for a 65px QR with padding on all sides.
+    const QR_ROW_HEIGHT = 90; // pts
 
     for (let i = 0; i < exportData.length; i++) {
       const item = exportData[i];
@@ -170,11 +170,9 @@ const ExportControlSerials = ({ serials }) => {
           extension: "png",
         });
 
-        // Column 6 is QR Code (0-indexed: 5)
-        // Draw exact 45x45 square to prevent Excel stretching/warping
         ws.addImage(imageId, {
-          tl: { col: 5.1, row: rowIndex - 0.8 },
-          ext: { width: 45, height: 45 },
+          tl: { col: 5.2, row: rowIndex - 1 + 0.25 },
+          ext: { width: 55, height: 55 },
           editAs: "oneCell",
         });
       }
@@ -221,16 +219,32 @@ const ExportControlSerials = ({ serials }) => {
     const QR_CELL_SIZE = 12; // smaller size for PDF cell
     const ROW_HEIGHT = QR_CELL_SIZE + 2;
 
+    // S.No | Status | Serial Number | Side | Side Qty | QR Code | Item Code | Item Name | GTIN | Upper | Sole | Width | Color | Size | Created At
     const headers = [
-      "S.No", "Status", "Serial Number", "QR Code", "Item Code", "Item Name",
-      "GTIN", "Upper", "Sole", "Width", "Color", "Size", "Created At"
+      "S.No",
+      "Status",
+      "Serial Number",
+      "Side",
+      "Side Qty",
+      "QR Code",
+      "Item Code",
+      "Item Name",
+      "GTIN",
+      "Upper",
+      "Sole",
+      "Width",
+      "Color",
+      "Size",
+      "Created At",
     ];
 
     const rows = exportData.map((item) => [
       item["S.No"],
       item["Status"],
       item["Serial Number"],
-      "",  // QR cell
+      item["Side"],
+      item["Side Qty"],
+      "",             // QR Code cell — image drawn via didDrawCell
       item["Item Code"],
       item["Item Name"],
       item["GTIN"],
@@ -259,26 +273,28 @@ const ExportControlSerials = ({ serials }) => {
         minCellHeight: 8,
       },
       columnStyles: {
-        0:  { cellWidth: 10 },  // S.No
-        1:  { cellWidth: 'auto' },  // Status
-        2:  { cellWidth: 35 },  // Serial Number
-        3:  { cellWidth: QR_CELL_SIZE + 4, halign: "center" }, // QR Code
-        4:  { cellWidth: 20 },  // Item Code
-        5:  { cellWidth: 'auto' },  // Item Name
-        6:  { cellWidth: 26 },  // GTIN
-        7:  { cellWidth: 'auto' },  // Upper
-        8:  { cellWidth: 'auto' },  // Sole
-        9:  { cellWidth: 14 },  // Width
-        10: { cellWidth: 16 },  // Color
-        11: { cellWidth: 12 },  // Size
-        12: { cellWidth: 20 },  // Created At
+        0:  { cellWidth: 10 },                                  // S.No
+        1:  { cellWidth: "auto" },                              // Status
+        2:  { cellWidth: 30 },                                  // Serial Number
+        3:  { cellWidth: 12 },                                  // Side
+        4:  { cellWidth: 14 },                                  // Side Qty
+        5:  { cellWidth: QR_CELL_SIZE + 4, halign: "center" }, // QR Code
+        6:  { cellWidth: 20 },                                  // Item Code
+        7:  { cellWidth: "auto" },                              // Item Name
+        8:  { cellWidth: 26 },                                  // GTIN
+        9:  { cellWidth: "auto" },                              // Upper
+        10: { cellWidth: "auto" },                              // Sole
+        11: { cellWidth: 14 },                                  // Width
+        12: { cellWidth: 16 },                                  // Color
+        13: { cellWidth: 12 },                                  // Size
+        14: { cellWidth: 20 },                                  // Created At
       },
       margin: { top: 10, left: 10, right: 10 },
       theme: "grid",
       tableWidth: "auto",
       didDrawCell: (data) => {
-        // Draw QR in column index 3 (QR Code)
-        if (data.section === "body" && data.column.index === 3) {
+        // QR Code is now at column index 5
+        if (data.section === "body" && data.column.index === 5) {
           const rowIndex = data.row.index;
           const qrUrl = qrDataUrls[rowIndex];
           if (qrUrl) {
