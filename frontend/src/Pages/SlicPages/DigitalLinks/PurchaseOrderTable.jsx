@@ -219,7 +219,9 @@ const PurchaseOrderTable = ({
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">PO Number</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created Serials</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Qty</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Right Qty</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Left Qty</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ItemCode</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
@@ -229,7 +231,7 @@ const PurchaseOrderTable = ({
               <tbody className="divide-y divide-gray-200 bg-white">
                 {currentOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                       No Records found
                     </td>
                   </tr>
@@ -244,7 +246,9 @@ const PurchaseOrderTable = ({
                     >
                       <td className="px-4 py-3 text-sm text-gray-600">{order.poNumber || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{order.size || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 font-medium">{order.qty || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 font-medium">{order.qty || 0}</td>
+                      <td className="px-4 py-3 text-sm text-blue-700 font-semibold">{order.rightQty || 0}</td>
+                      <td className="px-4 py-3 text-sm text-purple-700 font-semibold">{order.leftQty || 0}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{order.ItemCode || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{order.supplierName || 'N/A'}</td>
                       <td className="px-4 py-3">

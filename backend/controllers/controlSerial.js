@@ -214,8 +214,10 @@ exports.createControlSerials = async (req, res, next) => {
     const durationMs = Date.now() - start;
 
     // Always return a summary — fetching back 500k rows for a response is wasteful
+    const totalSerials = serials.length;
     res.status(201).json(
-      generateResponse(201, true, `${totalQty} control serial(s) created successfully`, {
+      generateResponse(201, true, `${totalSerials} control serial(s) created (${totalQty} total units)`, {
+        totalSerials,
         master: {
           id: master.id,
           poNumber: master.poNumber,
@@ -318,31 +320,66 @@ exports.receiveWithQty = async (req, res, next) => {
       throw error;
     }
 
-    // Validate quantities don't exceed what's available per size
+    // Build per-size summary based on UNITS (sideQty) — not serial count
     const sizeSummary = {};
     for (const serial of master.serials) {
       const sz = serial.size || "unknown";
-      if (!sizeSummary[sz]) sizeSummary[sz] = { total: 0, received: 0 };
-      sizeSummary[sz].total += 1;
-      if (serial.isReceived) sizeSummary[sz].received += 1;
+      if (!sizeSummary[sz]) {
+        sizeSummary[sz] = { rTotal: 0, lTotal: 0, rReceived: 0, lReceived: 0 };
+      }
+      const qty = serial.sideQty || 0;
+      const received = serial.receivedSideQty || 0;
+      if (serial.side === "R") {
+        sizeSummary[sz].rTotal += qty;
+        sizeSummary[sz].rReceived += received;
+      } else if (serial.side === "L") {
+        sizeSummary[sz].lTotal += qty;
+        sizeSummary[sz].lReceived += received;
+      } else {
+        // legacy serials without side: treat as right
+        sizeSummary[sz].rTotal += qty || 1;
+        if (serial.isReceived) sizeSummary[sz].rReceived += qty || 1;
+      }
     }
 
-    for (const { size, receivedQty } of sizeReceived) {
-      if (receivedQty < 0) {
-        const error = new CustomError(`Received quantity cannot be negative for size ${size}`);
-        error.statusCode = 400;
-        throw error;
-      }
+    for (const entry of sizeReceived) {
+      const { size } = entry;
       const info = sizeSummary[size];
       if (!info) {
         const error = new CustomError(`Size ${size} not found in this PO`);
         error.statusCode = 400;
         throw error;
       }
-      const remaining = info.total - info.received;
-      if (receivedQty > remaining) {
+
+      const rightReceived = Number(entry.rightReceived ?? 0);
+      const leftReceived = Number(entry.leftReceived ?? 0);
+      const legacyQty = Number(entry.receivedQty ?? 0);
+
+      if (rightReceived < 0 || leftReceived < 0 || legacyQty < 0) {
+        const error = new CustomError(`Received quantity cannot be negative for size ${size}`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // Validate: total requested cannot exceed total planned
+      if (rightReceived > info.rTotal) {
         const error = new CustomError(
-          `Cannot receive ${receivedQty} for size ${size} — only ${remaining} remaining`
+          `Cannot receive ${rightReceived} right for size ${size} — only ${info.rTotal} planned`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+      if (leftReceived > info.lTotal) {
+        const error = new CustomError(
+          `Cannot receive ${leftReceived} left for size ${size} — only ${info.lTotal} planned`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+      // Legacy single-qty path: cap at total units for the size
+      if (legacyQty > info.rTotal + info.lTotal) {
+        const error = new CustomError(
+          `Cannot receive ${legacyQty} for size ${size} — only ${info.rTotal + info.lTotal} units planned`
         );
         error.statusCode = 400;
         throw error;

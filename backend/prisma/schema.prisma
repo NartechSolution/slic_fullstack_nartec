@@ -94,8 +94,9 @@ model ControlSerial {
   supplier   Supplier? @relation(fields: [supplierId], references: [id], onUpdate: NoAction, onDelete: NoAction)
 
   // Left/Right shoe tracking
-  side    String? // "R" or "L"
-  sideQty Int?    // quantity this serial represents for that side
+  side             String? // "R" or "L"
+  sideQty          Int?    // quantity this serial represents for that side
+  receivedSideQty  Int?    @default(0) // units received so far for this serial's side
 
   // Bin Location relation
   binLocationId String?

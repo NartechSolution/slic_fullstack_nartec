@@ -154,7 +154,13 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     }
   };
 
+  // Total units (R + L across all sizes)
   const totalQuantity = sizeQuantities.reduce((sum, item) => sum + (item.rightQty || 0) + (item.leftQty || 0), 0);
+
+  // Unique control serial records that will be created (2 per size: 1 Right + 1 Left, skipping zero-qty sides)
+  const totalSerials = sizeQuantities.reduce((sum, item) => {
+    return sum + ((item.rightQty || 0) > 0 ? 1 : 0) + ((item.leftQty || 0) > 0 ? 1 : 0);
+  }, 0);
 
   return (
     <div>
@@ -417,15 +423,24 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                   {/* Summary */}
                   <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                     <p className="text-sm text-blue-800">
-                      <strong>{t("Summary")}:</strong> {t("Total")} <strong>{totalQuantity}</strong> {t("control serial numbers will be generated for item")} <strong>{itemCode}</strong>
+                      <strong>{t("Summary")}:</strong>{" "}
+                      <strong>{totalSerials}</strong> {t("unique control serial(s) will be generated")} ({totalQuantity} {t("total units")}) {t("for item")} <strong>{itemCode}</strong>
+                    </p>
+                    <p className="text-xs text-blue-700 mt-1 italic">
+                      {t("Note: each size generates up to 2 serials — one for Right shoes, one for Left shoes.")}
                     </p>
                     {sizeQuantities.length > 0 && (
                       <div className="mt-2 text-xs text-blue-700">
-                        {sizeQuantities.map((item) => (
-                          <div key={item.id}>
-                            • {t("Size")} <strong>{item.size || "___"}</strong>: R={item.rightQty}, L={item.leftQty} ({(item.rightQty || 0) + (item.leftQty || 0)} {t("total")})
-                          </div>
-                        ))}
+                        {sizeQuantities.map((item) => {
+                          const serialsForSize = ((item.rightQty || 0) > 0 ? 1 : 0) + ((item.leftQty || 0) > 0 ? 1 : 0);
+                          return (
+                            <div key={item.id}>
+                              • {t("Size")} <strong>{item.size || "___"}</strong>: R={item.rightQty || 0}, L={item.leftQty || 0}
+                              {" → "}
+                              <strong>{serialsForSize}</strong> {t("serial(s)")}, {(item.rightQty || 0) + (item.leftQty || 0)} {t("units")}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

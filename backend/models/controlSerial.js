@@ -106,27 +106,39 @@ class ControlSerialMasterModel {
         orderBy: { createdAt: "desc" },
       }),
       prisma.controlSerial.groupBy({
-        by: ["poNumber", "size", "isReceived", "isSentToSupplier"],
+        by: ["poNumber", "size", "isReceived", "isSentToSupplier", "side"],
         where: { poNumber: { in: poNumbers } },
         _count: { id: true },
+        _sum: { sideQty: true, receivedSideQty: true },
       })
     ]);
 
-    // 3. Consolidate: one entry per PO
+    // 3. Consolidate: one entry per PO (units-based, not serial-count based)
     const enriched = poNumbers.map(po => {
       const mastersForPo = allMastersForPos.filter(m => m.poNumber === po);
       const latestMaster = mastersForPo[0];
-      
+
       const poSerials = serialCounts.filter(s => s.poNumber === po);
-      const totalQty = poSerials.reduce((sum, s) => sum + s._count.id, 0);
-      
+      // totalQty = sum of planned units (fallback to serial count for legacy data without sideQty)
+      const totalQty = poSerials.reduce((sum, s) => sum + ((s._sum?.sideQty || 0) || s._count.id), 0);
+      const rightQty = poSerials.filter(s => s.side === "R").reduce((sum, s) => sum + (s._sum?.sideQty || 0), 0);
+      const leftQty = poSerials.filter(s => s.side === "L").reduce((sum, s) => sum + (s._sum?.sideQty || 0), 0);
+
       // Aggregates
       const isSentToSupplierAgg = mastersForPo.every(m => m.isSentToSupplier);
-      
-      const receivedCount = poSerials.filter(s => s.isReceived).reduce((sum, s) => sum + s._count.id, 0);
+
+      // Received units: prefer receivedSideQty sum; fallback to count of isReceived legacy rows
+      const receivedCount = poSerials.reduce((sum, s) => {
+        const recUnits = s._sum?.receivedSideQty || 0;
+        if (recUnits > 0) return sum + recUnits;
+        // legacy row (no side): if isReceived, count by _count.id
+        if (s.isReceived && !s.side) return sum + s._count.id;
+        return sum;
+      }, 0);
+
       let receivedStatus;
       if (receivedCount === 0) receivedStatus = "pending";
-      else if (receivedCount >= totalQty) receivedStatus = "received";
+      else if (totalQty > 0 && receivedCount >= totalQty) receivedStatus = "received";
       else receivedStatus = "partially_received";
 
       return {
@@ -142,6 +154,8 @@ class ControlSerialMasterModel {
         createdAt: latestMaster.createdAt,
         totalQty,
         totalCount: totalQty, // For frontend compatibility
+        rightQty,
+        leftQty,
         receivedQty: receivedCount, // For frontend compatibility
         sizeSummary: buildSizeSummaryFromSerialsConsolidated(poSerials)
       };
@@ -243,24 +257,61 @@ class ControlSerialMasterModel {
     // Load all children for this master
     const allSerials = await prisma.controlSerial.findMany({
       where: { masterId },
-      orderBy: [{ size: "asc" }, { createdAt: "asc" }],
+      orderBy: [{ size: "asc" }, { side: "asc" }],
     });
 
     const updateOps = [];
 
-    for (const { size, receivedQty } of sizeReceived) {
-      if (!size || receivedQty <= 0) continue;
+    for (const entry of sizeReceived) {
+      const { size } = entry;
+      if (!size) continue;
 
-      // Get serials for this size that aren't yet received
-      const forSize = allSerials.filter((s) => s.size === size && !s.isReceived);
-      const toReceive = forSize.slice(0, receivedQty);
+      // Support both new payload (rightReceived/leftReceived) and legacy (receivedQty)
+      const rightReceived = Number(entry.rightReceived ?? 0);
+      const leftReceived = Number(entry.leftReceived ?? 0);
+      const legacyQty = Number(entry.receivedQty ?? 0);
 
-      if (toReceive.length > 0) {
-        // Batch update these specific serials
+      const forSize = allSerials.filter((s) => s.size === size);
+      const rightSerial = forSize.find((s) => s.side === "R");
+      const leftSerial = forSize.find((s) => s.side === "L");
+
+      // Calculate target received per side
+      let rTarget = 0;
+      let lTarget = 0;
+
+      if (rightReceived > 0 || leftReceived > 0) {
+        // New payload: explicit per-side values
+        rTarget = Math.min(rightReceived, rightSerial?.sideQty || 0);
+        lTarget = Math.min(leftReceived, leftSerial?.sideQty || 0);
+      } else if (legacyQty > 0) {
+        // Legacy: distribute total across R then L (fill R first, then L)
+        const rMax = rightSerial?.sideQty || 0;
+        const lMax = leftSerial?.sideQty || 0;
+        rTarget = Math.min(legacyQty, rMax);
+        lTarget = Math.min(Math.max(legacyQty - rMax, 0), lMax);
+      } else {
+        continue;
+      }
+
+      if (rightSerial && rTarget > 0) {
         updateOps.push(
-          prisma.controlSerial.updateMany({
-            where: { id: { in: toReceive.map((s) => s.id) } },
-            data: { isReceived: true },
+          prisma.controlSerial.update({
+            where: { id: rightSerial.id },
+            data: {
+              receivedSideQty: rTarget,
+              isReceived: rTarget >= (rightSerial.sideQty || 0),
+            },
+          })
+        );
+      }
+      if (leftSerial && lTarget > 0) {
+        updateOps.push(
+          prisma.controlSerial.update({
+            where: { id: leftSerial.id },
+            data: {
+              receivedSideQty: lTarget,
+              isReceived: lTarget >= (leftSerial.sideQty || 0),
+            },
           })
         );
       }
@@ -270,26 +321,24 @@ class ControlSerialMasterModel {
       await Promise.all(updateOps);
     }
 
-    // Recompute receivedStatus from fresh data
+    // Recompute receivedStatus from fresh data — based on UNITS, not serial count
     const refreshed = await prisma.controlSerial.findMany({
       where: { masterId },
-      select: { isReceived: true },
+      select: { sideQty: true, receivedSideQty: true, isReceived: true },
     });
 
-    const total = refreshed.length;
-    const receivedCount = refreshed.filter((s) => s.isReceived).length;
+    const totalUnits = refreshed.reduce((sum, s) => sum + (s.sideQty || 0), 0);
+    const receivedUnits = refreshed.reduce((sum, s) => sum + (s.receivedSideQty || 0), 0);
+
     let receivedStatus;
-    if (receivedCount === 0) receivedStatus = "pending";
-    else if (receivedCount >= total) receivedStatus = "received";
+    if (receivedUnits === 0) receivedStatus = "pending";
+    else if (totalUnits > 0 && receivedUnits >= totalUnits) receivedStatus = "received";
     else receivedStatus = "partially_received";
 
     return await prisma.controlSerialMaster.update({
       where: { id: masterId },
       data: { receivedStatus },
-      include: {
-        product: true,
-        supplier: true,
-      },
+      include: { product: true, supplier: true },
     });
   }
 
@@ -902,15 +951,34 @@ class ControlSerialModel {
   }
 
   /**
-   * Get size summary for a PO number
+   * Get size summary for a PO number — unit-based with R/L breakdown
    */
   static async getSizeSummaryByPoNumber(poNumber) {
-    const sizeCounts = await prisma.controlSerial.groupBy({
-      by: ["size"],
+    const rows = await prisma.controlSerial.groupBy({
+      by: ["size", "side"],
       where: { poNumber },
       _count: { id: true },
+      _sum: { sideQty: true, receivedSideQty: true },
     });
-    return sizeCounts.map((s) => ({ size: s.size, qty: s._count.id }));
+
+    // Consolidate by size
+    const map = {};
+    for (const r of rows) {
+      const sz = r.size || "unknown";
+      if (!map[sz]) {
+        map[sz] = { size: sz, qty: 0, rightQty: 0, leftQty: 0, receivedQty: 0 };
+      }
+      const units = (r._sum?.sideQty || 0) || r._count.id;
+      const recUnits = r._sum?.receivedSideQty || 0;
+      map[sz].qty += units;
+      map[sz].receivedQty += recUnits;
+      if (r.side === "R") map[sz].rightQty += units;
+      else if (r.side === "L") map[sz].leftQty += units;
+    }
+
+    return Object.values(map).sort((a, b) =>
+      String(a.size).localeCompare(String(b.size), undefined, { numeric: true })
+    );
   }
 }
 
@@ -934,18 +1002,24 @@ function buildSizeSummary(serials = []) {
 }
 
 /**
- * Build a per-size summary from a summarized (groupBy) array of serial objects
- * @param {Array<{size, isReceived, isSentToSupplier, _count: {id: number}}>} summaries
+ * Build a per-size summary from a summarized (groupBy) array of serial objects.
+ * Units are measured via sideQty (falls back to _count.id for legacy rows with no side).
+ * @param {Array<{size, isReceived, side, _count: {id: number}, _sum?: {sideQty: number}}>} summaries
  */
 function buildSizeSummaryFromSerialsConsolidated(summaries = []) {
   const map = {};
   for (const s of summaries) {
     const sz = String(s.size || "unknown").trim();
-    if (!map[sz]) map[sz] = { size: sz, total: 0, received: 0, pending: 0 };
-    const count = s._count.id;
-    map[sz].total += count;
-    if (s.isReceived) map[sz].received += count;
-    else map[sz].pending += count;
+    if (!map[sz]) {
+      map[sz] = { size: sz, total: 0, received: 0, pending: 0, rightQty: 0, leftQty: 0 };
+    }
+    // Prefer sideQty sum (new model); fallback to count (legacy rows)
+    const units = (s._sum?.sideQty || 0) || s._count.id;
+    map[sz].total += units;
+    if (s.isReceived) map[sz].received += units;
+    else map[sz].pending += units;
+    if (s.side === "R") map[sz].rightQty += units;
+    else if (s.side === "L") map[sz].leftQty += units;
   }
   return Object.values(map).sort((a, b) => a.size.localeCompare(b.size, undefined, { numeric: true }));
 }
