@@ -761,24 +761,69 @@ class ControlSerialModel {
   /**
    * Get unique PO numbers with total qty with pagination
    */
-  static async getUniquePONumbersWithTotalQty(isArchived = null, supplierId = null, page = 1, limit = 10) {
+  static async getUniquePONumbersWithTotalQty(
+    isArchived = null,
+    supplierId = null,
+    page = 1,
+    limit = 10,
+    isSentToSupplier = null
+  ) {
     const skip = (page - 1) * limit;
-    const where = {};
-    if (isArchived !== null && typeof isArchived === "boolean") where.isArchived = isArchived;
-    if (supplierId) where.supplierId = supplierId;
 
-    // 1. Get unique PO numbers with pagination
-    const uniquePosRaw = await prisma.controlSerialMaster.groupBy({
-      by: ["poNumber"],
-      where,
-      orderBy: { _max: { createdAt: "desc" } },
-      skip,
-      take: limit,
-    });
+    // ──────────────────────────────────────────────────────────────────────
+    // Build WHERE clauses for the raw SQL query.
+    // We need raw SQL because the response aggregates isSentToSupplier across
+    // ALL masters of a PO with .every() — a simple groupBy filter would leak
+    // POs that have some sent + some unsent masters. HAVING is the only way
+    // to filter on that aggregate cleanly AND page correctly.
+    // ──────────────────────────────────────────────────────────────────────
+    const whereParts = ["1=1"];
+    if (isArchived !== null && typeof isArchived === "boolean") {
+      whereParts.push(`isArchived = ${isArchived ? 1 : 0}`);
+    }
+    if (supplierId) {
+      const escapedId = String(supplierId).replace(/'/g, "''");
+      whereParts.push(`supplierId = '${escapedId}'`);
+    }
+    const whereSql = whereParts.join(" AND ");
 
-    if (uniquePosRaw.length === 0) return { masters: [], total: 0 };
+    // HAVING filter for the aggregate "all masters sent" / "not all sent"
+    let havingSql = "";
+    if (isSentToSupplier === true) {
+      // Every master for this PO must be sent → MIN(cast to int) = 1
+      havingSql = "HAVING MIN(CAST(isSentToSupplier AS INT)) = 1";
+    } else if (isSentToSupplier === false) {
+      // At least one master is still unsent → MIN(cast to int) = 0
+      havingSql = "HAVING MIN(CAST(isSentToSupplier AS INT)) = 0";
+    }
 
-    const poNumbers = uniquePosRaw.map(p => p.poNumber);
+    // 1a. Page of PO numbers (ordered by most recent createdAt)
+    const pageRows = await prisma.$queryRawUnsafe(`
+      SELECT poNumber
+      FROM [dbo].[ControlSerialMaster]
+      WHERE ${whereSql}
+      GROUP BY poNumber
+      ${havingSql}
+      ORDER BY MAX(createdAt) DESC
+      OFFSET ${skip} ROWS FETCH NEXT ${limit} ROWS ONLY
+    `);
+
+    const poNumbers = pageRows.map((r) => r.poNumber).filter(Boolean);
+
+    // 1b. Total count (same filters) for pagination
+    const totalRows = await prisma.$queryRawUnsafe(`
+      SELECT COUNT(*) AS total
+      FROM (
+        SELECT poNumber
+        FROM [dbo].[ControlSerialMaster]
+        WHERE ${whereSql}
+        GROUP BY poNumber
+        ${havingSql}
+      ) t
+    `);
+    const total = Number(totalRows[0]?.total || 0);
+
+    if (poNumbers.length === 0) return { masters: [], total };
 
     // 2. Fetch full metadata and aggregate metrics
     const [masters, allSerialsForPos] = await Promise.all([
@@ -838,15 +883,10 @@ class ControlSerialModel {
       };
     });
 
-    // 4. Get total count of unique POs
-    const totalCountResult = await prisma.controlSerialMaster.groupBy({
-      by: ["poNumber"],
-      where,
-    });
-
+    // 4. Total already computed above via raw SQL
     return {
       masters: consolidated,
-      total: totalCountResult.length
+      total,
     };
   }
 

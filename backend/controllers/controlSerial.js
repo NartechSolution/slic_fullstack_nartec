@@ -953,11 +953,17 @@ exports.getUniquePONumbersWithTotalQty = async (req, res, next) => {
       req.query.isArchived !== undefined ? req.query.isArchived === "true" : null;
     const supplierId = req.query.supplierId || null;
 
+    // Parse isSentToSupplier as tri-state: true | false | null (ignored)
+    let isSentToSupplier = null;
+    if (req.query.isSentToSupplier === "true") isSentToSupplier = true;
+    else if (req.query.isSentToSupplier === "false") isSentToSupplier = false;
+
     const result = await ControlSerialModel.getUniquePONumbersWithTotalQty(
       isArchived,
       supplierId,
       page,
-      limit
+      limit,
+      isSentToSupplier
     );
 
     res.status(200).json(
