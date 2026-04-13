@@ -407,60 +407,9 @@ async function main() {
 
     await fireCreatedEvents(serials);
 
-    // ── TESTING INSTRUCTIONS ─────────────────────────────────────────────
-    h1("✅ SEED COMPLETE — TESTER CHEAT SHEET");
+    // ── TESTING INSTRUCTIONS — linear walkthrough ────────────────────────
 
-    console.log(
-      `${c.bold}Use the values below to walk through the full supply chain flow.${c.reset}`
-    );
-    console.log(`${c.dim}(Open the app and follow each step in order.)${c.reset}\n`);
-
-    // Step-by-step
-    console.log(`${c.bold}${c.blue}▶ Step 1: Browse the PO${c.reset}`);
-    console.log(`  Screen: Digital Link → PO Numbers (/po-number in SLIC_POS)`);
-    console.log(`  Look for PO: ${c.bold}${PO_NUMBER}${c.reset}`);
-    console.log(`  Items: ${PRODUCTS.map((p) => p.ItemCode).join(", ")}`);
-    console.log();
-
-    console.log(`${c.bold}${c.blue}▶ Step 2: Send to Supplier${c.reset}`);
-    console.log(`  Click "Send by PO" on the row → confirms email dispatch.`);
-    console.log(`  Supplier email (seeded): ${c.bold}${SUPPLIER.email}${c.reset}`);
-    console.log();
-
-    console.log(`${c.bold}${c.blue}▶ Step 3: Receive PO  (Serialization app)${c.reset}`);
-    console.log(`  URL: /purchase-order → pick PO → click "Receive PO"`);
-    console.log(`  ReceiveQtyModal asks for Right + Left received per size.`);
-    console.log(`  Use these planned quantities:`);
-    for (const itemCode of Object.keys(PO_LAYOUT)) {
-      console.log(`    ${c.cyan}${itemCode}${c.reset}`);
-      for (const [size, qty] of Object.entries(PO_LAYOUT[itemCode])) {
-        console.log(`      size ${size}: R=${qty.rightQty}, L=${qty.leftQty}`);
-      }
-    }
-    console.log();
-
-    console.log(`${c.bold}${c.blue}▶ Step 4: Print Box Labels → Put Away${c.reset}`);
-    console.log(`  ReceivePOModal opens → enter box count × qty per box → print.`);
-    console.log(`  Generated SSCCs are auto-registered in rawMaterialLot.`);
-    console.log(`  Then navigate to /put-away → scan any printed SSCC → pick bin → confirm.`);
-    console.log();
-
-    console.log(`${c.bold}${c.blue}▶ Step 5: Pick Raw Materials${c.reset}`);
-    console.log(`  URL: /picking-raw-materials`);
-    console.log(`  Search by item code: ${c.bold}${Object.keys(PO_LAYOUT)[0]}${c.reset}`);
-    console.log(`  Select a bin → enter qty → submit. Result shows PICK-… number.`);
-    console.log();
-
-    console.log(`${c.bold}${c.blue}▶ Step 6: Production RM List (NEW)${c.reset}`);
-    console.log(`  URL: /production-list`);
-    console.log(`  Your pick should appear as a row — click 👁 for full detail.`);
-    console.log();
-
-    console.log(`${c.bold}${c.blue}▶ Step 7: Merge Serial (L + R)${c.reset}`);
-    console.log(`  URL: /merge-serial`);
-    console.log(`  Scan the LEFT and RIGHT serials of the same size. Examples:`);
-
-    // Pair up serials by (itemCode, size): emit a few ready-to-copy pairs
+    // Group serials by (itemCode, size) so we can hand out L/R pairs inline
     const pairsByKey = new Map();
     for (const s of serials) {
       const key = `${s.itemCode}__${s.size}`;
@@ -469,44 +418,182 @@ async function main() {
     }
     const pairs = [];
     for (const [key, obj] of pairsByKey) {
-      if (obj.L && obj.R) {
-        pairs.push({ key, L: obj.L, R: obj.R });
-      }
+      if (obj.L && obj.R) pairs.push({ key, L: obj.L, R: obj.R });
     }
-    pairs.slice(0, 6).forEach((p, i) => {
+
+    // Golden path = first product, first size — the flow a tester should walk first
+    const golden = pairs[0]
+      ? (() => {
+          const [itemCode, size] = pairs[0].key.split("__");
+          return { itemCode, size, L: pairs[0].L, R: pairs[0].R };
+        })()
+      : null;
+
+    h1("✅ SEED COMPLETE — COPY-PASTE TESTING WALKTHROUGH");
+
+    console.log(
+      `${c.bold}Follow each step in order. Every screen, field, and click is below.${c.reset}`
+    );
+    console.log(`${c.dim}Tip: keep this terminal open side-by-side with the browser.${c.reset}\n`);
+
+    // Tiny helper to print each step block consistently
+    const step = (num, title) => {
+      console.log(
+        `${c.bold}${c.cyan}━━━ STEP ${num} ━━━ ${title} ${c.dim}${"━".repeat(
+          Math.max(0, 50 - title.length)
+        )}${c.reset}`
+      );
+    };
+    const field = (label, value) =>
+      console.log(`   ${c.yellow}▸${c.reset} ${label}: ${c.bold}${value}${c.reset}`);
+    const action = (text) => console.log(`   ${c.green}✓${c.reset} ${text}`);
+    const note = (text) => console.log(`   ${c.dim}  ${text}${c.reset}`);
+    const spacer = () => console.log();
+
+    // ─────────────────────────────────────────────────────────────────────
+    step(1, "Receive the PO (Serialization app)");
+    console.log(`   ${c.dim}Open:${c.reset}  ${c.bold}/purchase-order${c.reset}`);
+    action(`Find the card with PO Number: ${c.bold}${PO_NUMBER}${c.reset}`);
+    action(`Click the card → Control Serials list appears`);
+    action(`Click the blue ${c.bold}"Receive PO"${c.reset} button (top right)`);
+    spacer();
+    console.log(`   ${c.magenta}→ ReceiveQtyModal opens${c.reset}`);
+    if (golden) {
+      console.log(`   ${c.dim}Use these values for size ${golden.size}:${c.reset}`);
+      field("Right Received", `${PO_LAYOUT[golden.itemCode][golden.size].rightQty}`);
+      field("Left Received", `${PO_LAYOUT[golden.itemCode][golden.size].leftQty}`);
+    }
+    action(`Click ${c.bold}"Confirm Receive"${c.reset}`);
+    spacer();
+
+    // ─────────────────────────────────────────────────────────────────────
+    step(2, "Print box labels (SSCCs)");
+    console.log(`   ${c.magenta}→ ReceivePOModal opens automatically${c.reset}`);
+    action(`In "Number of boxes" row 1, type: ${c.bold}2${c.reset}`);
+    action(`In "Qty per box" row 1, type: ${c.bold}5${c.reset}   (total = 2 × 5 = 10 units)`);
+    action(`Click ${c.bold}"🖨️ Print Box Labels"${c.reset}`);
+    note("SSCCs are generated dynamically now — each print creates brand-new 18-digit codes.");
+    note("Write down (or screenshot) any 1 of the printed SSCCs — you'll scan it in Step 3.");
+    action(`When the print window closes, click ${c.bold}"Put Away"${c.reset} at the bottom`);
+    spacer();
+
+    // ─────────────────────────────────────────────────────────────────────
+    step(3, "Put Away — scan the SSCC");
+    console.log(`   ${c.dim}Open:${c.reset}  ${c.bold}/put-away${c.reset}`);
+    action(`In "Scan Barcode" field, paste the ${c.bold}18-digit SSCC${c.reset} you printed in Step 2`);
+    action(`Click ${c.bold}"Continue"${c.reset} or press Enter`);
+    spacer();
+    console.log(`   ${c.magenta}→ Step "View Details" appears${c.reset}`);
+    action(`Pick any bin from the "Select Bin Location" dropdown`);
+    action(`In "Scan Bin Location Barcode" field, type anything (e.g. ${c.bold}BIN-A1${c.reset})`);
+    action(`Click ${c.bold}"Confirm to Put Away"${c.reset} → then "Yes" in the modal`);
+    spacer();
+
+    // ─────────────────────────────────────────────────────────────────────
+    step(4, "Pick Raw Materials");
+    console.log(`   ${c.dim}Open:${c.reset}  ${c.bold}/picking-raw-materials${c.reset}`);
+    if (golden) field("Search field", `${golden.itemCode}`);
+    action(`Click ${c.bold}"Search"${c.reset} → results appear`);
+    action(`Click the ${c.bold}"Select"${c.reset} button on the first result`);
+    action(`Click the ${c.bold}"Select"${c.reset} button on a bin/lot row`);
+    field("Quantity to pick", "5");
+    action(`Click ${c.bold}"Confirm Pick"${c.reset}`);
+    note("You should see a green success screen with a PICK-XXXX number.");
+    spacer();
+
+    // ─────────────────────────────────────────────────────────────────────
+    step(5, "Verify Production RM List (NEW)");
+    console.log(`   ${c.dim}Open:${c.reset}  ${c.bold}/production-list${c.reset}`);
+    action(`You should see the pick you just made as a new row`);
+    action(`Click the ${c.bold}👁 eye icon${c.reset} → detail modal shows item, SSCC, bin, qty, picked by, etc.`);
+    spacer();
+
+    // ─────────────────────────────────────────────────────────────────────
+    step(6, "Merge Serial (Left + Right = Finished Good)");
+    console.log(`   ${c.dim}Open:${c.reset}  ${c.bold}/merge-serial${c.reset}`);
+    if (golden) {
+      console.log(`   ${c.dim}Golden path — ${golden.itemCode} size ${golden.size}:${c.reset}`);
+      field("First scan (Left)", golden.L);
+      field("Second scan (Right)", golden.R);
+    }
+    action(`In the "Scan Serial 1" field, paste the Left serial → press Enter`);
+    action(`In the "Scan Serial 2" field, paste the Right serial → press Enter`);
+    action(`Click ${c.bold}"View Product Details"${c.reset}`);
+    action(`Click ${c.bold}"Generate FG Barcode"${c.reset}`);
+    note("You will see a QR code. Write down the FG serial shown below it — you'll need it in Step 8.");
+    spacer();
+
+    // ─────────────────────────────────────────────────────────────────────
+    step(7, "Verify Finished Goods (NEW)");
+    console.log(`   ${c.dim}Open:${c.reset}  ${c.bold}/finished-goods${c.reset}`);
+    if (golden)
+      action(
+        `You should see a new card for ${c.bold}${golden.itemCode}${c.reset} · size ${c.bold}${golden.size}${c.reset} with "1 Finished Good"`
+      );
+    action(`Click the ${c.bold}👁 eye icon${c.reset} → side panel shows the FG serial + QR code`);
+    action(`Click the ${c.bold}"🖨️ Label"${c.reset} button on the FG row`);
+    action(`In the label preview modal, click ${c.bold}"🖨️ Print Label"${c.reset}`);
+    note("A new window opens with an 80×100mm printable label — this is what goes on the box.");
+    spacer();
+
+    // ─────────────────────────────────────────────────────────────────────
+    step(8, "Scan the QR — Public Trace Page (NEW)");
+    console.log(`   ${c.dim}Option A:${c.reset}  Scan the QR on the printed label with any phone`);
+    console.log(
+      `   ${c.dim}Option B:${c.reset}  In the Finished Goods side panel, click the small QR thumbnail`
+    );
+    console.log(`   ${c.dim}Option C:${c.reset}  Manually open: ${c.bold}/fg-trace/<fgSerial>${c.reset}`);
+    spacer();
+    console.log(`   ${c.magenta}→ Trace page opens${c.reset}`);
+    action(`Verify the product name + image`);
+    action(`Verify both shoe cards (Left / Right) with their serial numbers`);
+    action(`Scroll down and read the "Supply Chain History" timeline`);
+    note("You should see: CREATED events for both serials → MERGED → FG_CREATED at the top.");
+    spacer();
+
+    // ─────────────────────────────────────────────────────────────────────
+    h2("⏭  OPTIONAL — repeat for other sizes");
+    console.log(
+      `${c.dim}Steps 6–8 can be run again with any of these pairs:${c.reset}\n`
+    );
+    pairs.forEach((p, i) => {
+      const [itemCode, size] = p.key.split("__");
+      const marker = i === 0 ? `${c.green}(done above)${c.reset}` : "";
+      console.log(
+        `   ${c.bold}Pair ${i + 1}${c.reset}  ${itemCode} · size ${size}  ${marker}`
+      );
+      console.log(`      L: ${c.bold}${p.L}${c.reset}`);
+      console.log(`      R: ${c.bold}${p.R}${c.reset}`);
+    });
+    spacer();
+
+    // ─────────────────────────────────────────────────────────────────────
+    h2("📋 Quick reference");
+    field("PO Number", PO_NUMBER);
+    field("Supplier email", SUPPLIER.email);
+    field("Item codes", PRODUCTS.map((p) => p.ItemCode).join(", "));
+    spacer();
+    console.log(`   ${c.dim}All 10 serial numbers (ready to paste):${c.reset}`);
+    for (const p of pairs) {
       const [itemCode, size] = p.key.split("__");
       console.log(
-        `    ${c.green}Pair ${i + 1}${c.reset}  ${itemCode} · size ${size}`
+        `     ${c.bold}${itemCode}${c.reset} size ${c.bold}${size}${c.reset}  L=${p.L}  R=${p.R}`
       );
-      console.log(`       L: ${c.bold}${p.L}${c.reset}`);
-      console.log(`       R: ${c.bold}${p.R}${c.reset}`);
-    });
-    console.log();
+    }
+    spacer();
 
-    console.log(`${c.bold}${c.blue}▶ Step 8: Finished Goods (NEW)${c.reset}`);
-    console.log(`  URL: /finished-goods`);
-    console.log(`  After each merge, a row appears grouped by (item, size).`);
-    console.log(`  Click the card → see every FG serial with QR code + "Label" button.`);
-    console.log(`  Click "Label" to open the printable FG label with QR pointing to /fg-trace/:fgSerial.`);
-    console.log();
-
-    console.log(`${c.bold}${c.blue}▶ Step 9: Public Trace Page${c.reset}`);
-    console.log(`  Scan the QR or open: ${c.cyan}/fg-trace/<fgSerial>${c.reset}`);
-    console.log(`  See full history: Product → both shoes → events → merged FG.`);
-    console.log();
-
-    // Final summary
+    // ─────────────────────────────────────────────────────────────────────
     console.log(line("═"));
-    console.log(`${c.bold}${c.green}Summary${c.reset}`);
+    console.log(`${c.bold}${c.green}Seed Summary${c.reset}`);
     console.log(line("═"));
     const perItem = {};
     for (const s of serials) {
-      if (!perItem[s.itemCode]) perItem[s.itemCode] = { serials: 0, units: 0, pairs: 0 };
+      if (!perItem[s.itemCode]) perItem[s.itemCode] = { serials: 0, units: 0 };
       perItem[s.itemCode].serials += 1;
       perItem[s.itemCode].units += s.qty;
     }
     for (const [code, stats] of Object.entries(perItem)) {
-      info(code, `${stats.serials} serials, ${stats.units} units`);
+      info(code, `${stats.serials} serials · ${stats.units} units`);
     }
     info("Total pairs (L+R)", pairs.length);
     info("Seed time", `${((Date.now() - t0) / 1000).toFixed(1)}s`);
