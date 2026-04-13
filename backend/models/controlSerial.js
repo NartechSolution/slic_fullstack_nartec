@@ -607,16 +607,56 @@ class ControlSerialModel {
   }
 
   /**
-   * Batch version: get the next series start number for multiple product IDs
-   * in a SINGLE raw SQL query (one MAX per productId via GROUP BY).
+   * Get the next series start number for a RAW ItemCode string (e.g. "49188EH").
    *
-   * @param {string[]} productIds  Array of TblItemCodes1S1Br.id values
+   * Serial numbers are formatted as `<ItemCode><6-digit-seq>`, so the next sequence
+   * must be scoped by the raw ItemCode prefix — NOT by productId — otherwise
+   * different sizes of the same ItemCode produce duplicate serial numbers.
+   *
+   * Uses a LIKE prefix query and parses the last 6 chars of MAX(serialNumber) to
+   * find the highest sequence seen so far across all sizes/PRs for this ItemCode.
+   *
+   * @param {string} rawItemCode  The raw ItemCode string (e.g. "49188EH")
+   * @returns {Promise<number>}   Next sequence number (integer)
+   */
+  static async getNextSeriesForRawItemCode(rawItemCode) {
+    if (!rawItemCode) return 1;
+
+    // Escape single quotes for raw SQL prefix
+    const escaped = rawItemCode.replace(/'/g, "''");
+    const prefixLike = `${escaped}%`;
+
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT TOP 1 serialNumber
+      FROM [dbo].[ControlSerial]
+      WHERE serialNumber LIKE '${prefixLike}'
+        AND LEN(serialNumber) = ${rawItemCode.length + 6}
+      ORDER BY serialNumber DESC
+    `);
+
+    if (!rows || rows.length === 0) return 1;
+    const maxSerial = rows[0].serialNumber;
+    if (!maxSerial || maxSerial.length < 6) return 1;
+
+    const seqStr = maxSerial.slice(-6);
+    const seq = parseInt(seqStr, 10);
+    if (Number.isNaN(seq)) return 1;
+    const nextNum = seq + 1;
+    if (nextNum > 999999) {
+      throw new Error(`Series number exceeds 999999 for ItemCode ${rawItemCode}`);
+    }
+    return nextNum;
+  }
+
+  /**
+   * DEPRECATED — kept for backward compatibility with callers that pass productIds.
+   * New code should use getNextSeriesForRawItemCode(rawItemCode) instead.
+   * @param {string[]} productIds
    * @returns {Map<string, string>}  productId → next 6-digit series string
    */
   static async getNextSeriesNumbersBatch(productIds) {
     if (!productIds || productIds.length === 0) return new Map();
 
-    // Build IN list (all values are internal cuid strings — safe to interpolate)
     const inList = productIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(",");
 
     const rows = await prisma.$queryRawUnsafe(`
@@ -629,7 +669,6 @@ class ControlSerialModel {
     `);
 
     const resultMap = new Map();
-    // Seed with default "000001" for products not yet in DB
     for (const id of productIds) {
       resultMap.set(id, "000001");
     }
