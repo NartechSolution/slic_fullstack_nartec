@@ -918,14 +918,16 @@ class ControlSerialModel {
 
     const [summaries, products] = await Promise.all([
       prisma.controlSerial.groupBy({
-        by: ["masterId", "size", "isReceived"],
+        // Include side so we can split rightQty / leftQty per size
+        by: ["masterId", "size", "isReceived", "side"],
         where: { masterId: { in: masterIds } },
         _count: { id: true },
+        _sum: { sideQty: true, receivedSideQty: true },
       }),
       prisma.tblItemCodes1S1Br.findMany({
         where: { ItemCode: { in: itemCodes } },
-        select: { ItemCode: true, ProductSize: true, GTIN: true }
-      })
+        select: { ItemCode: true, ProductSize: true, GTIN: true },
+      }),
     ]);
 
     return {
@@ -933,34 +935,72 @@ class ControlSerialModel {
         const mSummaries = summaries.filter((s) => s.masterId === m.id);
         const map = {};
         let totalCount = 0;
+        let totalReceived = 0;
 
         for (const s of mSummaries) {
           const sz = s.size || "unknown";
           if (!map[sz]) {
-            const matchingProduct = products.find(p => p.ItemCode === m.product?.ItemCode && p.ProductSize === sz);
-            map[sz] = { size: sz, total: 0, received: 0, pending: 0, gtin: matchingProduct?.GTIN || null };
+            const matchingProduct = products.find(
+              (p) => p.ItemCode === m.product?.ItemCode && p.ProductSize === sz
+            );
+            map[sz] = {
+              size: sz,
+              total: 0,
+              received: 0,
+              pending: 0,
+              rightQty: 0,
+              leftQty: 0,
+              rightReceived: 0,
+              leftReceived: 0,
+              gtin: matchingProduct?.GTIN || null,
+            };
           }
-          map[sz].total += s._count.id;
-          if (s.isReceived) map[sz].received += s._count.id;
-          else map[sz].pending += s._count.id;
-          totalCount += s._count.id;
+
+          // Unit-based count: prefer sideQty sum; fall back to row count for legacy rows
+          const plannedUnits = s._sum?.sideQty && s._sum.sideQty > 0 ? s._sum.sideQty : s._count.id;
+          const receivedUnits = s._sum?.receivedSideQty && s._sum.receivedSideQty > 0
+            ? s._sum.receivedSideQty
+            : s.isReceived ? s._count.id : 0;
+
+          map[sz].total += plannedUnits;
+          totalCount += plannedUnits;
+          totalReceived += receivedUnits;
+
+          if (s.isReceived) map[sz].received += plannedUnits;
+          else map[sz].received += receivedUnits;
+          map[sz].pending = map[sz].total - map[sz].received;
+
+          if (s.side === "R") {
+            map[sz].rightQty += plannedUnits;
+            map[sz].rightReceived += receivedUnits;
+          } else if (s.side === "L") {
+            map[sz].leftQty += plannedUnits;
+            map[sz].leftReceived += receivedUnits;
+          }
         }
 
         const sizeSummary = Object.values(map).sort((a, b) =>
           a.size.localeCompare(b.size, undefined, { numeric: true })
         );
 
+        // Recompute PO-level receivedStatus from units
+        let receivedStatus;
+        if (totalReceived <= 0) receivedStatus = "pending";
+        else if (totalCount > 0 && totalReceived >= totalCount) receivedStatus = "received";
+        else receivedStatus = "partially_received";
+
         return {
           poNumber: m.poNumber,
           product: m.product,
           supplier: m.supplier,
           isSentToSupplier: m.isSentToSupplier,
-          receivedStatus: m.receivedStatus,
+          receivedStatus,
           sizeSummary,
           isArchived: m.isArchived,
           createdAt: m.createdAt,
           updatedAt: m.updatedAt,
           totalCount,
+          receivedQty: totalReceived,
         };
       }),
       total: await prisma.controlSerialMaster.count({ where }),
