@@ -51,6 +51,7 @@ const FGBarcodePrint = ({ selectedRows, onPrintComplete }) => {
       '</body></html>';
 
     printWindow.document.write(html);
+    printWindow.document.close();
     const barcodeContainer = printWindow.document.getElementById('printBarcode');
     const barcode = document.getElementById('fg-barcode-container').cloneNode(true);
     barcodeContainer.appendChild(barcode);
@@ -90,7 +91,7 @@ const FGBarcodePrint = ({ selectedRows, onPrintComplete }) => {
           <div className="label-container hidden" key={index}>
             <div className="qr-code">
               <QRCodeSVG
-                value={`https://uat.slicapp.online/product-info?id=${barcode?.id}`}
+                value={barcode?.GTIN || ''}
                 size={45}
                 level="M"
               />
