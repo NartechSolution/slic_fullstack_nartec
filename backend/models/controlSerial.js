@@ -335,9 +335,15 @@ class ControlSerialMasterModel {
     else if (totalUnits > 0 && receivedUnits >= totalUnits) receivedStatus = "received";
     else receivedStatus = "partially_received";
 
+    const updateData = { receivedStatus };
+    // Set receivedAt on first receive (any status change from pending)
+    if (receivedStatus !== "pending") {
+      updateData.receivedAt = new Date();
+    }
+
     return await prisma.controlSerialMaster.update({
       where: { id: masterId },
-      data: { receivedStatus },
+      data: updateData,
       include: { product: true, supplier: true },
     });
   }
