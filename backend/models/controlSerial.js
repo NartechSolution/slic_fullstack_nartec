@@ -607,16 +607,56 @@ class ControlSerialModel {
   }
 
   /**
-   * Batch version: get the next series start number for multiple product IDs
-   * in a SINGLE raw SQL query (one MAX per productId via GROUP BY).
+   * Get the next series start number for a RAW ItemCode string (e.g. "49188EH").
    *
-   * @param {string[]} productIds  Array of TblItemCodes1S1Br.id values
+   * Serial numbers are formatted as `<ItemCode><6-digit-seq>`, so the next sequence
+   * must be scoped by the raw ItemCode prefix — NOT by productId — otherwise
+   * different sizes of the same ItemCode produce duplicate serial numbers.
+   *
+   * Uses a LIKE prefix query and parses the last 6 chars of MAX(serialNumber) to
+   * find the highest sequence seen so far across all sizes/PRs for this ItemCode.
+   *
+   * @param {string} rawItemCode  The raw ItemCode string (e.g. "49188EH")
+   * @returns {Promise<number>}   Next sequence number (integer)
+   */
+  static async getNextSeriesForRawItemCode(rawItemCode) {
+    if (!rawItemCode) return 1;
+
+    // Escape single quotes for raw SQL prefix
+    const escaped = rawItemCode.replace(/'/g, "''");
+    const prefixLike = `${escaped}%`;
+
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT TOP 1 serialNumber
+      FROM [dbo].[ControlSerial]
+      WHERE serialNumber LIKE '${prefixLike}'
+        AND LEN(serialNumber) = ${rawItemCode.length + 6}
+      ORDER BY serialNumber DESC
+    `);
+
+    if (!rows || rows.length === 0) return 1;
+    const maxSerial = rows[0].serialNumber;
+    if (!maxSerial || maxSerial.length < 6) return 1;
+
+    const seqStr = maxSerial.slice(-6);
+    const seq = parseInt(seqStr, 10);
+    if (Number.isNaN(seq)) return 1;
+    const nextNum = seq + 1;
+    if (nextNum > 999999) {
+      throw new Error(`Series number exceeds 999999 for ItemCode ${rawItemCode}`);
+    }
+    return nextNum;
+  }
+
+  /**
+   * DEPRECATED — kept for backward compatibility with callers that pass productIds.
+   * New code should use getNextSeriesForRawItemCode(rawItemCode) instead.
+   * @param {string[]} productIds
    * @returns {Map<string, string>}  productId → next 6-digit series string
    */
   static async getNextSeriesNumbersBatch(productIds) {
     if (!productIds || productIds.length === 0) return new Map();
 
-    // Build IN list (all values are internal cuid strings — safe to interpolate)
     const inList = productIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(",");
 
     const rows = await prisma.$queryRawUnsafe(`
@@ -629,7 +669,6 @@ class ControlSerialModel {
     `);
 
     const resultMap = new Map();
-    // Seed with default "000001" for products not yet in DB
     for (const id of productIds) {
       resultMap.set(id, "000001");
     }
@@ -722,24 +761,69 @@ class ControlSerialModel {
   /**
    * Get unique PO numbers with total qty with pagination
    */
-  static async getUniquePONumbersWithTotalQty(isArchived = null, supplierId = null, page = 1, limit = 10) {
+  static async getUniquePONumbersWithTotalQty(
+    isArchived = null,
+    supplierId = null,
+    page = 1,
+    limit = 10,
+    isSentToSupplier = null
+  ) {
     const skip = (page - 1) * limit;
-    const where = {};
-    if (isArchived !== null && typeof isArchived === "boolean") where.isArchived = isArchived;
-    if (supplierId) where.supplierId = supplierId;
 
-    // 1. Get unique PO numbers with pagination
-    const uniquePosRaw = await prisma.controlSerialMaster.groupBy({
-      by: ["poNumber"],
-      where,
-      orderBy: { _max: { createdAt: "desc" } },
-      skip,
-      take: limit,
-    });
+    // ──────────────────────────────────────────────────────────────────────
+    // Build WHERE clauses for the raw SQL query.
+    // We need raw SQL because the response aggregates isSentToSupplier across
+    // ALL masters of a PO with .every() — a simple groupBy filter would leak
+    // POs that have some sent + some unsent masters. HAVING is the only way
+    // to filter on that aggregate cleanly AND page correctly.
+    // ──────────────────────────────────────────────────────────────────────
+    const whereParts = ["1=1"];
+    if (isArchived !== null && typeof isArchived === "boolean") {
+      whereParts.push(`isArchived = ${isArchived ? 1 : 0}`);
+    }
+    if (supplierId) {
+      const escapedId = String(supplierId).replace(/'/g, "''");
+      whereParts.push(`supplierId = '${escapedId}'`);
+    }
+    const whereSql = whereParts.join(" AND ");
 
-    if (uniquePosRaw.length === 0) return { masters: [], total: 0 };
+    // HAVING filter for the aggregate "all masters sent" / "not all sent"
+    let havingSql = "";
+    if (isSentToSupplier === true) {
+      // Every master for this PO must be sent → MIN(cast to int) = 1
+      havingSql = "HAVING MIN(CAST(isSentToSupplier AS INT)) = 1";
+    } else if (isSentToSupplier === false) {
+      // At least one master is still unsent → MIN(cast to int) = 0
+      havingSql = "HAVING MIN(CAST(isSentToSupplier AS INT)) = 0";
+    }
 
-    const poNumbers = uniquePosRaw.map(p => p.poNumber);
+    // 1a. Page of PO numbers (ordered by most recent createdAt)
+    const pageRows = await prisma.$queryRawUnsafe(`
+      SELECT poNumber
+      FROM [dbo].[ControlSerialMaster]
+      WHERE ${whereSql}
+      GROUP BY poNumber
+      ${havingSql}
+      ORDER BY MAX(createdAt) DESC
+      OFFSET ${skip} ROWS FETCH NEXT ${limit} ROWS ONLY
+    `);
+
+    const poNumbers = pageRows.map((r) => r.poNumber).filter(Boolean);
+
+    // 1b. Total count (same filters) for pagination
+    const totalRows = await prisma.$queryRawUnsafe(`
+      SELECT COUNT(*) AS total
+      FROM (
+        SELECT poNumber
+        FROM [dbo].[ControlSerialMaster]
+        WHERE ${whereSql}
+        GROUP BY poNumber
+        ${havingSql}
+      ) t
+    `);
+    const total = Number(totalRows[0]?.total || 0);
+
+    if (poNumbers.length === 0) return { masters: [], total };
 
     // 2. Fetch full metadata and aggregate metrics
     const [masters, allSerialsForPos] = await Promise.all([
@@ -799,15 +883,10 @@ class ControlSerialModel {
       };
     });
 
-    // 4. Get total count of unique POs
-    const totalCountResult = await prisma.controlSerialMaster.groupBy({
-      by: ["poNumber"],
-      where,
-    });
-
+    // 4. Total already computed above via raw SQL
     return {
       masters: consolidated,
-      total: totalCountResult.length
+      total,
     };
   }
 
@@ -839,14 +918,16 @@ class ControlSerialModel {
 
     const [summaries, products] = await Promise.all([
       prisma.controlSerial.groupBy({
-        by: ["masterId", "size", "isReceived"],
+        // Include side so we can split rightQty / leftQty per size
+        by: ["masterId", "size", "isReceived", "side"],
         where: { masterId: { in: masterIds } },
         _count: { id: true },
+        _sum: { sideQty: true, receivedSideQty: true },
       }),
       prisma.tblItemCodes1S1Br.findMany({
         where: { ItemCode: { in: itemCodes } },
-        select: { ItemCode: true, ProductSize: true, GTIN: true }
-      })
+        select: { ItemCode: true, ProductSize: true, GTIN: true },
+      }),
     ]);
 
     return {
@@ -854,34 +935,72 @@ class ControlSerialModel {
         const mSummaries = summaries.filter((s) => s.masterId === m.id);
         const map = {};
         let totalCount = 0;
+        let totalReceived = 0;
 
         for (const s of mSummaries) {
           const sz = s.size || "unknown";
           if (!map[sz]) {
-            const matchingProduct = products.find(p => p.ItemCode === m.product?.ItemCode && p.ProductSize === sz);
-            map[sz] = { size: sz, total: 0, received: 0, pending: 0, gtin: matchingProduct?.GTIN || null };
+            const matchingProduct = products.find(
+              (p) => p.ItemCode === m.product?.ItemCode && p.ProductSize === sz
+            );
+            map[sz] = {
+              size: sz,
+              total: 0,
+              received: 0,
+              pending: 0,
+              rightQty: 0,
+              leftQty: 0,
+              rightReceived: 0,
+              leftReceived: 0,
+              gtin: matchingProduct?.GTIN || null,
+            };
           }
-          map[sz].total += s._count.id;
-          if (s.isReceived) map[sz].received += s._count.id;
-          else map[sz].pending += s._count.id;
-          totalCount += s._count.id;
+
+          // Unit-based count: prefer sideQty sum; fall back to row count for legacy rows
+          const plannedUnits = s._sum?.sideQty && s._sum.sideQty > 0 ? s._sum.sideQty : s._count.id;
+          const receivedUnits = s._sum?.receivedSideQty && s._sum.receivedSideQty > 0
+            ? s._sum.receivedSideQty
+            : s.isReceived ? s._count.id : 0;
+
+          map[sz].total += plannedUnits;
+          totalCount += plannedUnits;
+          totalReceived += receivedUnits;
+
+          if (s.isReceived) map[sz].received += plannedUnits;
+          else map[sz].received += receivedUnits;
+          map[sz].pending = map[sz].total - map[sz].received;
+
+          if (s.side === "R") {
+            map[sz].rightQty += plannedUnits;
+            map[sz].rightReceived += receivedUnits;
+          } else if (s.side === "L") {
+            map[sz].leftQty += plannedUnits;
+            map[sz].leftReceived += receivedUnits;
+          }
         }
 
         const sizeSummary = Object.values(map).sort((a, b) =>
           a.size.localeCompare(b.size, undefined, { numeric: true })
         );
 
+        // Recompute PO-level receivedStatus from units
+        let receivedStatus;
+        if (totalReceived <= 0) receivedStatus = "pending";
+        else if (totalCount > 0 && totalReceived >= totalCount) receivedStatus = "received";
+        else receivedStatus = "partially_received";
+
         return {
           poNumber: m.poNumber,
           product: m.product,
           supplier: m.supplier,
           isSentToSupplier: m.isSentToSupplier,
-          receivedStatus: m.receivedStatus,
+          receivedStatus,
           sizeSummary,
           isArchived: m.isArchived,
           createdAt: m.createdAt,
           updatedAt: m.updatedAt,
           totalCount,
+          receivedQty: totalReceived,
         };
       }),
       total: await prisma.controlSerialMaster.count({ where }),

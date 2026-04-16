@@ -7,7 +7,8 @@
   "scripts": {
     "start": "nodemon app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prisma:push": "npx prisma db push"
+    "prisma:push": "npx prisma db push",
+    "seed": "node scripts/seed-supply-chain.js"
   },
   "keywords": [],
   "author": "",

@@ -141,20 +141,19 @@ exports.createControlSerials = async (req, res, next) => {
       supplierId,
     });
 
-    // ── Step 3: One SQL query for MAX serial per unique product  ────────────
-    const uniqueProductIds = [...new Set([...sizeProductMap.values()].map((p) => p.id))];
-    const seriesStartMap = await ControlSerialModel.getNextSeriesNumbersBatch(uniqueProductIds);
+    // ── Step 3: ONE counter per raw ItemCode (prefix of serialNumber) ──────
+    // All sizes of the same ItemCode share the same prefix, so they must share
+    // the same sequence counter to avoid duplicate serial numbers.
+    let currentNum = await ControlSerialModel.getNextSeriesForRawItemCode(ItemCode);
 
     const master = await masterPromise;
 
     // ── Step 4: Generate 2 serial objects per size (1 Right + 1 Left) ──
     const serials = [];
-    const counterMap = new Map(seriesStartMap);
 
     let totalQty = 0;
     for (const { size, rightQty, leftQty } of validSizeQuantities) {
       const product = sizeProductMap.get(size);
-      let currentNum = parseInt(counterMap.get(product.id), 10);
       totalQty += rightQty + leftQty;
 
       // Right serial
@@ -188,8 +187,6 @@ exports.createControlSerials = async (req, res, next) => {
         });
         currentNum++;
       }
-
-      counterMap.set(product.id, currentNum.toString().padStart(6, "0"));
     }
 
     // ── Step 5: Bulk raw-SQL INSERT (1 000 rows/chunk, 50 parallel) ─────────
@@ -956,11 +953,17 @@ exports.getUniquePONumbersWithTotalQty = async (req, res, next) => {
       req.query.isArchived !== undefined ? req.query.isArchived === "true" : null;
     const supplierId = req.query.supplierId || null;
 
+    // Parse isSentToSupplier as tri-state: true | false | null (ignored)
+    let isSentToSupplier = null;
+    if (req.query.isSentToSupplier === "true") isSentToSupplier = true;
+    else if (req.query.isSentToSupplier === "false") isSentToSupplier = false;
+
     const result = await ControlSerialModel.getUniquePONumbersWithTotalQty(
       isArchived,
       supplierId,
       page,
-      limit
+      limit,
+      isSentToSupplier
     );
 
     res.status(200).json(

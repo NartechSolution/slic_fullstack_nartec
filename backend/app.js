@@ -28,6 +28,7 @@ const binLocationRoutes = require("./routes/binLocation");
 const migrationRoutes = require("./routes/migration");
 const digitalLinkRoutes = require("./routes/digitalLink");
 const mergeSerialRoutes = require("./routes/mergeSerial");
+const finishedGoodsRoutes = require("./routes/finishedGoods");
 const path = require("path");
 const prisma = require("./db");
 const app = express();
@@ -69,6 +70,8 @@ app.use("/api/admin/migrate", migrationRoutes);
 app.use("/api/digital-link", digitalLinkRoutes);
 // Merge Serial — protected endpoints
 app.use("/api/merge-serial", mergeSerialRoutes);
+// Finished Goods — list/stats/grouped (protected) + /:fgSerial trace (public QR target)
+app.use("/api/finished-goods", finishedGoodsRoutes);
 
 app.get("/test", (req, res) => {
   function calculateCheckDigit(gtinWithoutCheckDigit) {
