@@ -35,6 +35,15 @@ router.post("/validate", isAuth, mergeController.validateSerial);
 router.post("/merge", isAuth, mergeController.mergeSerials);
 
 /**
+ * GET /api/merge-serial/counts-by-item
+ * @summary Aggregated merge counts per (itemCode, size) — consumed by the
+ *          Production RM List to derive "pairs still available on the line".
+ * @query itemCode, size, from, to
+ * Must be declared BEFORE the :fgSerial catch-all route below.
+ */
+router.get("/counts-by-item", isAuth, mergeController.getCountsByItem);
+
+/**
  * GET /api/merge-serial/:fgSerial
  * @summary Get merge record by FG serial number (public — used in QR links)
  */

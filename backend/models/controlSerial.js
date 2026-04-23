@@ -266,51 +266,58 @@ class ControlSerialMasterModel {
       const { size } = entry;
       if (!size) continue;
 
-      // Support both new payload (rightReceived/leftReceived) and legacy (receivedQty)
-      const rightReceived = Number(entry.rightReceived ?? 0);
-      const leftReceived = Number(entry.leftReceived ?? 0);
-      const legacyQty = Number(entry.receivedQty ?? 0);
+      // The frontend sends an INCREMENTAL amount per batch (input is capped at
+      // the per-side remaining). So we must ADD to the existing receivedSideQty,
+      // not overwrite it — otherwise a 5+5 receive on a 10-unit side leaves the
+      // final value at 5 and the master stays in "partially_received" forever.
+      const rightInc = Number(entry.rightReceived ?? 0);
+      const leftInc = Number(entry.leftReceived ?? 0);
+      const legacyInc = Number(entry.receivedQty ?? 0);
 
       const forSize = allSerials.filter((s) => s.size === size);
       const rightSerial = forSize.find((s) => s.side === "R");
       const leftSerial = forSize.find((s) => s.side === "L");
 
-      // Calculate target received per side
-      let rTarget = 0;
-      let lTarget = 0;
+      const rPrev = rightSerial?.receivedSideQty || 0;
+      const lPrev = leftSerial?.receivedSideQty || 0;
+      const rCap = rightSerial?.sideQty || 0;
+      const lCap = leftSerial?.sideQty || 0;
 
-      if (rightReceived > 0 || leftReceived > 0) {
-        // New payload: explicit per-side values
-        rTarget = Math.min(rightReceived, rightSerial?.sideQty || 0);
-        lTarget = Math.min(leftReceived, leftSerial?.sideQty || 0);
-      } else if (legacyQty > 0) {
-        // Legacy: distribute total across R then L (fill R first, then L)
-        const rMax = rightSerial?.sideQty || 0;
-        const lMax = leftSerial?.sideQty || 0;
-        rTarget = Math.min(legacyQty, rMax);
-        lTarget = Math.min(Math.max(legacyQty - rMax, 0), lMax);
+      // New per-side cumulative totals
+      let rNew = rPrev;
+      let lNew = lPrev;
+
+      if (rightInc > 0 || leftInc > 0) {
+        rNew = Math.min(rPrev + rightInc, rCap);
+        lNew = Math.min(lPrev + leftInc, lCap);
+      } else if (legacyInc > 0) {
+        // Legacy single-qty path: top up R first, then spill into L
+        const addR = Math.min(legacyInc, Math.max(0, rCap - rPrev));
+        const addL = Math.min(Math.max(legacyInc - addR, 0), Math.max(0, lCap - lPrev));
+        rNew = rPrev + addR;
+        lNew = lPrev + addL;
       } else {
         continue;
       }
 
-      if (rightSerial && rTarget > 0) {
+      if (rightSerial && rNew !== rPrev) {
         updateOps.push(
           prisma.controlSerial.update({
             where: { id: rightSerial.id },
             data: {
-              receivedSideQty: rTarget,
-              isReceived: rTarget >= (rightSerial.sideQty || 0),
+              receivedSideQty: rNew,
+              isReceived: rCap > 0 && rNew >= rCap,
             },
           })
         );
       }
-      if (leftSerial && lTarget > 0) {
+      if (leftSerial && lNew !== lPrev) {
         updateOps.push(
           prisma.controlSerial.update({
             where: { id: leftSerial.id },
             data: {
-              receivedSideQty: lTarget,
-              isReceived: lTarget >= (leftSerial.sideQty || 0),
+              receivedSideQty: lNew,
+              isReceived: lCap > 0 && lNew >= lCap,
             },
           })
         );

@@ -266,6 +266,61 @@ exports.mergeSerials = async (req, res, next) => {
   }
 };
 
+// ── GET /api/merge-serial/counts-by-item ────────────────────────────────────
+// Aggregated merge counts grouped by (itemCode, size). Consumed by the
+// Production RM List to compute "pairs already consumed by production" so the
+// list can show available-vs-merged and flag rows as fully consumed.
+//
+// Query params:
+//   itemCode (optional) — filter to one product
+//   size     (optional) — filter to one size
+//   from, to (optional) — ISO date range against MergeRecord.createdAt
+//
+// Response:
+//   { items: [{ itemCode, size, mergedCount, lastMergedAt }], totalMerged }
+exports.getCountsByItem = async (req, res, next) => {
+  try {
+    const { itemCode, size, from, to } = req.query;
+
+    const where = {};
+    if (itemCode) where.itemCode = itemCode;
+    if (size) where.size = String(size);
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(from);
+      if (to) where.createdAt.lte = new Date(to);
+    }
+
+    // Group by itemCode+size. SQL Server via Prisma: use groupBy aggregation.
+    const grouped = await prisma.mergeRecord.groupBy({
+      by: ["itemCode", "size"],
+      where,
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
+
+    const items = grouped
+      .filter((g) => g.itemCode) // drop null item codes
+      .map((g) => ({
+        itemCode: g.itemCode,
+        size: g.size || null,
+        mergedCount: g._count._all,
+        lastMergedAt: g._max.createdAt,
+      }));
+
+    const totalMerged = items.reduce((s, g) => s + g.mergedCount, 0);
+
+    res.status(200).json(
+      generateResponse(200, true, "Merge counts retrieved", {
+        items,
+        totalMerged,
+      })
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ── GET /api/merge-serial/:fgSerial — public — get FG merge details ──────────
 exports.getMergeByFgSerial = async (req, res, next) => {
   try {
