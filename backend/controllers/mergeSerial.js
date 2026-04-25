@@ -18,9 +18,22 @@ const CustomError = require("../exceptions/customError");
 // ── Helper: generate a deterministic FG serial ──────────────────────────────
 function buildFgSerial(serial1, serial2, poNumber, size) {
   const ts = Date.now();
+  // Random suffix prevents collisions when two merges land in the same ms
+  // (matters when batch-scanning many pairs of the same master serial).
+  const rnd = Math.floor(Math.random() * 9000) + 1000;
   const po = (poNumber || "NOPO").replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
   const sz = (size || "XX").replace(/\s+/g, "");
-  return `FG-${po}-${sz}-${ts}`;
+  return `FG-${po}-${sz}-${ts}${rnd}`;
+}
+
+// ── Helper: count merge usages of a serial number ───────────────────────────
+async function countMergeUsages(serialNumber) {
+  if (!serialNumber) return 0;
+  return prisma.mergeRecord.count({
+    where: {
+      OR: [{ serial1: serialNumber }, { serial2: serialNumber }],
+    },
+  });
 }
 
 // ── GET /api/merge-serial — list all merge records (paginated) ───────────────
@@ -90,18 +103,35 @@ exports.validateSerial = async (req, res, next) => {
       throw err;
     }
 
-    // Check if already merged
-    const existingMerge = await prisma.mergeRecord.findFirst({
-      where: {
-        OR: [{ serial1: serialNumber }, { serial2: serialNumber }],
-      },
-    });
+    // A "master" ControlSerial can be merged up to `sideQty` times — once per
+    // physical unit it represents. The legacy rule (one merge per serial string)
+    // breaks for shoe-pair flows where 1 R-master + 1 L-master cover 50 pairs.
+    const mergeCount = await countMergeUsages(serial.serialNumber);
+    const cap = serial.sideQty && serial.sideQty > 0 ? serial.sideQty : 1;
+    const remaining = Math.max(0, cap - mergeCount);
+    const isFullyMerged = remaining === 0;
+
+    // Last-merge ref (informational — shown to the user when fully merged)
+    const lastMerge = mergeCount > 0
+      ? await prisma.mergeRecord.findFirst({
+          where: { OR: [{ serial1: serial.serialNumber }, { serial2: serial.serialNumber }] },
+          orderBy: { createdAt: "desc" },
+        })
+      : null;
 
     res.status(200).json(
       generateResponse(200, true, "Serial validated successfully", {
         serialNumber: serial.serialNumber,
-        isAlreadyMerged: !!existingMerge,
-        existingFgSerial: existingMerge?.fgSerial || null,
+        side: serial.side || null,
+        sideQty: cap,
+        // Merge-usage tracking
+        mergeCount,
+        mergeCap: cap,
+        mergesRemaining: remaining,
+        isFullyMerged,
+        // Backwards-compat: only flag "already merged" once the cap is hit
+        isAlreadyMerged: isFullyMerged,
+        existingFgSerial: lastMerge?.fgSerial || null,
         product: {
           itemCode: serial.product?.ItemCode || null,
           englishName: serial.product?.EnglishName || null,
@@ -184,20 +214,30 @@ exports.mergeSerials = async (req, res, next) => {
       throw err;
     }
 
-    // Check neither is already merged
-    const existingMerge = await prisma.mergeRecord.findFirst({
-      where: {
-        OR: [
-          { serial1: serial1.trim() },
-          { serial2: serial1.trim() },
-          { serial1: serial2.trim() },
-          { serial2: serial2.trim() },
-        ],
-      },
-    });
-    if (existingMerge) {
+    // Cap-based merge check
+    // ─────────────────────
+    // A master ControlSerial can be merged up to `sideQty` times — once per
+    // physical unit it represents. We count how many times each input serial
+    // has been used in a MergeRecord and reject only when the cap is reached.
+    // This lets workers scan the same R + L master barcodes many times to
+    // pair every unit in the lot, instead of being blocked after the first one.
+    const [c1, c2] = await Promise.all([
+      countMergeUsages(serial1.trim()),
+      countMergeUsages(serial2.trim()),
+    ]);
+    const cap1 = s1.sideQty && s1.sideQty > 0 ? s1.sideQty : 1;
+    const cap2 = s2.sideQty && s2.sideQty > 0 ? s2.sideQty : 1;
+
+    if (c1 >= cap1) {
       const err = new CustomError(
-        `One or both serials are already merged into FG: ${existingMerge.fgSerial}`
+        `Serial ${serial1} has reached its merge cap (${c1}/${cap1}). All units under this master serial have been paired.`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+    if (c2 >= cap2) {
+      const err = new CustomError(
+        `Serial ${serial2} has reached its merge cap (${c2}/${cap2}). All units under this master serial have been paired.`
       );
       err.statusCode = 400;
       throw err;
@@ -241,6 +281,10 @@ exports.mergeSerials = async (req, res, next) => {
       }),
     ]);
 
+    // Post-merge usage — useful for the UI to show "X of Y merged · N left"
+    const newC1 = c1 + 1;
+    const newC2 = c2 + 1;
+
     res.status(201).json(
       generateResponse(201, true, "Serials merged successfully", {
         fgSerial: mergeRecord.fgSerial,
@@ -251,6 +295,13 @@ exports.mergeSerials = async (req, res, next) => {
         size: mergeRecord.size,
         gtin: mergeRecord.gtin,
         mergedAt: mergeRecord.createdAt,
+        // Cap usage post-merge — let the frontend show remaining counts and
+        // decide whether to clear the inputs (cap reached) or keep them for
+        // batch scanning the same master pair.
+        usage: {
+          serial1: { count: newC1, cap: cap1, remaining: Math.max(0, cap1 - newC1) },
+          serial2: { count: newC2, cap: cap2, remaining: Math.max(0, cap2 - newC2) },
+        },
         product: {
           itemCode: s1.product?.ItemCode,
           englishName: s1.product?.EnglishName,
