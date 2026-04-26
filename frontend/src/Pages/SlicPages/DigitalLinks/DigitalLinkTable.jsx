@@ -447,6 +447,7 @@ const DigitalLinkTable = ({
           ItemCode: serial.ItemCode || 'N/A',
           size: serial.product?.ProductSize || 'N/A',
           GTIN: serial.gtin || 'N/A',
+          poNumber: serial.poNumber || 'N/A',
         }))}
         onPrintComplete={handlePrintComplete}
       />
