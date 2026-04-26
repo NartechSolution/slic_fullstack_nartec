@@ -448,6 +448,7 @@ const DigitalLinkTable = ({
           size: serial.product?.ProductSize || 'N/A',
           GTIN: serial.gtin || 'N/A',
           poNumber: serial.poNumber || 'N/A',
+          side: serial.side || '',
         }))}
         onPrintComplete={handlePrintComplete}
       />
