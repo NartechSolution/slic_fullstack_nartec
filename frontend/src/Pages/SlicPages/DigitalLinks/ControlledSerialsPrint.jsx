@@ -96,6 +96,7 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
                     <div id="gtin">ItemCode : {barcode?.ItemCode}</div>
                     <div id="expiry">Size : {barcode?.size}</div>
                     <div id="batch">GTIN : {barcode?.GTIN}</div>
+                    <div id="batch">PO : {barcode?.poNumber}</div>
                   </div>
                 </div>
               </div>
