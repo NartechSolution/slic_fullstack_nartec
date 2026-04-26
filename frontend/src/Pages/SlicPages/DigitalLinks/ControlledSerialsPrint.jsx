@@ -34,6 +34,8 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
       "</body></html>";
 
     printWindow.document.write(html);
+    printWindow.document.close();
+    
     const barcodeContainer = printWindow.document.getElementById("printBarcode12");
     const barcode = document.getElementById("gtin-products-container").cloneNode(true);
     barcodeContainer.appendChild(barcode);
