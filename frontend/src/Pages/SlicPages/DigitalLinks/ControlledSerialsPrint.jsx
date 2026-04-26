@@ -3,7 +3,7 @@ import { QRCodeSVG } from "qrcode.react";
 import logo from "../../../Images/sliclogo.png";
 
 const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
-  console.log(selectedRows)
+  // console.log(selectedRows)
   const handlePrint = () => {
     if (selectedRows.length === 0) {
       return;
@@ -92,7 +92,7 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
 
                   {/* Right side - Data */}
                   <div id="description">
-                    <div id="gtin">SerialNo. : {barcode?.serialNo}</div>
+                    <div id="gtin">SerialNo. : {barcode?.serialNo} {barcode?.side}</div>
                     <div id="gtin">ItemCode : {barcode?.ItemCode}</div>
                     <div id="expiry">Size : {barcode?.size}</div>
                     <div id="batch">GTIN : {barcode?.GTIN}</div>
