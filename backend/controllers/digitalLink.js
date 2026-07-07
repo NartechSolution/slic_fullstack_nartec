@@ -37,6 +37,99 @@ exports.getDigitalLink = async (req, res, next) => {
     });
 
     if (!serial) {
+      // Check if it's a Finished Good (FG) serial from MergeRecord
+      const mergeRecord = await prisma.mergeRecord.findUnique({
+        where: { fgSerial: identifier },
+      });
+
+      if (mergeRecord) {
+        // Redirect-style: build a full FG trace response inline
+        const [s1, s2, events1, events2] = await Promise.all([
+          prisma.controlSerial.findFirst({
+            where: { serialNumber: mergeRecord.serial1 },
+            include: { product: true, supplier: true, binLocation: true },
+          }),
+          prisma.controlSerial.findFirst({
+            where: { serialNumber: mergeRecord.serial2 },
+            include: { product: true, supplier: true, binLocation: true },
+          }),
+          prisma.serialEvent.findMany({
+            where: { serialNumber: mergeRecord.serial1 },
+            orderBy: { occurredAt: "asc" },
+          }),
+          prisma.serialEvent.findMany({
+            where: { serialNumber: mergeRecord.serial2 },
+            orderBy: { occurredAt: "asc" },
+          }),
+        ]);
+
+        const product = s1?.product || s2?.product;
+
+        // Build combined timeline
+        const timeline = [
+          ...events1.map((e) => ({
+            type: e.eventType,
+            title: eventTypeToTitle(e.eventType),
+            description: e.description,
+            side: s1?.side || null,
+            serialNumber: mergeRecord.serial1,
+            performedBy: e.performedBy,
+            occurredAt: e.occurredAt,
+          })),
+          ...events2.map((e) => ({
+            type: e.eventType,
+            title: eventTypeToTitle(e.eventType),
+            description: e.description,
+            side: s2?.side || null,
+            serialNumber: mergeRecord.serial2,
+            performedBy: e.performedBy,
+            occurredAt: e.occurredAt,
+          })),
+          {
+            type: "FG_CREATED",
+            title: "Finished Good Created",
+            description: `FG serial ${mergeRecord.fgSerial} from ${mergeRecord.serial1} + ${mergeRecord.serial2}`,
+            occurredAt: mergeRecord.createdAt,
+            performedBy: mergeRecord.mergedBy,
+          },
+        ].sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt));
+
+        return res.status(200).json(
+          generateResponse(200, true, "Finished Good trace retrieved", {
+            type: "FINISHED_GOOD",
+            fg: {
+              fgSerial: mergeRecord.fgSerial,
+              serial1: mergeRecord.serial1,
+              serial2: mergeRecord.serial2,
+              poNumber: mergeRecord.poNumber,
+              itemCode: mergeRecord.itemCode,
+              size: mergeRecord.size,
+              gtin: mergeRecord.gtin,
+              mergedBy: mergeRecord.mergedBy,
+              createdAt: mergeRecord.createdAt,
+            },
+            product: product
+              ? {
+                  itemCode: product.ItemCode,
+                  englishName: product.EnglishName,
+                  arabicName: product.ArabicName,
+                  gtin: product.GTIN,
+                  image: product.image,
+                  color: product.color,
+                  upper: product.upper,
+                  sole: product.sole,
+                  width: product.width,
+                  brandName: product.BrandName,
+                  size: mergeRecord.size,
+                }
+              : null,
+            leftShoe: s1 ? { serialNumber: s1.serialNumber, side: s1.side, sideQty: s1.sideQty, size: s1.size, isReceived: s1.isReceived, bin: s1.binLocation?.binNumber } : null,
+            rightShoe: s2 ? { serialNumber: s2.serialNumber, side: s2.side, sideQty: s2.sideQty, size: s2.size, isReceived: s2.isReceived, bin: s2.binLocation?.binNumber } : null,
+            timeline,
+          })
+        );
+      }
+
       // Try GTIN or ItemCode lookup → product-level response
       const productFound = await prisma.tblItemCodes1S1Br.findFirst({
         where: {

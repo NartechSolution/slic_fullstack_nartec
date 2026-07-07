@@ -59,7 +59,8 @@ model ControlSerialMaster {
   // PO-level status flags
   isSentToSupplier Boolean @default(false)
   // "pending" | "partial" | "received"
-  receivedStatus   String  @default("pending")
+  receivedStatus   String    @default("pending")
+  receivedAt       DateTime? // set to now() when status first changes away from "pending"
 
   isArchived Boolean @default(false)
 
