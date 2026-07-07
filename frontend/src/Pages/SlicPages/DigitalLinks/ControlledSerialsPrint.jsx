@@ -26,7 +26,7 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
       "#inside-BRCode { flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; }" +
       "#slic-logo { width: 55px; height: auto; display: block; }" +
       "#description { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; }" +
-      "#gtin { font-size: 9px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; }" +
+      "#gtin { font-size: 8px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; white-space: nowrap; }" +
       "#expiry { font-size: 9px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; }" +
       "#batch { font-size: 9px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; word-break: break-all; }" +
       "</style>" +
