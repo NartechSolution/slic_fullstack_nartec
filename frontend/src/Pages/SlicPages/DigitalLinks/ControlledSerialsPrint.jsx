@@ -94,11 +94,11 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
 
                   {/* Right side - Data */}
                   <div id="description">
-                    <div id="gtin">SerialNo. : {barcode?.serialNo}</div>
                     <div id="gtin">STYLE : {barcode?.ItemCode}</div>
                     <div id="expiry">Size : {barcode?.size}</div>
                     <div id="batch">GTIN : {barcode?.GTIN}</div>
                     <div id="batch">EN ISO-20347:2022</div>
+                    <div id="gtin">SerialNo. : {barcode?.serialNo}</div>
                   </div>
                 </div>
               </div>
