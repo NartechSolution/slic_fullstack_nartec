@@ -1,65 +1,42 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { toast } from 'react-toastify';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import SendIcon from '@mui/icons-material/Send';
 import { useTranslation } from 'react-i18next';
-import axios from 'axios';
-import { baseUrl } from '../../../../utils/config';
+import newRequest from '../../../../utils/userRequest';
 
 const UpdataLanguageChange = ({ isVisible, setVisibility, refreshBrandData }) => {
-    // get this session data
     const updateBrandData = JSON.parse(sessionStorage.getItem("updatelanguageData"));
     const [loading, setLoading] = useState(false);
     const { t, i18n } = useTranslation();
+    
     const handleCloseUpdatePopup = () => {
-        setVisibility(false);
+      setVisibility(false);
     };
 
     const [category_name_en, setcategory_name_en] = useState(updateBrandData?.key || '');
     const [category_name_ar, setcategory_name_ar] = useState(updateBrandData?.value || '');
 
     const handleUpdateBrand = async () => {
-        setLoading(true);
+      setLoading(true);
 
-        try {
-            const response = await axios.put(baseUrl + `/language/translations_put/${updateBrandData?.id}`, {
-                'value': category_name_ar,
-            });
+      try {
+        const response = await newRequest.put(`/language/translations_put/${updateBrandData?.id}`, {
+          'value': category_name_ar,
+        });
 
-            toast.success(response?.data?.message || `${t('Word')} ${category_name_en}  ${t('has been')} ${t('Updated Successfully')}.`, {
-                position: "top-right",
-                autoClose: 5000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: "light",
-            });
-            refreshBrandData();
-            handleCloseUpdatePopup();
+        toast.success(response?.data?.message || `${t('Word')} ${category_name_en}  ${t('has been')} ${t('Updated Successfully')}.`);
+        refreshBrandData();
+        handleCloseUpdatePopup();
 
-        } catch (error) {
-            toast.error(error?.message|| `${t('Something went wrong')}`, {
-                position: "top-right",
-                autoClose: 5000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: "light",
-            });
-            // console.log(error);
-        }
-        finally {
-            setLoading(false);
-        }
-
-
-
-
+      } catch (err) {
+          toast.error(err?.response?.data?.error || err?.response?.data?.message || `${t('Something went wrong')}`);
+          // console.log(error);
+      }
+      finally {
+        setLoading(false);
+      }
     };
 
 

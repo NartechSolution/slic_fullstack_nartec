@@ -151,4 +151,14 @@ exports.postItemCode = [
     .withMessage("Start size is required.")
     .isInt({ min: 0 })
     .withMessage("Start size must be a non-negative integer."),
+
+  body("upper").optional().isString().withMessage("Upper must be a string."),
+
+  body("sole").optional().isString().withMessage("Sole must be a string."),
+
+  body("width").optional().isString().withMessage("Width must be a string."),
+
+  body("color").optional().isString().withMessage("Color must be a string."),
+
+  body("label").optional().isString().withMessage("Label must be a string."),
 ];

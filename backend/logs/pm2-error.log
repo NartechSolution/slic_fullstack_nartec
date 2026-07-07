@@ -1,0 +1,20 @@
+2025-12-20 13:48:52 +05:00: Error: Execution context was destroyed, most likely because of a navigation.
+2025-12-20 13:48:52 +05:00:     at rewriteError (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/puppeteer-core/lib/cjs/puppeteer/common/ExecutionContext.js:284:15)
+2025-12-20 13:48:52 +05:00:     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-12-20 13:48:52 +05:00:     at async ExecutionContext._ExecutionContext_evaluate (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/puppeteer-core/lib/cjs/puppeteer/common/ExecutionContext.js:227:56)
+2025-12-20 13:48:52 +05:00:     at async ExecutionContext.evaluate (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/puppeteer-core/lib/cjs/puppeteer/common/ExecutionContext.js:107:16)
+2025-12-20 13:48:52 +05:00:     at async Client.getWWebVersion (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/whatsapp-web.js/src/Client.js:878:16)
+2025-12-20 13:48:52 +05:00:     at async Client.inject (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/whatsapp-web.js/src/Client.js:101:25)
+2025-12-20 13:48:52 +05:00:     at async /Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/whatsapp-web.js/src/Client.js:356:13
+2025-12-20 13:49:01 +05:00: Error: Failed to add page binding with name onQRChangedEvent: window['onQRChangedEvent'] already exists!
+2025-12-20 13:49:01 +05:00:     at CDPPage.exposeFunction (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/puppeteer-core/lib/cjs/puppeteer/common/Page.js:889:19)
+2025-12-20 13:49:01 +05:00:     at exposeFunctionIfAbsent (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/whatsapp-web.js/src/util/Puppeteer.js:20:16)
+2025-12-20 13:49:01 +05:00:     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-12-20 13:49:01 +05:00:     at async Client.inject (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/whatsapp-web.js/src/Client.js:161:17)
+2025-12-20 13:49:01 +05:00:     at async /Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/whatsapp-web.js/src/Client.js:356:13
+2025-12-20 13:49:01 +05:00: Error: Failed to add page binding with name onQRChangedEvent: window['onQRChangedEvent'] already exists!
+2025-12-20 13:49:01 +05:00:     at CDPPage.exposeFunction (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/puppeteer-core/lib/cjs/puppeteer/common/Page.js:889:19)
+2025-12-20 13:49:01 +05:00:     at exposeFunctionIfAbsent (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/whatsapp-web.js/src/util/Puppeteer.js:20:16)
+2025-12-20 13:49:01 +05:00:     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-12-20 13:49:01 +05:00:     at async Client.inject (/Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/whatsapp-web.js/src/Client.js:161:17)
+2025-12-20 13:49:01 +05:00:     at async /Users/abdulmajid/Desktop/Nartec_Projects/SLIC_POS/backend/node_modules/whatsapp-web.js/src/Client.js:356:13

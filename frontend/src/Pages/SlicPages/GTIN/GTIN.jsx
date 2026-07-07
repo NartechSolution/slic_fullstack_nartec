@@ -1,66 +1,101 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useState } from "react";
+import { useQuery, useQueryClient } from "react-query";
 import SideNav from "../../../components/Sidebar/SideNav";
 import { GtinColumn } from "../../../utils/datatablesource";
-import { Button } from "@mui/material";
+import { Button, IconButton, Tooltip } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
+import LinkIcon from '@mui/icons-material/Link';
 import DeleteIcon from "@mui/icons-material/Delete";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import ImageIcon from "@mui/icons-material/Image";
 import DataTable from "../../../components/Datatable/Datatable";
 import { PiBarcodeDuotone } from "react-icons/pi";
 import { MdPrint } from "react-icons/md";
 import { FcPrint } from "react-icons/fc";
-import logo from "../../../Images/sliclogo.png"
 import RightDashboardHeader from "../../../components/RightDashboardHeader/RightDashboardHeader";
-import Barcode from "react-barcode";
 import { DataTableContext } from "../../../Contexts/DataTableContext";
 import { toast } from "react-toastify";
 import newRequest from "../../../utils/userRequest";
 import Swal from "sweetalert2";
-import { useQuery } from "react-query";
 import AddGTINPopUp from "./AddGTINPopUp";
 import UpdateGTINPopUp from "./UpdateGTINPopUp";
-import { QRCodeSVG } from "qrcode.react";
 import ViewGTINPopUp from "./ViewGTINPopUp";
 import { useTranslation } from "react-i18next";
+import FGBarcodePrint from "./FGBarcodePrint";
+import GTINBarcodePrint from "./GTINBarcodePrint";
+import { RolesContext } from "../../../Contexts/FetchRolesContext";
+import { useNavigate } from "react-router-dom";
+import UpdateImagesPopUp from "./UpdateImagesPopUp";
+import CreateControlSerials from "./CreateControlSerials";
+import AddControlSerialPopup from "../DigitalLinks/AddControlSerialPopup";
+import { CircularProgress } from "@mui/material";
+import { saveAs } from "file-saver";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import GetAppIcon from "@mui/icons-material/GetApp";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 
 const GTIN = () => {
   const { t, i18n } = useTranslation();
-  const [data, setData] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
   const memberDataString = sessionStorage.getItem('slicUserData');
   const memberData = JSON.parse(memberDataString);
-  // console.log(memberData)
+  const { userRoles } = useContext(RolesContext);
+  const navigate = useNavigate();
+
+  const canGenerateBarcode = userRoles?.some(
+    role => role.RoleName?.toLowerCase() === 'generate_new_barcode'
+  );
+
+  const canPrintProducts = userRoles?.some(
+    role => role.RoleName?.toLowerCase() === 'print_products'
+  );
 
   const {
-    rowSelectionModel,
     setRowSelectionModel,
     tableSelectedRows,
     setTableSelectedRows,
   } = useContext(DataTableContext);
 
-
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const response = await newRequest.get("/itemCodes/v1/itemCodes/all", {
-        headers: {
-          Authorization: `Bearer ${memberData?.data?.token}`,
-        },
-      });
-      // console.log(response?.data?.data);
-      setData(response?.data?.data || []);
-    } catch (err) {
-      console.log(err);
-      toast.error(err?.response?.data?.error || "failed to load data");
-    } finally {
-      setIsLoading(false);
-    }
+  // React Query fetch function
+  const fetchGTINData = async () => {
+    const response = await newRequest.get("/itemCodes/v1/itemCodes/all", {
+      headers: {
+        Authorization: `Bearer ${memberData?.data?.token}`,
+      },
+    });
+    return response?.data?.data || [];
   };
 
-  useEffect(() => {
-    fetchData();
-  },[])
+  // React Query hook with 5 minutes cache time
+  const { data = [], isLoading, isError, error, refetch, isFetching } = useQuery({
+    queryKey: ['gtinData'],
+    queryFn: fetchGTINData,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+    retry: false,
+    onError: (err) => {
+      toast.error(err?.response?.data?.error || "Failed to load data");
+    },
+  });
 
+  // Manual refresh handler
+  const handleRefresh = () => {
+    toast.promise(
+      refetch(),
+      {
+        pending: 'Refreshing data...',
+        success: 'Data refreshed successfully!',
+        error: 'Failed to refresh data'
+      }
+    );
+  };
+
+  // Invalidate and refetch data after mutations
+  const refreshGTINData = () => {
+    queryClient.invalidateQueries(['gtinData']);
+  };
 
   const [isCreatePopupVisible, setCreatePopupVisibility] = useState(false);
   const handleShowCreatePopup = () => {
@@ -70,136 +105,141 @@ const GTIN = () => {
   const [isUpdatePopupVisible, setUpdatePopupVisibility] = useState(false);
   const handleShowUpdatePopup = (row) => {
     setUpdatePopupVisibility(true);
-    // console.log(row)
     sessionStorage.setItem("updateListOfEmployeeData", JSON.stringify(row));
   };
 
   const [isViewPopupVisible, setViewPopupVisibility] = useState(false);
   const handleShowViewPopup = (row) => {
     setViewPopupVisibility(true);
-    // console.log(row)
     sessionStorage.setItem("viewGtinBarcodesData", JSON.stringify(row));
   };
 
+  const [isUpdateImagesPopupVisible, setUpdateImagesPopupVisibility] = useState(false);
+  const handleShowUpdateImagesPopup = () => {
+    if (tableSelectedRows.length === 0) {
+      toast.info(t("Please select at least one product to update images"));
+      return;
+    }
+    setUpdateImagesPopupVisibility(true);
+  };
+
+  const handleDigitalLinks = (row) => {
+    navigate(`/po-number`, {
+      state: { rowData: row }
+    });
+  };
+
+  // Create Control Serials Popup Logic
+  const [isCreateControlSerialsPopupVisible, setCreateControlSerialsPopupVisibility] = useState(false);
+  const [isAddControlSerialPopupVisible, setAddControlSerialPopupVisibility] = useState(false);
+  const [selectedItemForControlSerial, setSelectedItemForControlSerial] = useState(null);
+
+  const handleShowCreateControlSerialsPopup = () => {
+    setCreateControlSerialsPopupVisibility(true);
+  };
+
+  const handleContinueToControlSerial = (item) => {
+    setSelectedItemForControlSerial(item);
+    setCreateControlSerialsPopupVisibility(false);
+    setAddControlSerialPopupVisibility(true);
+  };
+
+  // FG Barcode Print Handler
   const handlePrintFGBarcode = () => {
     if (tableSelectedRows.length === 0) {
       toast.info("Please select a row to print");
       return;
     }
-    const printWindow = window.open('', 'Print Window', 'height=400,width=800');
-  
-    const html = '<html><head><title>FG Products</title>' +
-      '<style>' +
-      '@page { size: 3in 2in; margin: 0; }' +
-      'body { font-size: 13px; line-height: 0.1;}' +
-      '#header { display: flex; justify-content: start;}' +
-      '#imglogo {height: 15px; width: 50px; visibility: hidden;}' +
-      '#itemcode { font-size: 12px; font-weight: 400; display: flex; justify-content: between; align-items: center;}' +
-      '#inside-BRCode { display: flex; justify-content: start; align-items: start; padding: 1px;}' +
-      
-      '#main-image {height: 100px; width: 100px; object-fit: contain;}' +
-      '#description { display: flex; flex-direction: column; justify-content: start; align-items: start; gap: 12px; padding: 1px;}' +
-      '#gtin { font-size: 12px; font-weight: 600; margin-top: 5px;}' +
-      '#batch { font-size: 12px; font-weight: 600; margin-top: 9px;}'+
-      '#2dBarcode { margin-top: 139px; }' +
-      '#Qrcodeserails { height: 100%; width: 100%;}' +
-      '</style>' +
-      '</head><body>' +
-      '<div id="printBarcode"></div>' +
-      '</body></html>';
+    document.getElementById('fg-print-trigger')?.click();
+  };
 
-      printWindow.document.write(html);
-      const barcodeContainer = printWindow.document.getElementById('printBarcode');
-      const barcode = document.getElementById('barcode12').cloneNode(true);
-      barcodeContainer.appendChild(barcode);
-
-
-      const logoImg = new Image();
-      logoImg.src = logo;
-
-      logoImg.onload = function () {
-        const printWindowLogoImg = printWindow.document.getElementById('imglogo');
-        if (printWindowLogoImg) {
-          printWindowLogoImg.src = logoImg.src;
-
-          printWindow.print();
-          printWindow.close();
-          setTimeout(() => {
-            setTableSelectedRows([]);
-            setRowSelectionModel([]);
-          }, 500);
-        }
-      };
-    };
-
-
-    const handleGtinPage = () => {
+  // GTIN Barcode Print Handler
+  const handleGtinPage = () => {
     if (tableSelectedRows.length === 0) {
       toast.info("Please select a row to print.");
       return;
     }
-    const printWindow = window.open("", "Print Window", "height=400,width=800");
-    const html =
-      "<html><head><title>GTIN Number</title>" +
-      "<style>" +
-      "@page { size: 2in 1in; margin: 0; }" +
-      "body { font-size: 12px; line-height: 1.0; }" +
-      "#header { display: flex; justify-content: start;}" +
-      "#imglogo {height: 15px; width: 50px; visibility: hidden;}" +
-      "#itemcode { font-size: 8px; font-weight: 400; }" +
-      "#inside-BRCode { display: flex; justify-content: center; align-items: center; padding: 1px; margin-top: -14px;}" +
-
-      "#description { width: 100%; display: flex; flex-direction: column; justify-content: between; align-items: center; margin-top: -3px;}" +
-      "#itemSerialNo { font-size: 13px; font-weight: 400;}" +
-      "#gtin { font-size: 8px; font-weight: 500; margin-top: 5px;}" +
-      "#expiry { font-size: 8px; font-weight: 600; margin-top: 3px;}" +
-      "#batch { font-size: 8px; font-weight: 600; margin-top: 3px;}" +
-
-      "#Qrcodeserails { height: 100%; width: 100%;}" +
-      "</style>" +
-      "</head><body>" +
-      '<div id="printBarcode12"></div>' +
-      "</body></html>";
-
-    printWindow.document.write(html);
-    const barcodeContainer =
-      printWindow.document.getElementById("printBarcode12");
-    const barcode = document
-      .getElementById("priniproducts")
-      .cloneNode(true);
-    barcodeContainer.appendChild(barcode);
-
-    const logoImg = new Image();
-    logoImg.src = logo;
-
-    logoImg.onload = function () {
-      // printWindow.document.getElementById('imglogo').src = logoImg.src;
-      printWindow.print();
-      printWindow.close();
-      setTimeout(() => {
-        setTableSelectedRows([]);
-        setRowSelectionModel([]);
-      }, 500);
-    };
+    document.getElementById('gtin-print-trigger')?.click();
   };
 
-    const handleRowClickInParent = (item) => {
-      if (!item || item?.length === 0) {
-        // setTableSelectedRows(item)
-        // setTableSelectedExportRows(item);
-        // setFilteredData(data);
-        return;
-      }
-      const formattedItems = item.map((row) => ({
-        ...row,
-        updatedAt: new Date(row.updatedAt).toLocaleDateString(),
-      }));
-      setTableSelectedRows(formattedItems);
-    };
+  // Handle print complete callback
+  const handlePrintComplete = () => {
+    setTableSelectedRows([]);
+    setRowSelectionModel([]);
+  };
 
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleBulkUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("image", file); // Multer expects 'image' field based on route config, but for file upload it might be expecting 'file' or 'image'. 
+    // The route uses `upload` middleware which is `uploadSingle({ destination: PATH, filename: "image" })`. 
+    // So the field name must be "image".
+
+    try {
+      setIsUploading(true);
+      const response = await newRequest.post(
+        "/itemCodes/v1/bulk-import",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${memberData?.data?.token}`,
+          },
+        }
+      );
+      toast.success(response?.data?.message || "Products uploaded successfully");
+      refreshGTINData();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.response?.data?.message || "Failed to upload products");
+    } finally {
+      setIsUploading(false);
+      e.target.value = null; // Reset input
+    }
+  };
+
+  const handleDownloadProducts = async () => {
+    try {
+      const response = await newRequest.get("/itemCodes/v1/download-products", {
+        headers: {
+          Authorization: `Bearer ${memberData?.data?.token}`,
+        },
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, "All_Products.xlsx");
+    } catch (err) {
+      toast.error("Failed to download products");
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    // Construct URL based on API base URL
+    // newRequest.defaults.baseURL usually contains /api
+    const baseUrl = newRequest.defaults.baseURL;
+    const rootUrl = baseUrl.includes('/api') ? baseUrl.split('/api')[0] : baseUrl;
+    const templateUrl = `${rootUrl}/templates/product_import_template.xlsx`;
+
+    // Trigger download
+    saveAs(templateUrl, "product_import_template.xlsx");
+  };
+
+  const handleRowClickInParent = (item) => {
+    if (!item || item?.length === 0) {
+      return;
+    }
+    const formattedItems = item.map((row) => ({
+      ...row,
+      updatedAt: new Date(row.updatedAt).toLocaleDateString(),
+    }));
+    setTableSelectedRows(formattedItems);
+  };
 
   const handleDelete = (row) => {
-    console.log(row);
     Swal.fire({
       title: `${t('Are you sure to delete this record?')}!`,
       text: `${t('You will not be able to recover this Products!')}`,
@@ -215,19 +255,16 @@ const GTIN = () => {
           try {
             const response = await newRequest.delete("/itemCodes/v1/itemCode/" + row?.GTIN);
             if (response) {
-              // await refetch();
               resolve(response?.data?.message || `${t('Products deleted successfully')}`);
-              const updatedData = data.filter(item => item.GTIN !== row.GTIN);
-              setData(updatedData);
+              queryClient.invalidateQueries(['gtinData']);
             } else {
               reject(new Error('Failed to delete product'));
             }
           } catch (error) {
-            console.error("Error deleting product:", error);
             reject(error);
           }
         });
-  
+
         toast.promise(
           deletePromise,
           {
@@ -249,13 +286,7 @@ const GTIN = () => {
       }
     });
   };
-  
 
-  // const handleFetchData = () => {
-  //   refetch();
-  // };
-
- 
   return (
     <div>
       <SideNav>
@@ -266,31 +297,160 @@ const GTIN = () => {
         <div className="h-auto w-full">
           <div className="h-auto w-full p-0 bg-white shadow-xl rounded-md pb-10">
             <div
-              className={`flex  items-center flex-wrap gap-2 py-7 px-5 ${i18n.language==='ar'?'justify-start':'justify-end'}`}
+              className={`flex items-center flex-wrap gap-2 py-7 px-5 ${i18n.language === 'ar' ? 'justify-start' : 'justify-end'}`}
             >
-              <Button
-                variant="contained"
-                onClick={handleShowCreatePopup}
-                style={{ backgroundColor: "#CFDDE0", color: "#1D2F90" }}
-                startIcon={<PiBarcodeDuotone />}
-              >
-                {t("Generate New Barcode")}
-              </Button>
+              {/* Refresh Button */}
+              <Tooltip title={t("Refresh Data")}>
+                <IconButton
+                  onClick={handleRefresh}
+                  disabled={isFetching}
+                  style={{
+                    backgroundColor: "#CFDDE0",
+                    color: "#1D2F90",
+                    marginRight: '8px'
+                  }}
+                >
+                  <RefreshIcon className={isFetching ? 'animate-spin' : ''} />
+                </IconButton>
+              </Tooltip>
 
-              <Button
-                variant="contained"
-                onClick={handleGtinPage}
-                style={{
-                  backgroundColor: "#CFDDE0",
-                  color: "#1D2F90",
-                  paddingLeft: 70,
-                  paddingRight: 70,
-                }}
-                className="bg-[#B6BAD6]"
-                startIcon={<MdPrint />}
-              >
-                {t("Print Products")}
-              </Button>
+              {/* File Input for Bulk Upload */}
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                style={{ display: "none" }}
+                id="bulk-upload-input"
+                onChange={handleBulkUpload}
+              />
+
+              {/* Bulk Upload Button */}
+              <Tooltip title="Bulk Upload">
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={() => document.getElementById('bulk-upload-input').click()}
+                    disabled={isUploading}
+                    style={{
+                      backgroundColor: "#CFDDE0",
+                      color: "#1D2F90",
+                      marginRight: '8px'
+                    }}
+                    startIcon={isUploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
+                  >
+                    {isUploading ? "Uploading..." : "Bulk Upload"}
+                  </Button>
+                </span>
+              </Tooltip>
+
+              {/* Download Products Button */}
+              <Tooltip title="Download Products">
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleDownloadProducts}
+                    style={{
+                      backgroundColor: "#CFDDE0",
+                      color: "#1D2F90",
+                      marginRight: '8px'
+                    }}
+                    startIcon={<FileDownloadIcon />}
+                  >
+                    Download Products
+                  </Button>
+                </span>
+              </Tooltip>
+
+              {/* Download Template Button */}
+              <Tooltip title="Download Template">
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleDownloadTemplate}
+                    style={{
+                      backgroundColor: "#CFDDE0",
+                      color: "#1D2F90",
+                      marginRight: '8px'
+                    }}
+                    startIcon={<GetAppIcon />}
+                  >
+                    Download Template
+                  </Button>
+                </span>
+              </Tooltip>
+
+              {/* Create Control Serials Button - New */}
+              <Tooltip title={t("Create Control Serials")}>
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleShowCreateControlSerialsPopup}
+                    style={{
+                      backgroundColor: "#CFDDE0",
+                      color: "#1D2F90",
+                      marginRight: '8px'
+                    }}
+                    startIcon={<PiBarcodeDuotone />}
+                  >
+                    {t("Create Control Serials")}
+                  </Button>
+                </span>
+              </Tooltip>
+
+              <Tooltip title={!canGenerateBarcode ? "You don't have permission to generate barcodes" : ""}>
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleShowCreatePopup}
+                    disabled={!canGenerateBarcode}
+                    style={{
+                      backgroundColor: canGenerateBarcode ? "#CFDDE0" : "#E0E0E0",
+                      color: canGenerateBarcode ? "#1D2F90" : "#9E9E9E",
+                      cursor: canGenerateBarcode ? "pointer" : "not-allowed"
+                    }}
+                    startIcon={<PiBarcodeDuotone />}
+                  >
+                    {t("Generate New Barcode")}
+                  </Button>
+                </span>
+              </Tooltip>
+
+              {/* Update Images Button */}
+              <Tooltip title={tableSelectedRows.length === 0 ? t("Please select products to update images") : ""}>
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleShowUpdateImagesPopup}
+                    style={{
+                      backgroundColor: "#CFDDE0",
+                      color: "#1D2F90"
+                    }}
+                    startIcon={<ImageIcon />}
+                  >
+                    {t("Update Images")}
+                  </Button>
+                </span>
+              </Tooltip>
+
+              <Tooltip title={!canPrintProducts ? "You don't have permission to print products" : ""}>
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleGtinPage}
+                    disabled={!canPrintProducts}
+                    style={{
+                      backgroundColor: canPrintProducts ? "#CFDDE0" : "#E0E0E0",
+                      color: canPrintProducts ? "#1D2F90" : "#9E9E9E",
+                      paddingLeft: 70,
+                      paddingRight: 70,
+                      cursor: canPrintProducts ? "pointer" : "not-allowed"
+                    }}
+                    className="bg-[#B6BAD6]"
+                    startIcon={<MdPrint />}
+                  >
+                    {t("Print Products")}
+                  </Button>
+                </span>
+              </Tooltip>
 
               <Button
                 variant="contained"
@@ -303,17 +463,16 @@ const GTIN = () => {
               </Button>
             </div>
 
-            <div style={{marginTop: '-15px'}}>
+            <div style={{ marginTop: '-15px' }}>
               <DataTable
                 data={data}
                 title={t("Products List")}
                 columnsName={GtinColumn(t)}
-                loading={isLoading}
+                loading={isLoading || isFetching}
                 secondaryColor="secondary"
                 uniqueId="customerListId"
                 globalSearch={true}
                 handleRowClickInParent={handleRowClickInParent}
-                // checkboxSelection="disabled"
                 dropDownOptions={[
                   {
                     label: t("View"),
@@ -337,6 +496,17 @@ const GTIN = () => {
                     ),
                     action: handleShowUpdatePopup,
                   },
+                  // {
+                  //   label: t("Digital Links"),
+                  //   icon: (
+                  //     <LinkIcon
+                  //       fontSize="small"
+                  //       color="action"
+                  //       style={{ color: "rgb(37 99 235)" }}
+                  //     />
+                  //   ),
+                  //   action: handleDigitalLinks,
+                  // },
                   {
                     label: t("Delete"),
                     icon: (
@@ -353,101 +523,67 @@ const GTIN = () => {
             </div>
           </div>
 
+          {/* Print Components */}
+          <FGBarcodePrint
+            selectedRows={tableSelectedRows}
+            onPrintComplete={handlePrintComplete}
+          />
 
-          {/* print barcode */}
-        <div id="barcode12">
-              {tableSelectedRows.map((barcode, index) => (
-                <div id="Qrcodeserails" className="hidden" key={index}>
-                  <div id="header">
-                    <div>
-                      <img src={logo} id="imglogo" alt="" />
-                    </div>
-                  </div>
+          <GTINBarcodePrint
+            selectedRows={tableSelectedRows}
+            onPrintComplete={handlePrintComplete}
+          />
 
-                  <div id="itemcode">
-                    <div id="inside-BRCode">
-                      <img id="main-image" src={logo} alt="" />
-                    </div>
-                    
-                    <div id="description">
-                      <div id="batch">Size#: {barcode?.ItemCode}</div>
-                      <div id="gtin">Color : {barcode?.ItemQty}</div>
-                      <div id="batch">Width#: {barcode?.WHLocation}</div>
-                      <div id="2dBarcode">
-                        <Barcode
-                          value={barcode?.GTIN}
-                          format="EAN13"
-                          width={1.5}
-                          height={45}
-                        />
-                      </div>
-                    </div>
+          {/* Popups */}
+          {isCreatePopupVisible && (
+            <AddGTINPopUp
+              isVisible={isCreatePopupVisible}
+              setVisibility={setCreatePopupVisibility}
+              refreshGTINData={refreshGTINData}
+            />
+          )}
 
-                  </div>
-                  <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '6px', fontWeight: 'bold'}}>
-                    <span>Made in KSA</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {isCreateControlSerialsPopupVisible && (
+            <CreateControlSerials
+              isVisible={isCreateControlSerialsPopupVisible}
+              setVisibility={setCreateControlSerialsPopupVisibility}
+              onContinue={handleContinueToControlSerial}
+            />
+          )}
 
+          {isAddControlSerialPopupVisible && (
+            <AddControlSerialPopup
+              isVisible={isAddControlSerialPopupVisible}
+              setVisibility={setAddControlSerialPopupVisibility}
+              itemCode={selectedItemForControlSerial?.ItemCode}
+            />
+          )}
 
-            {/* print barcode */}
-            <div id="priniproducts">
-              {tableSelectedRows.map((barcode, index) => {
-                return (
-                  <div id="Qrcodeserails" className="hidden" key={index}>
-                    <div id="header">
-                      <div>
-                        <img src={logo} id="imglogo" alt="" />
-                      </div>
-                    </div>
+          {isUpdatePopupVisible && (
+            <UpdateGTINPopUp
+              isVisible={isUpdatePopupVisible}
+              setVisibility={setUpdatePopupVisibility}
+              refreshGTINData={refreshGTINData}
+            />
+          )}
 
-                    <div id="itemcode">
-                      <div id="inside-BRCode">
-                        <QRCodeSVG
-                          value={`${barcode?.ItemCode} - ${barcode?.ProductSize} - ${barcode?.GTIN}`}
-                          width="65"
-                          height="45"
-                        />
-                      </div>
+          {isUpdateImagesPopupVisible && (
+            <UpdateImagesPopUp
+              isVisible={isUpdateImagesPopupVisible}
+              setVisibility={setUpdateImagesPopupVisibility}
+              refreshGTINData={refreshGTINData}
+              selectedRows={tableSelectedRows}
+              onPrintComplete={handlePrintComplete}
+            />
+          )}
 
-                      <div id="description">
-                        <div id="gtin">Style# : {barcode?.ItemCode}</div>
-                        <div id="expiry">Size# : {barcode?.ProductSize}</div>
-                        <div id="batch">{barcode?.GTIN}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-
-            {/* AddListOfEmployee component with handleShowCreatePopup prop */}
-            {isCreatePopupVisible && (
-              <AddGTINPopUp
-                isVisible={isCreatePopupVisible}
-                setVisibility={setCreatePopupVisibility}
-                refreshGTINData={fetchData}
-              />
-            )}
-
-            {isUpdatePopupVisible && (
-              <UpdateGTINPopUp
-                isVisible={isUpdatePopupVisible}
-                setVisibility={setUpdatePopupVisibility}
-                refreshGTINData={fetchData}
-              />
-            )}
-
-            {isViewPopupVisible && (
-              <ViewGTINPopUp
-                isVisible={isViewPopupVisible}
-                setVisibility={setViewPopupVisibility}
-                refreshGTINData={fetchData}
-              />
-            )}
+          {isViewPopupVisible && (
+            <ViewGTINPopUp
+              isVisible={isViewPopupVisible}
+              setVisibility={setViewPopupVisibility}
+              refreshGTINData={refreshGTINData}
+            />
+          )}
         </div>
       </SideNav>
     </div>

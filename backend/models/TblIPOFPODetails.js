@@ -1,7 +1,5 @@
-const { PrismaClient } = require("@prisma/client");
 const CustomError = require("../exceptions/customError");
-
-const prisma = new PrismaClient();
+const prisma = require("../db");
 
 class POFPODetails {
   // Existing method: Get records by HEAD_SYS_ID

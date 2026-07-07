@@ -1,0 +1,428 @@
+{
+  "info": {
+    "_postman_id": "bin-location-api-v1",
+    "name": "BinLocation API",
+    "description": "Complete Bin Location Management API with CRUD operations for inventory management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:1100",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "YOUR_AUTH_TOKEN_HERE",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Get Bin Locations",
+      "item": [
+        {
+          "name": "Get All Bin Locations (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page (default: 10)"
+                }
+              ]
+            },
+            "description": "Get all bin locations with pagination support"
+          }
+        },
+        {
+          "name": "Get All Bin Locations (Paginated with Search)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1?page=1&limit=10&search=Zone-A",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": "Zone-A",
+                  "description": "Search by warehouse, zone, bin number, etc."
+                }
+              ]
+            },
+            "description": "Get all bin locations with pagination and search functionality"
+          }
+        },
+        {
+          "name": "Get All Bin Locations (No Pagination)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", "all"]
+            },
+            "description": "Get all bin locations without pagination (requires authentication)"
+          }
+        },
+        {
+          "name": "Get Bin Location by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "your-bin-location-id",
+                  "description": "Bin Location ID (cuid)"
+                }
+              ]
+            },
+            "description": "Get a specific bin location by its ID"
+          }
+        },
+        {
+          "name": "Get Bin Location by Bin Number",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/search/binNumber?binNumber=BIN-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", "search", "binNumber"],
+              "query": [
+                {
+                  "key": "binNumber",
+                  "value": "BIN-001",
+                  "description": "The bin number to search for"
+                }
+              ]
+            },
+            "description": "Get a bin location by its bin number"
+          }
+        },
+        {
+          "name": "Get Bin Locations by Zone",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/search/zone?zoneCode=ZONE-A",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", "search", "zone"],
+              "query": [
+                {
+                  "key": "zoneCode",
+                  "value": "ZONE-A",
+                  "description": "The zone code to filter by"
+                }
+              ]
+            },
+            "description": "Get all bin locations within a specific zone"
+          }
+        },
+        {
+          "name": "Get Bin Locations by Warehouse",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/search/warehouse?groupWarehouse=WH-01",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", "search", "warehouse"],
+              "query": [
+                {
+                  "key": "groupWarehouse",
+                  "value": "WH-01",
+                  "description": "The warehouse group to filter by"
+                }
+              ]
+            },
+            "description": "Get all bin locations within a specific warehouse"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Create Bin Location",
+      "item": [
+        {
+          "name": "Create Bin Location (Full Data)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"groupWarehouse\": \"WH-01\",\n  \"zoneCode\": \"ZONE-A\",\n  \"zones\": \"Storage Zone A\",\n  \"zoneName\": \"Primary Storage Zone\",\n  \"binNumber\": \"BIN-001\",\n  \"zoned\": \"Active\",\n  \"zoneType\": \"Storage\",\n  \"binType\": \"Shelf\",\n  \"binHeight\": 200,\n  \"binRow\": \"R1\",\n  \"binWidth\": 100,\n  \"binTotalSize\": 2.0,\n  \"gln\": \"1234567890123\",\n  \"longitude\": 46.67225301055906,\n  \"latitude\": 24.715393282521998,\n  \"sgln\": \"1234567890123.0.1\",\n  \"mapLocation\": \"Riyadh, Saudi Arabia\",\n  \"minQuantity\": 10,\n  \"availableQty\": 50,\n  \"maxQuantity\": 100,\n  \"capacityUsage\": 50\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1"]
+            },
+            "description": "Create a new bin location with all fields"
+          }
+        },
+        {
+          "name": "Create Bin Location (Minimal Data)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"groupWarehouse\": \"WH-02\",\n  \"zoneCode\": \"ZONE-B\",\n  \"zoneName\": \"Secondary Storage Zone\",\n  \"binNumber\": \"BIN-002\",\n  \"binType\": \"Pallet\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1"]
+            },
+            "description": "Create a new bin location with minimal required fields"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Update Bin Location",
+      "item": [
+        {
+          "name": "Update Bin Location (Full Update)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"groupWarehouse\": \"WH-01-UPDATED\",\n  \"zoneCode\": \"ZONE-A-UPDATED\",\n  \"zones\": \"Updated Storage Zone A\",\n  \"zoneName\": \"Updated Primary Storage Zone\",\n  \"binNumber\": \"BIN-001-UPDATED\",\n  \"zoned\": \"Active\",\n  \"zoneType\": \"Storage\",\n  \"binType\": \"Rack\",\n  \"binHeight\": 250,\n  \"binRow\": \"R2\",\n  \"binWidth\": 120,\n  \"binTotalSize\": 3.0,\n  \"gln\": \"9876543210987\",\n  \"longitude\": 46.67225301055906,\n  \"latitude\": 24.715393282521998,\n  \"sgln\": \"9876543210987.0.1\",\n  \"mapLocation\": \"Riyadh, Saudi Arabia - Updated\",\n  \"minQuantity\": 20,\n  \"availableQty\": 75,\n  \"maxQuantity\": 150,\n  \"capacityUsage\": 50\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "your-bin-location-id",
+                  "description": "Bin Location ID to update"
+                }
+              ]
+            },
+            "description": "Update a bin location with all fields"
+          }
+        },
+        {
+          "name": "Update Bin Location (Partial Update - Capacity Only)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"minQuantity\": 15,\n  \"availableQty\": 80,\n  \"maxQuantity\": 200,\n  \"capacityUsage\": 40\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "your-bin-location-id",
+                  "description": "Bin Location ID to update"
+                }
+              ]
+            },
+            "description": "Update only capacity-related fields of a bin location"
+          }
+        },
+        {
+          "name": "Update Bin Location (Partial Update - Measurements Only)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"binHeight\": 300,\n  \"binRow\": \"R3\",\n  \"binWidth\": 150,\n  \"binTotalSize\": 4.5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "your-bin-location-id",
+                  "description": "Bin Location ID to update"
+                }
+              ]
+            },
+            "description": "Update only measurement-related fields of a bin location"
+          }
+        },
+        {
+          "name": "Update Bin Location (Partial Update - Location/Identification Only)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gln\": \"1111222233334\",\n  \"longitude\": 46.75,\n  \"latitude\": 24.80,\n  \"sgln\": \"1111222233334.0.1\",\n  \"mapLocation\": \"Jeddah, Saudi Arabia\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "your-bin-location-id",
+                  "description": "Bin Location ID to update"
+                }
+              ]
+            },
+            "description": "Update only identification/location-related fields of a bin location"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Delete Bin Location",
+      "item": [
+        {
+          "name": "Delete Bin Location by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "your-bin-location-id",
+                  "description": "Bin Location ID to delete"
+                }
+              ]
+            },
+            "description": "Delete a specific bin location by its ID"
+          }
+        },
+        {
+          "name": "Delete Multiple Bin Locations",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\n    \"bin-location-id-1\",\n    \"bin-location-id-2\",\n    \"bin-location-id-3\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/binLocations/v1/bulk/delete",
+              "host": ["{{base_url}}"],
+              "path": ["api", "binLocations", "v1", "bulk", "delete"]
+            },
+            "description": "Delete multiple bin locations at once by providing an array of IDs"
+          }
+        }
+      ]
+    }
+  ]
+}

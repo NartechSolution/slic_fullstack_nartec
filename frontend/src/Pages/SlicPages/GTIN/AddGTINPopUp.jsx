@@ -16,10 +16,16 @@ const AddGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
   const [description, setDescription] = useState("");
   const [startSize, setStartSize] = useState(30);
   const [endSize, setEndSize] = useState(50);
+  const [upper, setUpper] = useState("");
+  const [sole, setSole] = useState("");
+  const [width, setWidth] = useState("");
+  const [label, setLabel] = useState("");
+  const [color, setColor] = useState("");
+  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const memberDataString = sessionStorage.getItem('slicUserData');
   const memberData = JSON.parse(memberDataString);
-  // console.log(memberData)
 
   useEffect(() => {
     setQuantity(endSize - startSize + 1);
@@ -27,27 +33,69 @@ const AddGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
 
   const handleCloseCreatePopup = () => {
     setVisibility(false);
+    setImage(null);
+    setImagePreview(null);
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error(t("Please select a valid image file"));
+        return;
+      }
+      
+      // Validate file size (e.g., max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(t("Image size should be less than 5MB"));
+        return;
+      }
+
+      setImage(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImage(null);
+    setImagePreview(null);
   };
 
   const handleAddGTIN = async (e) => {
     e.preventDefault();
-    // console.log("1", itemCode, "2", quantity, "3", description, "4", startSize, "5", endSize);
     setLoading(true);
 
     try {
-      const requestBody = {
-        itemCode: itemCode,
-        quantity: quantity,
-        description: description,
-        startSize: startSize,
-        endSize: endSize,
-      };
+      const formData = new FormData();
+      formData.append('itemCode', itemCode);
+      formData.append('quantity', quantity);
+      formData.append('description', description);
+      formData.append('startSize', startSize);
+      formData.append('endSize', endSize);
+      formData.append('upper', upper);
+      formData.append('sole', sole);
+      formData.append('width', width);
+      formData.append('label', label);
+      formData.append('color', color);
+      
+      if (image) {
+        formData.append('image', image);
+      }
 
-      const response = await newRequest.post("/itemCodes/v2/itemCode", requestBody, {
+      const response = await newRequest.post("/itemCodes/v2/itemCode", formData, {
         headers: {
           Authorization: `Bearer ${memberData?.data?.token}`,
+          'Content-Type': 'multipart/form-data',
         },
       });
+      
       toast.success(response?.data?.message || `${t("GTIN added successfully")}`);
       setLoading(false);
       handleCloseCreatePopup();
@@ -218,6 +266,156 @@ const AddGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
                             </option>
                           ))}
                         </select>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-center items-center sm:gap-3 gap-3">
+                      <div className="w-full font-body sm:text-base text-sm flex flex-col gap-0">
+                        <label htmlFor="color" className={`text-secondary ${i18n.language==='ar'?'text-end':'text-start'}`}>
+                          {t("Color")}
+                        </label>
+                        <input
+                          type="text"
+                          id="color"
+                          value={color}
+                          onChange={(e) => setColor(e.target.value)}
+                          placeholder={t("Enter Color")}
+                          className={`border w-full rounded-md border-secondary placeholder:text-secondary p-2 mb-3  ${i18n.language==='ar'?'text-end':'text-start'}`}
+                          required
+                        />
+                      </div>
+                      <div className="w-full font-body sm:text-base text-sm flex flex-col gap-0">
+                        <label htmlFor="modelName" className={`text-secondary ${i18n.language==='ar'?'text-end':'text-start'}`}>
+                          {t("Upper")}
+                        </label>
+                        <input
+                          type="text"
+                          id="modelName"
+                          value={upper}
+                          onChange={(e) => setUpper(e.target.value)}
+                          placeholder={t("Enter Upper")}
+                          className={`border w-full rounded-md border-secondary placeholder:text-secondary p-2 mb-3  ${i18n.language==='ar'?'text-end':'text-start'}`}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-center items-center sm:gap-3 gap-3">
+                      <div className="w-full font-body sm:text-base text-sm flex flex-col gap-0">
+                        <label htmlFor="productType" className={`text-secondary ${i18n.language==='ar'?'text-end':'text-start'}`}>
+                          {t("Sole")}
+                        </label>
+                        <input
+                          type="text"
+                          id="productType"
+                          value={sole}
+                          onChange={(e) => setSole(e.target.value)}
+                          placeholder={t("Enter Sole")}
+                          className={`border w-full rounded-md border-secondary placeholder:text-secondary p-2 mb-3  ${i18n.language==='ar'?'text-end':'text-start'}`}
+                          required
+                        />
+                      </div>
+                      <div className="w-full font-body sm:text-base text-sm flex flex-col gap-0">
+                        <label htmlFor="label" className={`text-secondary ${i18n.language==='ar'?'text-end':'text-start'}`}>
+                          {t("Label")}
+                        </label>
+                        <input
+                          type="text"
+                          id="label"
+                          value={label}
+                          onChange={(e) => setLabel(e.target.value)}
+                          placeholder={t("Enter Label")}
+                          className={`border w-full rounded-md border-secondary placeholder:text-secondary p-2 mb-3  ${i18n.language==='ar'?'text-end':'text-start'}`}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="w-full font-body sm:text-base text-sm flex flex-col gap-0">
+                      <label htmlFor="serialNumber" className={`text-secondary ${i18n.language==='ar'?'text-end':'text-start'}`}>
+                        {t("Width")}
+                      </label>
+                      <input
+                        type="text"
+                        id="serialNumber"
+                        value={width}
+                        onChange={(e) => setWidth(e.target.value)}
+                        placeholder={t("Enter Width")}
+                        className={`border w-full rounded-md border-secondary placeholder:text-secondary p-2 mb-3  ${i18n.language==='ar'?'text-end':'text-start'}`}
+                        required
+                      />
+                    </div>
+                    
+                    {/* Image Upload Section */}
+                    <div className="w-full font-body sm:text-base text-sm flex flex-col gap-0 mb-3">
+                      <label htmlFor="image" className={`text-secondary ${i18n.language==='ar'?'text-end':'text-start'}`}>
+                        {t("Product Image")}
+                      </label>
+                      <div className="border-2 border-dashed border-secondary rounded-md p-4 text-center">
+                        {!imagePreview ? (
+                          <div>
+                            <input
+                              type="file"
+                              id="image"
+                              accept="image/*"
+                              onChange={handleImageChange}
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor="image"
+                              className="cursor-pointer flex flex-col items-center justify-center"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-12 w-12 text-secondary mb-2"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                                />
+                              </svg>
+                              <span className="text-secondary font-semibold">
+                                {t("Click to upload image")}
+                              </span>
+                              <span className="text-gray-500 text-xs mt-1">
+                                {t("PNG, JPG up to 5MB")}
+                              </span>
+                            </label>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <img
+                              src={imagePreview}
+                              alt="Preview"
+                              className="max-h-40 mx-auto rounded-md"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleRemoveImage}
+                              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-5 w-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 

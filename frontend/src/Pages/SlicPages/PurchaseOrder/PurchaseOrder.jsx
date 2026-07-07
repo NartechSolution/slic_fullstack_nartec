@@ -1,39 +1,31 @@
 import React, { useEffect, useState } from "react";
 import SideNav from "../../../components/Sidebar/SideNav";
-import { useNavigate } from "react-router-dom";
 import { purchaseOrderColumn, purchaseOrderDetailsColumn } from "../../../utils/datatablesource";
 import DataTable from "../../../components/Datatable/Datatable";
 import newRequest from "../../../utils/userRequest";
 import { toast } from "react-toastify";
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Swal from "sweetalert2";
 import AddPurchaseOrderPopUp from "./AddPurchaseOrderPopUp";
-import { Button } from "@mui/material";
 import UpdatePurchaseOrderPopUp from "./UpdatePurchaseOrderPopUp";
 import ErpTeamRequest from "../../../utils/ErpTeamRequest";
 import { useTranslation } from "react-i18next";
+import { useSlicToken } from "../../../Contexts/SlicTokenContext";
 
 const PurchaseOrder = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [data, setData] = useState([]);
-  const memberDataString = sessionStorage.getItem("slicUserData");
-  const memberData = JSON.parse(memberDataString);
-  // console.log(memberData)
+  const { startTokenRefresh, stopTokenRefresh } = useSlicToken();
   const token = JSON.parse(sessionStorage.getItem("slicLoginToken"));
 
-
   const [isLoading, setIsLoading] = useState(true);
-  const [secondGridData, setSecondGridData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]); // for the map markers
-  const navigate = useNavigate();
+  const [filteredData, setFilteredData] = useState([]);
   const [isPurchaseOrderDataLoading, setIsPurchaseOrderDataLoading] = useState(false);
   
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // const response = await newRequest.get('/foreignPO/v1/foreignPO/all', {
       const response = await ErpTeamRequest.post(
         '/slicuat05api/v1/getApi',
         {
@@ -49,7 +41,7 @@ const PurchaseOrder = () => {
           },
         }
       );
-      console.log(response.data);
+      // console.log(response.data);
       
       // Map the API response to the expected data structure
       const mappedData = response.data.map(item => ({
@@ -68,15 +60,24 @@ const PurchaseOrder = () => {
     }
   };  
 
-    useEffect(() => {
-    fetchData(); // Calling the function within useEffect, not inside itself
+  // Start token refresh when component mounts
+  useEffect(() => {
+    startTokenRefresh();
+  
+    // Cleanup: stop refresh when component unmounts
+    return () => {
+      stopTokenRefresh();
+    };
+  }, [startTokenRefresh, stopTokenRefresh]);
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
 
   const handleRowClickInParent = async (item) => {
     // console.log(item)
     if (item.length === 0) {
-      setFilteredData(secondGridData);
       return;
     }
 
@@ -100,7 +101,7 @@ const PurchaseOrder = () => {
           },
         }
       );
-      console.log(res?.data);
+      // console.log(res?.data);
 
       // Map the response data to the expected structure for the second grid
       const mappedData = res?.data.map(item => ({
@@ -115,7 +116,7 @@ const PurchaseOrder = () => {
 
       setFilteredData(mappedData);
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       toast.error(error?.response?.data?.message ||"Something went wrong");
       setFilteredData([]);
     } finally {
@@ -164,7 +165,7 @@ const PurchaseOrder = () => {
               reject(new Error('Failed to delete product'));
             }
           } catch (error) {
-            console.error("Error deleting product:", error);
+            // console.error("Error deleting product:", error);
             reject(error);
           }
         });

@@ -14,13 +14,13 @@ const RolesProvider = ({ children }) => {
   }, []);
 
   const fetchRoles = (userID) => {
-    console.log(userID)
+    // console.log(userID)
     newRequest.post("/roles/v1/get-roles", {
       userLoginID: userID,
   }).then((response) => {
       setUserRoles(response.data.data);
       localStorage.setItem('userRoles', JSON.stringify(response.data.data)); // Persist roles
-      console.log(response.data.data);
+      // console.log(response.data.data);
     })
     .catch((error) => {
       console.error("Error fetching permissions:", error);

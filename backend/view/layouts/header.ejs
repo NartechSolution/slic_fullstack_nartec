@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title><%= locals.title || 'SLIC - Saudi Leather Industries Company' %></title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      @media only screen and (max-width: 600px) {
+        .mobile-padding {
+          padding: 20px 15px !important;
+        }
+        .mobile-text {
+          font-size: 18px !important;
+        }
+        .mobile-title {
+          font-size: 20px !important;
+        }
+        .mobile-logo {
+          height: 50px !important;
+        }
+        .mobile-container {
+          max-width: 100% !important;
+          margin: 10px !important;
+        }
+        .mobile-hide {
+          display: none !important;
+        }
+        .mobile-center {
+          text-align: center !important;
+        }
+      }
+      @media only screen and (max-width: 480px) {
+        .small-mobile-padding {
+          padding: 15px 10px !important;
+        }
+        .small-mobile-text {
+          font-size: 16px !important;
+        }
+        .small-mobile-title {
+          font-size: 18px !important;
+        }
+      }
+    </style>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', Arial, sans-serif;
+      background-color: #f8fafb;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      color: #1e3a5f;
+      line-height: 1.6;
+    "
+  >
+    <!-- Header -->
+    <table
+      role="presentation"
+      style="width: 100%; border-collapse: collapse; background-color: #ffffff"
+    >
+      <tr>
+        <td
+          style="
+            background: linear-gradient(135deg, #003366 0%, #004d7a 100%);
+            padding: 40px 20px;
+            border-bottom: 3px solid #003366;
+          "
+        >
+          <table
+            role="presentation"
+            style="width: 100%; max-width: 600px; margin: 0 auto"
+            class="mobile-container"
+          >
+            <tr>
+              <td
+                style="text-align: center; padding: 0 20px"
+                class="mobile-padding"
+              >
+                <img
+                  src="https://slicapp.online/public/slic-logo.png"
+                  alt="SLIC - Saudi Leather Industries Company"
+                  style="
+                    height: 70px;
+                    width: auto;
+                    margin-bottom: 20px;
+                    max-width: 100%;
+                  "
+                  class="mobile-logo"
+                />
+              </td>
+            </tr>
+            <tr>
+              <td style="text-align: center">
+                <h1
+                  style="
+                    color: #ffffff;
+                    font-size: 28px;
+                    font-weight: 700;
+                    margin: 0;
+                    letter-spacing: 0.5px;
+                    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                  "
+                  class="mobile-title"
+                >
+                  SLIC
+                </h1>
+                <p
+                  style="
+                    color: #e8f5f0;
+                    font-size: 16px;
+                    margin: 12px 0 0 0;
+                    line-height: 1.6;
+                    letter-spacing: 0.3px;
+                    font-weight: 400;
+                  "
+                  class="mobile-text"
+                >
+                  Saudi Leather Industries Company
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Content Container -->
+    <table
+      role="presentation"
+      style="
+        width: 100%;
+        max-width: 600px;
+        margin: 30px auto;
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 8px 25px rgba(27, 107, 82, 0.1);
+        overflow: hidden;
+        border: 1px solid #e5f2ef;
+      "
+      class="mobile-container"
+    >
+      <tr>
+        <td
+          style="padding: 50px 40px"
+          class="mobile-padding small-mobile-padding"
+        ></td>
+      </tr>
+    </table>
+  </body>
+</html>

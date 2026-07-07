@@ -1,54 +1,33 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
-import axios from 'axios';
-import { baseUrl } from '../../../../utils/config';
+import { MdClose, MdHorizontalRule, MdOutlineCheckBox } from 'react-icons/md';
+import newRequest from '../../../../utils/userRequest';
 
 const AddLanguageChange = ({ isVisible, setVisibility, refreshBrandData }) => {
     const [category_name_en, setcategory_name_en] = useState("");
     const [category_name_ar, setcategory_name_ar] = useState("");
     const { t, i18n } = useTranslation();
 
-    const [Pagedropdown, setPagedropdown] = useState([])
     const handleCloseCreatePopup = () => {
         setVisibility(false);
     };
 
     const handleAddCompany = async () => {
-        try {
-            const response = await axios.post(baseUrl + '/language/translations_post', {
-                'key': category_name_en,
-                'value': category_name_ar,
-            });
+      try {
+        const response = await newRequest.post('/language/translations_post', {
+          'key': category_name_en,
+          'value': category_name_ar,
+        });
 
-            toast.success(`${t('Word')} ${category_name_ar} ${t('has been added successfully')}.`, {
-                position: 'top-right',
-                autoClose: 2000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: 'light',
-            });
-            refreshBrandData();
-            handleCloseCreatePopup();
-        } catch (error) {
-            toast.error(error|| 'Error', {
-                position: 'top-right',
-                autoClose: 2000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: 'light',
-            });
-        }
-
-
+        toast.success(`${t('Word')} ${category_name_ar} ${t('has been added successfully')}.`);
+        refreshBrandData();
+        handleCloseCreatePopup();
+      
+      } catch (err) {
+        toast.error(err?.data?.response?.error || err?.data?.response?.message || 'Something Went Wrong!');
+      }
     };
-
 
     return (
       <div>
@@ -66,58 +45,19 @@ const AddLanguageChange = ({ isVisible, setVisibility, refreshBrandData }) => {
                       className="text-white hover:text-gray-300 focus:outline-none"
                       onClick={handleCloseCreatePopup}
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M20 14H4"
-                        />
-                      </svg>
+                      <MdHorizontalRule className="h-6 w-6" />
                     </button>
                     <button
                       className="text-white hover:text-gray-300 focus:outline-none"
                       onClick={handleCloseCreatePopup}
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 4h16v16H4z"
-                        />
-                      </svg>
+                      <MdOutlineCheckBox className="h-6 w-6" />
                     </button>
                     <button
                       className="text-white hover:text-red-600 focus:outline-none"
                       onClick={handleCloseCreatePopup}
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
+                      <MdClose className="h-6 w-6" />
                     </button>
                   </div>
                 </div>

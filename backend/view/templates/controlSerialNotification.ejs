@@ -1,0 +1,214 @@
+<%- include('../layouts/header') %>
+
+<!-- Main Content -->
+<table
+  role="presentation"
+  style="
+    width: 100%;
+    max-width: 600px;
+    margin: 30px auto;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 51, 102, 0.1);
+    overflow: hidden;
+    border: 1px solid #e0e7ff;
+  "
+  class="mobile-container"
+>
+  <tr>
+    <td style="padding: 50px 40px" class="mobile-padding small-mobile-padding">
+      <!-- Greeting -->
+      <p
+        style="
+          color: #1e3a5f;
+          font-size: 16px;
+          margin: 0 0 20px 0;
+          line-height: 1.6;
+        "
+      >
+        Dear <%= supplierName %>,
+      </p>
+
+      <!-- Success Message -->
+      <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 20px; margin: 25px 0; border-radius: 6px;">
+        <p style="color: #15803d; font-size: 18px; font-weight: 600; margin: 0;">
+          ✓ New Control Serials Created
+        </p>
+      </div>
+
+      <!-- Details -->
+      <div style="margin: 30px 0;">
+        <p
+          style="
+            color: #1e3a5f;
+            font-size: 16px;
+            margin: 0 0 15px 0;
+            line-height: 1.6;
+          "
+        >
+          <strong>Serial Details:</strong>
+        </p>
+
+        <table
+          role="presentation"
+          style="
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #f8fafb;
+            border-radius: 6px;
+            overflow: hidden;
+          "
+        >
+          <tr>
+            <td
+              style="
+                padding: 12px 15px;
+                border-bottom: 1px solid #e5e7eb;
+                color: #64748b;
+                font-size: 14px;
+              "
+            >
+              <strong>PO Number:</strong>
+            </td>
+            <td
+              style="
+                padding: 12px 15px;
+                border-bottom: 1px solid #e5e7eb;
+                color: #1e3a5f;
+                font-size: 14px;
+              "
+            >
+              <%= poNumber %>
+            </td>
+          </tr>
+          <tr>
+            <td
+              style="
+                padding: 12px 15px;
+                border-bottom: 1px solid #e5e7eb;
+                color: #64748b;
+                font-size: 14px;
+              "
+            >
+              <strong>Item Code:</strong>
+            </td>
+            <td
+              style="
+                padding: 12px 15px;
+                border-bottom: 1px solid #e5e7eb;
+                color: #1e3a5f;
+                font-size: 14px;
+              "
+            >
+              <%= itemCode %>
+            </td>
+          </tr>
+          <tr>
+            <td
+              style="
+                padding: 12px 15px;
+                border-bottom: 1px solid #e5e7eb;
+                color: #64748b;
+                font-size: 14px;
+              "
+            >
+              <strong>Quantity:</strong>
+            </td>
+            <td
+              style="
+                padding: 12px 15px;
+                border-bottom: 1px solid #e5e7eb;
+                color: #1e3a5f;
+                font-size: 14px;
+              "
+            >
+              <%= quantity %> serial(s)
+            </td>
+          </tr>
+          <% if (size) { %>
+          <tr>
+            <td
+              style="
+                padding: 12px 15px;
+                color: #64748b;
+                font-size: 14px;
+              "
+            >
+              <strong>Size:</strong>
+            </td>
+            <td
+              style="
+                padding: 12px 15px;
+                color: #1e3a5f;
+                font-size: 14px;
+              "
+            >
+              <%= size %>
+            </td>
+          </tr>
+          <% } %>
+        </table>
+      </div>
+
+      <!-- Message -->
+      <div style="margin: 30px 0; padding: 20px; background-color: #f9fafb; border-radius: 6px;">
+        <p
+          style="
+            color: #1e3a5f;
+            font-size: 15px;
+            margin: 0 0 15px 0;
+            line-height: 1.6;
+          "
+        >
+          We are pleased to inform you that <strong><%= quantity %></strong> new control serial(s) have been generated for PO Number <strong><%= poNumber %></strong>.
+        </p>
+        <p
+          style="
+            color: #1e3a5f;
+            font-size: 15px;
+            margin: 0;
+            line-height: 1.6;
+          "
+        >
+          You can view and manage these serials in your supplier dashboard.
+        </p>
+      </div>
+
+      <!-- Call to Action -->
+      <div style="text-align: center; margin: 30px 0;">
+        <a
+          href="<%= baseUrl %>/supplier/dashboard"
+          style="
+            display: inline-block;
+            background: linear-gradient(135deg, #003366 0%, #004d7a 100%);
+            color: #ffffff;
+            text-decoration: none;
+            padding: 14px 32px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 15px;
+            letter-spacing: 0.3px;
+          "
+        >
+          View Control Serials
+        </a>
+      </div>
+
+      <!-- Closing -->
+      <p
+        style="
+          color: #1e3a5f;
+          font-size: 15px;
+          margin: 30px 0 0 0;
+          line-height: 1.6;
+        "
+      >
+        Best regards,<br />
+        <strong>SLIC Team</strong><br />
+        Saudi Leather Industries Company
+      </p>
+    </td>
+  </tr>
+</table>
+
+<%- include('../layouts/footer') %>

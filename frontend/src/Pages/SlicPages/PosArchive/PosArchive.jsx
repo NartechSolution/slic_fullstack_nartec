@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import SideNav from "../../../components/Sidebar/SideNav";
-import { useNavigate } from "react-router-dom";
-import { posArchiveColumns, posHistoryInvoiceColumns } from "../../../utils/datatablesource";
+import { posArchiveColumns } from "../../../utils/datatablesource";
 import DataTable from "../../../components/Datatable/Datatable";
 import newRequest from "../../../utils/userRequest";
 import { toast } from "react-toastify";
@@ -10,13 +9,10 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { useTranslation } from "react-i18next";
 
 const PosArchive = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [secondGridData, setSecondGridData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]); // for the map markers
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const [filteredData, setFilteredData] = useState([]);
   const [isPurchaseOrderDataLoading, setIsPurchaseOrderDataLoading] =
     useState(false);
 
@@ -24,7 +20,7 @@ const PosArchive = () => {
     setIsLoading(true);
     try {
       const response = await newRequest.get("/invoice/v1/invoiceMasterArchive");
-      console.log(response?.data);
+      // console.log(response?.data);
       setData(response?.data || []);
       setIsLoading(false);
     } catch (err) {
@@ -34,13 +30,12 @@ const PosArchive = () => {
   };
 
   useEffect(() => {
-    fetchData(); // Calling the function within useEffect, not inside itself
+    fetchData();
   }, []);
 
   const handleRowClickInParent = async (item) => {
     // console.log(item)
     if (item.length === 0) {
-      setFilteredData(secondGridData);
       return;
     }
 
@@ -50,11 +45,11 @@ const PosArchive = () => {
       const res = await newRequest.get(
         `/invoice/v1/invoiceDetailsArchive?filter[InvoiceNo]=${item[0].InvoiceNo}`
       );
-      console.log(res?.data);
+      // console.log(res?.data);
 
       setFilteredData(res?.data || []);
     } catch (err) {
-      console.log(err);
+      // console.log(err);
       toast.error(
         err?.response?.data?.error ||
           err?.response?.data?.message ||

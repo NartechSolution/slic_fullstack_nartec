@@ -1,0 +1,229 @@
+{
+  "info": {
+    "_postman_id": "control-serial-collection",
+    "name": "Control Serial API",
+    "description": "CRUD APIs for Control Serial Management\n\nSerial Number Generation Formula: ItemCode + 6-digit Series Number\nExample: 95169 + 000001 = 95169000001",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Bulk Control Serials",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ItemCode\": \"95169\",\n  \"qty\": 100\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials"]
+        },
+        "description": "Create multiple control serials in bulk\n\nThe API will automatically generate unique serial numbers using the formula:\nItemCode + 6-digit Series Number\n\nExample: If ItemCode is '95169' and series starts at '000001', \ngenerated serials will be: 95169000001, 95169000002, etc."
+      },
+      "response": []
+    },
+    {
+      "name": "Get All Control Serials (Paginated)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials?page=1&limit=10&search=",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1",
+              "description": "Page number (default: 1)"
+            },
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "Records per page (default: 10)"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Search by serialNumber or ItemCode (optional)"
+            }
+          ]
+        },
+        "description": "Retrieve all control serials with pagination\n\nQuery Parameters:\n- page: Page number\n- limit: Records per page\n- search: Search by serialNumber or ItemCode"
+      },
+      "response": []
+    },
+    {
+      "name": "Get All Control Serials (No Pagination)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/all",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "all"]
+        },
+        "description": "Retrieve all control serials without pagination"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Control Serial by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/{{serialId}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "{{serialId}}"]
+        },
+        "description": "Retrieve a specific control serial by its ID\n\nPath Parameters:\n- serialId: The ID of the control serial to retrieve"
+      },
+      "response": []
+    },
+    {
+      "name": "Search Control Serials by ItemCode",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/search/by-itemcode?ItemCode=95169",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "search", "by-itemcode"],
+          "query": [
+            {
+              "key": "ItemCode",
+              "value": "95169",
+              "description": "ItemCode to search for"
+            }
+          ]
+        },
+        "description": "Search control serials by ItemCode\n\nQuery Parameters:\n- ItemCode: The ItemCode value to search for"
+      },
+      "response": []
+    },
+    {
+      "name": "Search Control Serial by Serial Number",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/search/by-serial?serialNumber=95169000001",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "search", "by-serial"],
+          "query": [
+            {
+              "key": "serialNumber",
+              "value": "95169000001",
+              "description": "Serial number to search for"
+            }
+          ]
+        },
+        "description": "Search for a control serial by its serial number\n\nQuery Parameters:\n- serialNumber: The exact serial number to search for"
+      },
+      "response": []
+    },
+    {
+      "name": "Update Control Serial",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ItemCode\": \"95169\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/{{serialId}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "{{serialId}}"]
+        },
+        "description": "Update a control serial\n\nPath Parameters:\n- serialId: The ID of the control serial to update\n\nBody Parameters:\n- ItemCode: The new ItemCode (optional)"
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Control Serial",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/{{serialId}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "{{serialId}}"]
+        },
+        "description": "Delete a control serial\n\nPath Parameters:\n- serialId: The ID of the control serial to delete"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:1100",
+      "type": "string",
+      "description": "Base URL for the API (update with your server URL)"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT authentication token (obtain from login endpoint)"
+    },
+    {
+      "key": "serialId",
+      "value": "",
+      "type": "string",
+      "description": "ID of a control serial (replace with actual ID)"
+    }
+  ]
+}

@@ -2,118 +2,205 @@ pipeline {
     agent any
 
     stages {
+
         stage('Set Environment Variables') {
             steps {
                 script {
-                    // Set environment variables based on the branch
                     if (env.BRANCH_NAME == 'dev') {
-                        env.NODE_ENV = 'development'
-                        env.DATABASE_URL = "${env.slic_dev_DATABASE_URL}"
-                        env.PORT = "${env.slic_dev_PORT}"
-                        env.JWT_SECRET = "${env.slic_dev_JWT_SECRET}"
-                        env.SLIC_ERP_URL = 'https://slicuat05api.oneerpcloud.com'
+                        env.ENV_FILE_PATH = "C:\\ProgramData\\Jenkins\\.jenkins\\jenkinsEnv\\slic_pos\\dev\\.env"
+                        env.TARGET_PROJECT_PATH = "C:\\Users\\Administrator\\Desktop\\JENKINS_PROJECTS\\slic_pos_dev"
+                        env.APP_NAME = 'slic_dev_backend'
+                        env.BACKEND_PORT = '1100'
+                        echo '📁 Environment set for DEV'
                     } else if (env.BRANCH_NAME == 'master') {
-                        env.NODE_ENV = 'master'
-                        env.DATABASE_URL = "${env.slic_prod_DATABASE_URL}"
-                        env.PORT = "${env.slic_prod_PORT}"
-                        env.JWT_SECRET = "${env.slic_prod_JWT_SECRET}"
-                        env.SLIC_ERP_URL = 'https://slicapi.oneerpcloud.com'
+                        env.ENV_FILE_PATH = "C:\\ProgramData\\Jenkins\\.jenkins\\jenkinsEnv\\slic_pos\\prod\\.env"
+                        env.TARGET_PROJECT_PATH = "C:\\Users\\Administrator\\Desktop\\JENKINS_PROJECTS\\slic_pos_prod"
+                        env.APP_NAME = 'slic_prod_backend'
+                        env.BACKEND_PORT = '1101'
+                        echo '📁 Environment set for PROD'
                     } else {
-                        error "Unsupported branch: ${env.BRANCH_NAME}"
+                        error "❌ Unsupported branch: ${env.BRANCH_NAME}"
                     }
-                    echo "Environment set for ${env.BRANCH_NAME} branch"
-                    echo "DATABASE_URL=${env.DATABASE_URL}"
                 }
             }
         }
 
-        stage('Checkout') {
+        stage('📦 Checkout') {
+            steps {
+                checkout scmGit(
+                    branches: [[name: "*/${env.BRANCH_NAME}"]],
+                    extensions: [
+                        [$class: 'CleanBeforeCheckout'],
+                        [$class: 'PruneStaleBranch']
+                    ],
+                    userRemoteConfigs: [[
+                        credentialsId: 'dev_majid_new_github_credentials',
+                        url: 'https://github.com/AbdulMajid1m1/slic_fullstack_nartec.git'
+                    ]]
+                )
+                bat 'git log -1 --oneline'
+            }
+        }
+
+        stage('🛑 Stop Existing Backend') {
             steps {
                 script {
-                    echo "Checking out the branch: ${env.BRANCH_NAME}"
-                    checkout scmGit(branches: [[name: "*/${env.BRANCH_NAME}"]], extensions: [], userRemoteConfigs: [[credentialsId: 'usernameCredentials', url: 'https://github.com/AbdulMajid1m1/slic_fullstack_nartec.git']])
+                    bat(script: "pm2 stop ${env.APP_NAME}", returnStatus: true)
+                    bat(script: "pm2 delete ${env.APP_NAME}", returnStatus: true)
+                    sleep(time: 5, unit: 'SECONDS')
                 }
             }
         }
 
-        stage('Install Dependencies - Frontend') {
+        stage('💾 Preserve WhatsApp Session') {
             steps {
-                dir('frontend') {
-                    bat 'npm install'
+                script {
+                    bat """
+                        @echo off
+                        if exist "${env.TARGET_PROJECT_PATH}\\backend\\.baileys_auth" (
+                            echo Preserving WhatsApp session...
+                            xcopy /E /I /H /Y /Q "${env.TARGET_PROJECT_PATH}\\backend\\.baileys_auth" "%WORKSPACE%\\backend\\.baileys_auth"
+                        ) else (
+                            echo No WhatsApp session found
+                        )
+                    """
                 }
             }
         }
 
-        stage('Build - Frontend') {
+        stage('📂 Copy to Target Directory (No Delete)') {
             steps {
-                dir('frontend') {
+                script {
+                    bat """
+                        @echo off
+                        if not exist "${env.TARGET_PROJECT_PATH}" mkdir "${env.TARGET_PROJECT_PATH}"
+                        
+                        echo Copying updated files...
+                        xcopy /E /I /H /Y /Q "%WORKSPACE%\\*" "${env.TARGET_PROJECT_PATH}"
+                    """
+                }
+            }
+        }
+
+        /* ================= FRONTEND ================= */
+
+        stage('📁 Install Dependencies - Frontend') {
+            steps {
+                dir("${env.TARGET_PROJECT_PATH}\\frontend") {
+                    bat 'npm install --prefer-offline --no-audit --progress=false --legacy-peer-deps'
+                }
+            }
+        }
+        
+
+        stage('⚙️ Build - Frontend') {
+            steps {
+                dir("${env.TARGET_PROJECT_PATH}\\frontend") {
                     bat 'npm run build'
                 }
             }
         }
 
-        stage('Install Dependencies - Backend') {
+        stage('📝 Create web.config - Frontend') {
             steps {
-                dir('backend') {
-                    bat 'npm ci'
+                dir("${env.TARGET_PROJECT_PATH}\\frontend\\dist") {
+                    writeFile file: 'web.config', text: '''<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <rule name="SPA Routes" stopProcessing="true">
+          <match url=".*" />
+          <conditions logicalGrouping="MatchAll">
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+            <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+          </conditions>
+          <action type="Rewrite" url="/" />
+        </rule>
+      </rules>
+    </rewrite>
+  </system.webServer>
+</configuration>'''
                 }
             }
         }
 
-        stage('List Backend Files') {
+        /* ================= BACKEND ================= */
+
+        stage('📁 Install Dependencies - Backend') {
             steps {
-                dir('backend') {
-                    bat 'dir'  // Lists the contents of the backend directory
+                dir("${env.TARGET_PROJECT_PATH}\\backend") {
+                    bat 'npm install --prefer-offline --no-audit --progress=false'
                 }
             }
         }
 
-        stage('Create Environment File - Backend') {
+        stage('📋 Setup Environment File - Backend') {
             steps {
-                dir('backend') {
-                    script {
-                        writeFile file: '.env', text: """
-                            NODE_ENV=${env.NODE_ENV}
-                            DATABASE_URL=${env.DATABASE_URL}
-                            PORT=${env.PORT}
-                            JWT_SECRET=${env.JWT_SECRET}
-                        """
-                    }
+                dir("${env.TARGET_PROJECT_PATH}\\backend") {
+                    bat """
+                        if not exist "${env.ENV_FILE_PATH}" exit /b 1
+                        copy "${env.ENV_FILE_PATH}" ".env"
+                    """
                 }
             }
         }
 
-        stage('Stop Existing Backend') {
+        stage('📝 Create web.config - Backend') {
             steps {
-                script {
-                    def appName = env.BRANCH_NAME == 'dev' ? 'slic_dev_backend' : 'slic_prod_backend'
-                    def processStatus = bat(script: 'pm2 list', returnStdout: true).trim()
-                    if (processStatus.contains(appName)) {
-                        bat "pm2 stop ${appName} || exit 0"
-                        bat "pm2 delete ${appName} || exit 0"
-                    }
+                dir("${env.TARGET_PROJECT_PATH}\\backend") {
+                    writeFile file: 'web.config', text: """<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <rule name="ReverseProxy" stopProcessing="true">
+          <match url="(.*)" />
+          <action type="Rewrite" url="http://localhost:${env.BACKEND_PORT}/{R:1}" />
+        </rule>
+      </rules>
+    </rewrite>
+  </system.webServer>
+</configuration>"""
                 }
             }
         }
 
-        stage('Update Prisma Schema') {
+        stage('🗂️ Prisma Generate') {
             steps {
-                dir('backend') {
+                dir("${env.TARGET_PROJECT_PATH}\\backend") {
                     bat 'npx prisma generate'
                 }
             }
         }
 
-        stage('Start Backend') {
+        stage('🚀 Start Backend') {
             steps {
-                dir('backend') {
-                    script {
-                        def appName = env.BRANCH_NAME == 'dev' ? 'slic_dev_backend' : 'slic_prod_backend'
-                        def port = env.PORT
-                        bat "pm2 start app.js --name ${appName} --env ${env.BRANCH_NAME} -- -p ${port}"
-                    }
+                dir("${env.TARGET_PROJECT_PATH}\\backend") {
+                    bat "pm2 start app.js --name ${env.APP_NAME}"
+                    bat 'pm2 save'
+                    sleep(time: 5, unit: 'SECONDS')
                 }
             }
+        }
+
+        stage('✅ Verify Deployment') {
+            steps {
+                bat 'pm2 list'
+                bat "pm2 info ${env.APP_NAME}"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ DEPLOYMENT SUCCESSFUL – ${env.APP_NAME}"
+        }
+        failure {
+            echo "❌ DEPLOYMENT FAILED"
+        }
+        always {
+            echo "📊 Finished at: ${new Date()}"
         }
     }
 }

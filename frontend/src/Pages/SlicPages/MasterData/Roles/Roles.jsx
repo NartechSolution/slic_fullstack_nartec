@@ -1,12 +1,10 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import SideNav from "../../../../components/Sidebar/SideNav";
 import { usersColumn } from "../../../../utils/datatablesource";
-import EditIcon from "@mui/icons-material/Edit";
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 import DataTable from "../../../../components/Datatable/Datatable";
 import RightDashboardHeader from "../../../../components/RightDashboardHeader/RightDashboardHeader";
-import { DataTableContext } from "../../../../Contexts/DataTableContext";
 import { toast } from "react-toastify";
 import newRequest from "../../../../utils/userRequest";
 import AssignRolesPopUp from "./AssignRolesPopUp";
@@ -14,20 +12,13 @@ import RemoveRolesPopUp from "./RemoveRolesPopUp";
 import { useTranslation } from "react-i18next";
 
 const Roles = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const memberDataString = sessionStorage.getItem('slicUserData');
   const memberData = JSON.parse(memberDataString);
   // console.log(memberData)
-
-  const {
-    rowSelectionModel,
-    setRowSelectionModel,
-    tableSelectedRows,
-    setTableSelectedRows,
-  } = useContext(DataTableContext);
-
+  const hasFetchedRef = useRef(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -40,15 +31,18 @@ const Roles = () => {
       // console.log(response?.data?.data);
       setData(response?.data?.data || []);
     } catch (err) {
-      console.log(err);
-      toast.error(err?.response?.data?.error || "failed to load data");
+      // console.log(err);
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || "failed to load data");
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    if (!hasFetchedRef.current) {
+      fetchData();
+      hasFetchedRef.current = true;
+    }
   },[])
 
 

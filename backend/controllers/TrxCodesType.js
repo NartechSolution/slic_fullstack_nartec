@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const axios = require("axios");
 
 const TrxCodesType = require("../models/TrxCodesType");
@@ -125,8 +127,11 @@ exports.sync = async (req, res, next) => {
     }
     const token = authHeader.split(" ")[1];
 
+    // const slic_erp_url = process.env.SLIC_ERP_URL;
+    const slic_erp_url = "https://slicapi.oneerpcloud.com";
+
     // Configuration for the external API request
-    const externalApiUrl = SLIC_ERP_URL + "/oneerpreport/api/getapi";
+    const externalApiUrl = slic_erp_url + "/oneerpreport/api/getapi";
     const requestBody = {
       filter: { P_TXN_TYPE: "LTRFO" },
       M_COMP_CODE: "SLIC",
@@ -140,8 +145,32 @@ exports.sync = async (req, res, next) => {
     };
 
     // Make the request to the external API
-    const externalApiResponse = await axios.post(externalApiUrl, requestBody, {
+    let externalApiResponse;
+    try {
+      externalApiResponse = await axios.post(externalApiUrl, requestBody, {
+        headers,
+      });
+    } catch (axiosError) {
+      // Check if the error is due to expired token
+      if (axiosError.response?.data === "Expired JWT token") {
+        throw new CustomError(
+          "External API token has expired. Please login again to get a new token.",
+          401
+        );
+      }
+      // Re-throw other axios errors with more context
+      throw new CustomError(
+        axiosError.response?.data || "Failed to connect to external API",
+        axiosError.response?.status || 500
+      );
+    }
+
+    // log CURL for externalApiResponse
+    console.log("CURL for externalApiResponse:", {
+      url: externalApiUrl,
+      method: "POST",
       headers,
+      data: requestBody,
     });
 
     if (!externalApiResponse.data || !Array.isArray(externalApiResponse.data)) {
@@ -154,6 +183,8 @@ exports.sync = async (req, res, next) => {
       TXN_NAME: item.ListOfTransactionCod.TXN_NAME,
       TXN_TYPE: requestBody.filter.P_TXN_TYPE, // You can adjust this if you need to map different types
     }));
+
+    console.table(externalTrxCodes);
 
     // Fetch all existing transaction codes from your database
     const existingTrxCodes = await TrxCodesType.fetchAll();

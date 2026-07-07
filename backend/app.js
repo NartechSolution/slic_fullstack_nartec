@@ -22,18 +22,27 @@ const invoiceRoutes = require("./routes/invoice");
 const exchangeInvoiceRoutes = require("./routes/TblSalesExchangeInvoicetmp");
 const whatsappRoutes = require("./routes/whatsappRoutes.js");
 const languageRoutes = require("./routes/languageRoute.js");
+const controlSerialRoutes = require("./routes/controlSerial");
+const supplierRoutes = require("./routes/supplierRoute");
+const binLocationRoutes = require("./routes/binLocation");
+const migrationRoutes = require("./routes/migration");
+const digitalLinkRoutes = require("./routes/digitalLink");
+const mergeSerialRoutes = require("./routes/mergeSerial");
 const path = require("path");
-
+const prisma = require("./db");
 const app = express();
 const port = process.env.PORT || 8080;
 
 app.use(cors());
-app.use(express.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Increase payload limits for large file imports (100k+ records)
+app.use(express.json({ limit: "50mb" }));
+app.use(bodyParser.urlencoded({ extended: true, limit: "50mb" }));
 
-// Serve static files from the "public" directory
-// app.use(express.static("public"));
-app.use(express.static(path.join(__dirname, "public")));
+// Serve static files from the "uploads" and "public" directories
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/templates", express.static(path.join(__dirname, "templates")));
+app.use("/public", express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"))); // Serve public files at root level
 
 // Add your routes...
 app.use("/api/itemCodes", itemCodesRoutes);
@@ -52,38 +61,91 @@ app.use("/api/exchangeInvoice", exchangeInvoiceRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/api/language", languageRoutes);
-
-
+app.use("/api/controlSerials", controlSerialRoutes);
+app.use("/api/suppliers", supplierRoutes);
+app.use("/api/binLocations", binLocationRoutes);
+app.use("/api/admin/migrate", migrationRoutes);
+// Digital Link — public (no auth), accessible via QR scan
+app.use("/api/digital-link", digitalLinkRoutes);
+// Merge Serial — protected endpoints
+app.use("/api/merge-serial", mergeSerialRoutes);
 
 app.get("/test", (req, res) => {
-  
-function calculateCheckDigit(gtinWithoutCheckDigit) {
-  const digits = gtinWithoutCheckDigit.split("").map(Number);
-  let sum = 0;
+  function calculateCheckDigit(gtinWithoutCheckDigit) {
+    const digits = gtinWithoutCheckDigit.split("").map(Number);
+    let sum = 0;
 
-  // EAN-13 check digit calculation (modulo-10 algorithm)
-  for (let i = 0; i < digits.length; i++) {
-    sum += i % 2 === 0 ? digits[i] * 1 : digits[i] * 3;
+    // EAN-13 check digit calculation (modulo-10 algorithm)
+    for (let i = 0; i < digits.length; i++) {
+      sum += i % 2 === 0 ? digits[i] * 1 : digits[i] * 3;
+    }
+
+    const remainder = sum % 10;
+    const checkDigit = remainder === 0 ? 0 : 10 - remainder;
+
+    return checkDigit.toString();
   }
 
-  const remainder = sum % 10;
-  const checkDigit = remainder === 0 ? 0 : 10 - remainder;
-  
-
-  return checkDigit.toString();
-}
-
-
-let barcod3=calculateCheckDigit("628789803474")
-console.log(barcod3)
-res.send(barcod3)
+  let barcod3 = calculateCheckDigit("628789803474");
+  console.log(barcod3);
+  res.send(barcod3);
 });
 
+// Function to empty Arabic column in TblItemCodes1S1Br
+async function emptyArabicColumn() {
+  try {
+    console.log("🔄 Starting to empty ArabicName column...");
+    const startTime = Date.now();
+
+    // Update all records to set ArabicName to null
+    const result = await prisma.tblItemCodes1S1Br.updateMany({
+      data: {
+        ArabicName: null,
+      },
+    });
+
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+    console.log(
+      `✅ ArabicName column emptied successfully! ${result.count} records updated in ${duration}s`
+    );
+
+    return result;
+  } catch (error) {
+    console.error("❌ Error emptying ArabicName column:", error);
+    throw error;
+  }
+}
+
+// API endpoint to empty Arabic column
+app.post("/api/admin/empty-arabic", async (req, res) => {
+  try {
+    const result = await emptyArabicColumn();
+    res.status(200).json({
+      success: true,
+      message: "ArabicName column emptied successfully",
+      recordsUpdated: result.count,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to empty ArabicName column",
+      error: error.message,
+    });
+  }
+});
+
+// Catch-all route for serving frontend (MUST be AFTER all API routes)
+app.get("*", (req, res) => {
+  res.sendFile(path.resolve(__dirname, "public", "index.html"));
+});
+
+// Error handler (MUST be LAST)
 app.use((error, req, res, next) => {
   console.log(error);
   let status = 500;
-  let message =
-    "An error occurred while trying to process your request. Please try again later.";
+  let message = "Internal Server Error";
   let data = null;
   let success = false;
 
@@ -93,23 +155,78 @@ app.use((error, req, res, next) => {
     data = error.data || null;
   }
 
-  res.status(status).json(response(status, success, message, data));
+  res
+    .status(status)
+    .json(response(status, success, message, data, error?.stack));
 });
 
-// app.get("*", (req, res) => {
-//   res.sendFile(__dirname + "/public/index.html");
-// });
+// Test database connection before starting server
+async function testDatabaseConnection(retries = 3) {
+  for (let i = 1; i <= retries; i++) {
+    try {
+      console.log(`🔄 Testing database connection (attempt ${i}/${retries})...`);
+      await prisma.$connect();
+      // Try a simple query to verify connection works
+      await prisma.$queryRaw`SELECT 1 as test`;
+      console.log("✅ Database connection successful!");
+      return true;
+    } catch (error) {
+      console.error(`❌ Connection attempt ${i} failed:`, error.message);
 
-app.get("*", (req, res) => {
-  res.sendFile(path.resolve(__dirname, "public", "index.html"));
+      if (i === retries) {
+        console.warn("⚠️  Database connection failed after all retries");
+        console.warn("⚠️  Server will start anyway, but database operations may fail");
+        return false;
+      }
+
+      // Wait before retrying
+      console.log(`⏳ Waiting 3 seconds before retry...`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  }
+}
+
+// Start server only after DB connection is verified
+testDatabaseConnection().then(() => {
+  const server = app.listen(port, function () {
+    console.log(`✅ Server is running on port ${port}`);
+  });
+
+  // Move graceful shutdown handlers inside (need access to server)
+  // Graceful shutdown handling for PM2
+  process.on("SIGINT", async () => {
+    console.log("\n🔄 SIGINT received: Starting graceful shutdown...");
+    await gracefulShutdown("SIGINT", server);
+  });
+
+  process.on("SIGTERM", async () => {
+    console.log("\n🔄 SIGTERM received: Starting graceful shutdown...");
+    await gracefulShutdown("SIGTERM", server);
+  });
 });
 
-app.use((req, res, next) => {
-  const error = new CustomError(`No route found for ${req.originalUrl}`);
-  error.statusCode = 404;
-  next(error);
-});
+async function gracefulShutdown(signal, server) {
+  console.log(`⏳ ${signal} - Closing server...`);
 
-app.listen(port, function () {
-  console.log("Server is running on port " + port);
-});
+  // Close server to stop accepting new connections
+  server.close(async () => {
+    console.log("✓ HTTP server closed");
+
+    // Disconnect Prisma
+    try {
+      await prisma.$disconnect();
+      console.log("✓ Database connections closed");
+    } catch (err) {
+      console.error("✗ Error disconnecting from database:", err);
+    }
+
+    console.log("✓ Graceful shutdown complete");
+    process.exit(0);
+  });
+
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error("⚠ Forced shutdown after timeout");
+    process.exit(1);
+  }, 10000);
+}

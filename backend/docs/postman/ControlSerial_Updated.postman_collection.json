@@ -1,0 +1,634 @@
+{
+  "info": {
+    "_postman_id": "control-serial-v2-collection",
+    "name": "Control Serial API v2 (Updated)",
+    "description": "CRUD APIs for Control Serial Management with Supplier Integration\n\n**Features:**\n- ✅ Bulk serial creation with email notifications\n- ✅ Supplier Integration with automatic email notifications\n- ✅ PO Number Tracking and Filtering\n- ✅ Size Field Support\n- ✅ Search by Serial Number, Item Code, or PO Number\n- ✅ Pagination Support with Filters\n- ✅ Send notification emails by ItemCode (retry/resend)\n- ✅ Get unique PO numbers with supplier details\n- ✅ Supplier Portal: View own PO numbers\n- ✅ Admin Dashboard: View all PO numbers with suppliers\n\n**Endpoints Summary:**\n1. POST /api/controlSerials - Create bulk serials\n2. GET /api/controlSerials - Get all (paginated + filtered)\n3. GET /api/controlSerials/all - Get all (no pagination)\n4. GET /api/controlSerials/:id - Get by ID\n5. PUT /api/controlSerials/:id - Update serial\n6. DELETE /api/controlSerials/:id - Delete serial\n7. GET /api/controlSerials/search/by-itemcode - Search by ItemCode\n8. GET /api/controlSerials/search/by-serial - Search by serial number\n9. GET /api/controlSerials/search/by-po - Search by PO number\n10. POST /api/controlSerials/send-by-po - Send emails by PO number (NEW)\n11. GET /api/controlSerials/po-numbers - Get all PO numbers (Admin) (NEW)\n12. GET /api/controlSerials/supplier/po-numbers - Get my PO numbers (Supplier) (NEW)\n\n**Serial Number Generation Formula:** ItemCode + 6-digit Series Number\n**Example:** ITEM123 + 000001 = ITEM123000001\n\n**Version:** 2.1\n**Last Updated:** November 6, 2025\n**New APIs Added:** Send by PO number, PO Numbers (Admin & Supplier)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://uat.slicapp.online",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "SLIC Admin Bearer Token"
+    },
+    {
+      "key": "supplier_token",
+      "value": "",
+      "type": "string",
+      "description": "Supplier Bearer Token (for supplier portal endpoints)"
+    }
+  ],
+  "item": [
+    {
+      "name": "Create Control Serials (with Email Notification)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ItemCode\": \"ITEM123\",\n  \"qty\": 10,\n  \"supplierId\": \"clxxx123456789\",\n  \"poNumber\": \"PO-2024-001\",\n  \"size\": \"42\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials"]
+        },
+        "description": "**Create multiple control serials in bulk with supplier notification**\n\n**New in v2:**\n- Requires supplierId (supplier must exist)\n- Requires poNumber (Purchase Order number)\n- Optional size field\n- Automatically sends email notification to supplier\n\n**Request Body:**\n```json\n{\n  \"ItemCode\": \"ITEM123\",     // Required: Item code (string)\n  \"qty\": 10,                  // Required: Quantity (1-10000)\n  \"supplierId\": \"clxxx...\",  // Required: Supplier ID\n  \"poNumber\": \"PO-2024-001\",  // Required: PO number\n  \"size\": \"42\"                // Optional: Product size\n}\n```\n\n**Features:**\n- Generates unique serial numbers (ItemCode + 6-digit series)\n- Links serials to supplier and PO\n- Sends professional email notification to supplier\n- Email includes PO number, item code, quantity, and size\n- Email failure doesn't block serial creation\n\n**Response:** Returns created serials with supplier and product details"
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ItemCode\": \"ITEM123\",\n  \"qty\": 10,\n  \"supplierId\": \"clxxx123456789\",\n  \"poNumber\": \"PO-2024-001\",\n  \"size\": \"42\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/controlSerials",
+              "host": ["{{base_url}}"],
+              "path": ["api", "controlSerials"]
+            }
+          },
+          "status": "Created",
+          "code": 201,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"status\": 201,\n  \"success\": true,\n  \"message\": \"10 control serial(s) created successfully\",\n  \"data\": [\n    {\n      \"id\": \"clxxx987654321\",\n      \"serialNumber\": \"ITEM123000001\",\n      \"ItemCode\": \"clyyy111222333\",\n      \"supplierId\": \"clxxx123456789\",\n      \"poNumber\": \"PO-2024-001\",\n      \"size\": \"42\",\n      \"product\": {\n        \"id\": \"clyyy111222333\",\n        \"ItemCode\": \"ITEM123\",\n        \"EnglishName\": \"Leather Shoe\",\n        \"ArabicName\": \"حذاء جلدي\"\n      },\n      \"supplier\": {\n        \"id\": \"clxxx123456789\",\n        \"name\": \"Premium Leather Supplier\",\n        \"email\": \"supplier@example.com\",\n        \"status\": \"approved\"\n      },\n      \"createdAt\": \"2024-11-03T12:00:00.000Z\",\n      \"updatedAt\": \"2024-11-03T12:00:00.000Z\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get All Control Serials (Paginated with Filters)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials?page=1&limit=10&search=&poNumber=&supplierId=",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1",
+              "description": "Page number (default: 1)"
+            },
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "Items per page (default: 10)"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Search by serial number or item code"
+            },
+            {
+              "key": "poNumber",
+              "value": "",
+              "description": "NEW: Filter by PO number"
+            },
+            {
+              "key": "supplierId",
+              "value": "",
+              "description": "NEW: Filter by supplier ID"
+            }
+          ]
+        },
+        "description": "**Get all control serials with pagination and filtering**\n\n**New in v2:**\n- Filter by PO number\n- Filter by supplier ID\n- Returns supplier details with each serial\n\n**Query Parameters:**\n- `page` - Page number (default: 1)\n- `limit` - Records per page (default: 10)\n- `search` - Search by serial number or item code\n- `poNumber` - Filter by specific PO number\n- `supplierId` - Filter by specific supplier\n\n**Examples:**\n```\n# Get all serials for PO-2024-001\n?poNumber=PO-2024-001\n\n# Get all serials for a supplier\n?supplierId=clxxx123456789\n\n# Combined filters\n?poNumber=PO-2024-001&supplierId=clxxx123456789&page=1&limit=20\n\n# Search within PO\n?poNumber=PO-2024-001&search=ITEM123\n```\n\n**Response:** Returns paginated list with supplier and product details"
+      },
+      "response": []
+    },
+    {
+      "name": "Get All Control Serials (No Pagination)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/all",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "all"]
+        },
+        "description": "**Get all control serials without pagination**\n\n**Updated in v2:**\n- Returns supplier details with each serial\n- Includes size and PO number fields\n\n**Use Case:** Export all serials, generate reports\n\n**Warning:** May return large datasets. Use paginated endpoint for better performance."
+      },
+      "response": []
+    },
+    {
+      "name": "Search by PO Number",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/search/by-po?poNumber=PO-2024-001",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "search", "by-po"],
+          "query": [
+            {
+              "key": "poNumber",
+              "value": "PO-2024-001",
+              "description": "Purchase Order number (Required)"
+            }
+          ]
+        },
+        "description": "**NEW ENDPOINT: Search control serials by PO number**\n\n**Purpose:** Quickly retrieve all serials for a specific purchase order\n\n**Query Parameters:**\n- `poNumber` - Required: Purchase Order number\n\n**Use Cases:**\n- Track all serials for a specific PO\n- Verify PO fulfillment\n- Generate PO-specific reports\n- Supplier dashboard showing their PO serials\n\n**Response:** Returns all matching serials with full details (no pagination)"
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/controlSerials/search/by-po?poNumber=PO-2024-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "controlSerials", "search", "by-po"],
+              "query": [
+                {
+                  "key": "poNumber",
+                  "value": "PO-2024-001"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"status\": 200,\n  \"success\": true,\n  \"message\": \"Control serials retrieved successfully\",\n  \"data\": [\n    {\n      \"id\": \"clxxx987654321\",\n      \"serialNumber\": \"ITEM123000001\",\n      \"ItemCode\": \"clyyy111222333\",\n      \"supplierId\": \"clxxx123456789\",\n      \"poNumber\": \"PO-2024-001\",\n      \"size\": \"42\",\n      \"product\": {\n        \"id\": \"clyyy111222333\",\n        \"ItemCode\": \"ITEM123\",\n        \"EnglishName\": \"Leather Shoe\"\n      },\n      \"supplier\": {\n        \"id\": \"clxxx123456789\",\n        \"name\": \"Premium Leather Supplier\",\n        \"email\": \"supplier@example.com\"\n      },\n      \"createdAt\": \"2024-11-03T12:00:00.000Z\",\n      \"updatedAt\": \"2024-11-03T12:00:00.000Z\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Search by Item Code",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/search/by-itemcode?ItemCode=ITEM123",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "search", "by-itemcode"],
+          "query": [
+            {
+              "key": "ItemCode",
+              "value": "ITEM123",
+              "description": "Item code to search (Required)"
+            }
+          ]
+        },
+        "description": "**Search control serials by Item Code**\n\n**Updated in v2:** Now includes supplier details\n\n**Query Parameters:**\n- `ItemCode` - Required: Item code to search\n\n**Use Cases:**\n- Find all serials for a specific product\n- Inventory tracking by product\n- Product-specific reports"
+      },
+      "response": []
+    },
+    {
+      "name": "Search by Serial Number",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/search/by-serial?serialNumber=ITEM123000001",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "search", "by-serial"],
+          "query": [
+            {
+              "key": "serialNumber",
+              "value": "ITEM123000001",
+              "description": "Serial number to search (Required)"
+            }
+          ]
+        },
+        "description": "**Search control serial by exact serial number**\n\n**Updated in v2:** Now includes supplier and PO details\n\n**Query Parameters:**\n- `serialNumber` - Required: Exact serial number\n\n**Use Cases:**\n- Verify serial authenticity\n- Lookup serial details\n- Track serial ownership and PO"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Control Serial by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/:id",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", ":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "clxxx987654321",
+              "description": "Control Serial ID"
+            }
+          ]
+        },
+        "description": "**Get control serial by ID**\n\n**Updated in v2:**\n- Returns supplier details\n- Includes PO number and size\n\n**Path Parameters:**\n- `id` - Required: Control serial ID (cuid format)\n\n**Response:** Single serial record with full details"
+      },
+      "response": []
+    },
+    {
+      "name": "Update Control Serial",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ItemCode\": \"ITEM456\",\n  \"size\": \"44\",\n  \"poNumber\": \"PO-2024-002\",\n  \"supplierId\": \"clxxx987654321\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/:id",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", ":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "clxxx987654321",
+              "description": "Control Serial ID"
+            }
+          ]
+        },
+        "description": "**Update control serial details**\n\n**New in v2:** Can update size, PO number, and supplier\n\n**Path Parameters:**\n- `id` - Required: Control serial ID\n\n**Request Body (all fields optional):**\n```json\n{\n  \"ItemCode\": \"ITEM456\",           // Change item code\n  \"size\": \"44\",                    // Update size\n  \"poNumber\": \"PO-2024-002\",       // Change PO\n  \"supplierId\": \"clxxx987654321\"  // Reassign supplier\n}\n```\n\n**Note:** Updating ItemCode will verify the new product exists"
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Control Serial",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/:id",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", ":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "clxxx987654321",
+              "description": "Control Serial ID"
+            }
+          ]
+        },
+        "description": "**Delete control serial**\n\n**Path Parameters:**\n- `id` - Required: Control serial ID\n\n**Warning:** This is a permanent deletion. Consider implementing soft delete for production.\n\n**Response:** Returns deleted serial details"
+      },
+      "response": []
+    },
+    {
+      "name": "Filter Serials by Supplier",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials?supplierId=clxxx123456789&page=1&limit=50",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials"],
+          "query": [
+            {
+              "key": "supplierId",
+              "value": "clxxx123456789",
+              "description": "Supplier ID"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "description": "**NEW USE CASE: Get all serials for a specific supplier**\n\n**Purpose:** Supplier dashboard to view their serials\n\n**Query Parameters:**\n- `supplierId` - Supplier ID to filter\n- `page` - Page number\n- `limit` - Items per page\n\n**Use Cases:**\n- Supplier dashboard\n- Supplier-specific reports\n- Track supplier inventory"
+      },
+      "response": []
+    },
+    {
+      "name": "Filter Serials by PO and Supplier",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials?poNumber=PO-2024-001&supplierId=clxxx123456789&page=1&limit=20",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials"],
+          "query": [
+            {
+              "key": "poNumber",
+              "value": "PO-2024-001",
+              "description": "PO Number"
+            },
+            {
+              "key": "supplierId",
+              "value": "clxxx123456789",
+              "description": "Supplier ID"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "description": "**NEW USE CASE: Combined filter by PO and Supplier**\n\n**Purpose:** Verify specific PO fulfillment for a supplier\n\n**Query Parameters:**\n- `poNumber` - PO number to filter\n- `supplierId` - Supplier ID to filter\n- `page` - Page number\n- `limit` - Items per page\n\n**Use Cases:**\n- Verify PO delivery\n- Supplier-PO reconciliation\n- Quality control checks"
+      },
+      "response": []
+    },
+    {
+      "name": "Send Control Serials by ItemCode (with Email)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"poNumber\": \"PO-2024-001\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/send-by-po",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "send-by-po"]
+        },
+        "description": "**NEW ENDPOINT: Send control serial notification emails by PO number**\n\n**Purpose:** Trigger sending notification emails for all unsent control serials of a given PO number\n\n**Request Body:**\n```json\n{\n  \"poNumber\": \"PO-2024-001\"  // Required: PO number\n}\n```\n\n**Features:**\n- Finds all control serials for the PO number that haven't been sent yet\n- Groups serials by supplier and size\n- Sends notification email for each group\n- Marks serials as `isSentToSupplier = true` upon successful email send\n- Continues with other groups even if one email fails\n- Returns summary of sent and failed groups\n\n**Response:**\n```json\n{\n  \"status\": 200,\n  \"success\": true,\n  \"message\": \"Send-by-PO process completed\",\n  \"data\": {\n    \"sent\": [\n      {\n        \"supplierId\": \"clxxx123456789\",\n        \"supplierEmail\": \"supplier@example.com\",\n        \"poNumber\": \"PO-2024-001\",\n        \"quantity\": 10\n      }\n    ],\n    \"failed\": []\n  }\n}\n```\n\n**Use Cases:**\n- Manually trigger email resend for specific PO\n- Send reminders to suppliers for specific purchase order\n- Recovery from email delivery issues\n- PO-specific notification management"
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"poNumber\": \"PO-2024-001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/controlSerials/send-by-po",
+              "host": ["{{base_url}}"],
+              "path": ["api", "controlSerials", "send-by-po"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"status\": 200,\n  \"success\": true,\n  \"message\": \"Send-by-PO process completed\",\n  \"data\": {\n    \"sent\": [\n      {\n        \"supplierId\": \"clxxx123456789\",\n        \"supplierEmail\": \"supplier@example.com\",\n        \"poNumber\": \"PO-2024-001\",\n        \"quantity\": 10\n      },\n      {\n        \"supplierId\": \"clyyy987654321\",\n        \"supplierEmail\": \"other-supplier@example.com\",\n        \"poNumber\": \"PO-2024-002\",\n        \"quantity\": 5\n      }\n    ],\n    \"failed\": []\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get PO Numbers with Supplier Details (Admin)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/po-numbers",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "po-numbers"]
+        },
+        "description": "**NEW ENDPOINT: Get unique PO numbers with supplier details (Admin)**\n\n**Purpose:** SLIC admin endpoint to retrieve all unique PO numbers with associated supplier information\n\n**Authentication:** Requires SLIC admin bearer token (using isAuth middleware)\n\n**Query Parameters:** None\n\n**Response:**\n```json\n{\n  \"status\": 200,\n  \"success\": true,\n  \"message\": \"PO numbers with supplier details retrieved successfully\",\n  \"data\": [\n    {\n      \"poNumber\": \"PO-2024-001\",\n      \"size\": \"42\",\n      \"product\": {\n        \"ItemCode\": \"ITEM123\"\n      },\n      \"supplier\": {\n        \"id\": \"clxxx123456789\",\n        \"name\": \"Premium Leather Supplier\",\n        \"email\": \"supplier@example.com\",\n        \"status\": \"approved\",\n        \"createdAt\": \"2024-10-01T00:00:00.000Z\",\n        \"updatedAt\": \"2024-10-15T00:00:00.000Z\"\n      }\n    }\n  ]\n}\n```\n\n**Features:**\n- Returns distinct/unique PO numbers\n- Includes item code via product relationship\n- Shows complete supplier details\n- Ordered by most recent creation date\n- No pagination (returns all unique PO numbers)\n\n**Use Cases:**\n- Admin dashboard: view all POs\n- PO overview report\n- Supplier management dashboard\n- PO reconciliation\n- Generate all-POs report"
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/controlSerials/po-numbers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "controlSerials", "po-numbers"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"status\": 200,\n  \"success\": true,\n  \"message\": \"PO numbers with supplier details retrieved successfully\",\n  \"data\": [\n    {\n      \"poNumber\": \"PO-2024-001\",\n      \"size\": \"42\",\n      \"product\": {\n        \"ItemCode\": \"ITEM123\"\n      },\n      \"supplier\": {\n        \"id\": \"clxxx123456789\",\n        \"name\": \"Premium Leather Supplier\",\n        \"email\": \"supplier@example.com\",\n        \"status\": \"approved\",\n        \"createdAt\": \"2024-10-01T00:00:00.000Z\",\n        \"updatedAt\": \"2024-10-15T00:00:00.000Z\"\n      }\n    },\n    {\n      \"poNumber\": \"PO-2024-002\",\n      \"size\": \"44\",\n      \"product\": {\n        \"ItemCode\": \"ITEM456\"\n      },\n      \"supplier\": {\n        \"id\": \"clyyy987654321\",\n        \"name\": \"Quality Imports Ltd\",\n        \"email\": \"quality@example.com\",\n        \"status\": \"approved\",\n        \"createdAt\": \"2024-10-05T00:00:00.000Z\",\n        \"updatedAt\": \"2024-10-20T00:00:00.000Z\"\n      }\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get PO Numbers with Supplier Details (Supplier)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{supplier_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/controlSerials/supplier/po-numbers",
+          "host": ["{{base_url}}"],
+          "path": ["api", "controlSerials", "supplier", "po-numbers"]
+        },
+        "description": "**NEW ENDPOINT: Get PO numbers with supplier details (Supplier Portal)**\n\n**Purpose:** Supplier endpoint to view their own PO numbers with associated details\n\n**Authentication:** Requires supplier bearer token (using isAuth + email extraction middleware)\n\n**Query Parameters:** None\n\n**Response:**\n```json\n{\n  \"status\": 200,\n  \"success\": true,\n  \"message\": \"PO numbers with supplier details retrieved successfully\",\n  \"data\": [\n    {\n      \"poNumber\": \"PO-2024-001\",\n      \"size\": \"42\",\n      \"product\": {\n        \"ItemCode\": \"ITEM123\"\n      },\n      \"supplier\": {\n        \"id\": \"clxxx123456789\",\n        \"name\": \"Premium Leather Supplier\",\n        \"email\": \"supplier@example.com\",\n        \"status\": \"approved\",\n        \"createdAt\": \"2024-10-01T00:00:00.000Z\",\n        \"updatedAt\": \"2024-10-15T00:00:00.000Z\"\n      }\n    }\n  ]\n}\n```\n\n**Features:**\n- Returns only PO numbers belonging to authenticated supplier\n- Filters by supplier email extracted from token\n- Includes item code and product details\n- Shows supplier information\n- No pagination (returns supplier's unique PO numbers)\n\n**Use Cases:**\n- Supplier dashboard: view my POs\n- Supplier: track my orders\n- Supplier: view order status\n- Supplier portal: order history\n- Email verification for supplier authentication\n\n**Authentication Flow:**\n1. Supplier login and receives bearer token\n2. Supplier email is encoded in token\n3. Endpoint extracts supplier email from token (via isAuth middleware)\n4. Queries control serials for that supplier\n5. Returns only their PO numbers\n\n**Security Note:** Supplier can only see their own PO numbers. System verifies email from token."
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/controlSerials/supplier/po-numbers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "controlSerials", "supplier", "po-numbers"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"status\": 200,\n  \"success\": true,\n  \"message\": \"PO numbers with supplier details retrieved successfully\",\n  \"data\": [\n    {\n      \"poNumber\": \"PO-2024-001\",\n      \"size\": \"42\",\n      \"product\": {\n        \"ItemCode\": \"ITEM123\"\n      },\n      \"supplier\": {\n        \"id\": \"clxxx123456789\",\n        \"name\": \"Premium Leather Supplier\",\n        \"email\": \"supplier@example.com\",\n        \"status\": \"approved\",\n        \"createdAt\": \"2024-10-01T00:00:00.000Z\",\n        \"updatedAt\": \"2024-10-15T00:00:00.000Z\"\n      }\n    }\n  ]\n}"
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set base URL if not already set",
+          "if (!pm.collectionVariables.get('base_url')) {",
+          "    pm.collectionVariables.set('base_url', 'https://uat.slicapp.online');",
+          "}",
+          "",
+          "// Check for auth token",
+          "if (!pm.collectionVariables.get('token')) {",
+          "    console.log('Warning: No auth token set. Please set the token variable.');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Basic test for successful response",
+          "pm.test('Status code is 2xx', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+          "});",
+          "",
+          "// Test response format",
+          "pm.test('Response has correct format', function () {",
+          "    const jsonData = pm.response.json();",
+          "    pm.expect(jsonData).to.have.property('status');",
+          "    pm.expect(jsonData).to.have.property('success');",
+          "    pm.expect(jsonData).to.have.property('message');",
+          "});",
+          "",
+          "// Log response for debugging",
+          "console.log('Response:', pm.response.json());"
+        ]
+      }
+    }
+  ]
+}

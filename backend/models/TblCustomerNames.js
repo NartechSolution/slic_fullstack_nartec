@@ -1,7 +1,5 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
-
 const CustomError = require("../exceptions/customError");
+const prisma = require("../db");
 
 class CustomerName {
   static async fetchAll() {

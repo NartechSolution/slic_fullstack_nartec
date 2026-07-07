@@ -226,13 +226,23 @@ const ViewGTINPopUp = ({ isVisible, setVisibility }) => {
                   <div className="sm:w-1/3 w-full flex flex-col justify-start items-center lg:mt-3 md:mt-3 gap-3">
                     <Barcode
                       value={barcode}
-                    //   format="EAN13"
+                      format="EAN13"
                       height={75}
-                      width={1.3}
+                      width={1.5}
                       background="transparent"
                     />
 
-                    <QRCodeSVG value={`${barcode}, ${itemCode}, ${quantity}, ${description}, ${startSize}`} height={120} width={150} />
+                    {/* <QRCodeSVG value={`${barcode}, ${itemCode}, ${quantity}, ${description}, ${startSize}`} height={120} width={150} /> */}
+                    <QRCodeSVG value={`${barcode}`} height={120} width={150} />
+                    
+                    <button
+                      onClick={() => {
+                        window.open(`/product-info?gtin=${updateProductsData?.GTIN}`, "_blank");
+                      }}
+                      className="mt-4 px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary/80 transition-all text-sm font-semibold flex items-center gap-2"
+                    >
+                      <span>View Digital Link</span>
+                    </button>
                   </div>
                 </div>
               </div>

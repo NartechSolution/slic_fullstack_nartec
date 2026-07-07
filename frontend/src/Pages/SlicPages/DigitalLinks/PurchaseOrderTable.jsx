@@ -1,0 +1,366 @@
+import React, { useState } from "react";
+import { Button, CircularProgress, Tooltip } from "@mui/material";
+import { HiRefresh } from "react-icons/hi";
+import { FiEdit2, FiTrash2, FiLock } from "react-icons/fi";
+import Swal from 'sweetalert2';
+import { toast } from 'react-toastify';
+import newRequest from '../../../utils/userRequest';
+
+const PurchaseOrderTable = ({ 
+  orders, 
+  isLoading, 
+  refetchOrders, 
+  onViewOrder,
+  onUpdateSerial,
+}) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedRowIndex, setSelectedRowIndex] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const itemsPerPage = 5;
+
+  const ordersArray = Array.isArray(orders) ? orders : [];
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refetchOrders();
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
+
+  const handleRowClick = (order, index) => {
+    setSelectedRowIndex(index);
+    setSelectedOrder(order);
+    if (onViewOrder) {
+      onViewOrder(order);
+    }
+  };
+
+  const handleDelete = async (item) => {
+    // Check if already sent to supplier
+    if (item.isSentToSupplier) {
+      toast.warning('Cannot delete: This PO has already been sent to supplier');
+      return;
+    }
+
+    setDeletingId(item.poNumber);
+    try {
+      const result = await Swal.fire({
+        title: 'Are you sure?',
+        text: `You want to delete all serials for PO: ${item?.poNumber}?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete it!'
+      });
+
+      if (result.isConfirmed) {
+        await newRequest.delete('/controlSerials/bulk/by-po', { 
+          data: { 
+            poNumber: item?.poNumber,
+            size: item?.size
+          } 
+        });
+        
+        // Show success message
+        Swal.fire(
+          'Deleted!',
+          `All serials for PO ${item?.poNumber} have been deleted.`,
+          'success'
+        );
+        
+        // Refresh the table
+        handleRefresh();
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || "Failed to delete serials");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleEdit = (e, order) => {
+    e.stopPropagation();
+    
+    // Check if already sent to supplier
+    if (order.isSentToSupplier) {
+      toast.warning('Cannot edit: This PO has already been sent to supplier');
+      return;
+    }
+    
+    if (onUpdateSerial) {
+      onUpdateSerial(order);
+    }
+  };
+
+  const filteredOrders = ordersArray.filter(order => 
+    order.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.ItemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.size?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.supplierName?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentOrders = filteredOrders.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      setSelectedRowIndex(null);
+      setSelectedOrder(null);
+    }
+  };
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
+
+  return (
+    <div className="bg-white">
+      {/* Header Section */}
+      <div className="px-6 py-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+        <div>
+          <h3 className="font-bold text-gray-900 text-lg mb-1">Purchase Orders</h3>
+          <p className="text-sm text-gray-500">
+            Total {filteredOrders.length} Records
+            {selectedOrder && (
+              <span className="ml-2 text-secondary font-medium">
+                • Selected: {selectedOrder.poNumber}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <input
+            type="text"
+            placeholder="Search by PO, serial, supplier..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+              setSelectedRowIndex(null);
+              setSelectedOrder(null);
+            }}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm flex-1 sm:w-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+
+          <Button 
+            onClick={handleRefresh}
+            variant="contained"
+            disabled={isRefreshing || isLoading}
+            sx={{
+              backgroundColor: '#1D2F90',
+              '&:hover': {
+                backgroundColor: '#162561',
+              },
+              '&:disabled': {
+                backgroundColor: '#ccc',
+              },
+            }}
+            endIcon={
+              isRefreshing ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                <HiRefresh className="text-xl" />
+              )
+            }
+           >
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="text-sm text-gray-500 px-6 pb-3">
+        Click on any row to select
+      </div>
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="flex items-center justify-center h-64">
+          <CircularProgress className="w-12 h-12 animate-spin text-blue-600" />
+        </div>
+      )}
+
+      {!isLoading && (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full truncate">
+              <thead className="bg-gray-50 border-y border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">PO Number</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Qty</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Right Qty</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Left Qty</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ItemCode</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {currentOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
+                      No Records found
+                    </td>
+                  </tr>
+                ) : (
+                  currentOrders.map((order, idx) => (
+                    <tr 
+                      key={idx} 
+                      onClick={() => handleRowClick(order, idx)}
+                      className={`hover:bg-blue-50 transition-colors cursor-pointer ${
+                        selectedRowIndex === idx ? 'bg-blue-100 border-l-4 border-l-blue-600' : ''
+                      }`}
+                    >
+                      <td className="px-4 py-3 text-sm text-gray-600">{order.poNumber || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{order.size || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 font-medium">{order.qty || 0}</td>
+                      <td className="px-4 py-3 text-sm text-blue-700 font-semibold">{order.rightQty || 0}</td>
+                      <td className="px-4 py-3 text-sm text-purple-700 font-semibold">{order.leftQty || 0}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{order.ItemCode || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{order.supplierName || 'N/A'}</td>
+                      <td className="px-4 py-3">
+                        {order.isSentToSupplier ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <FiLock className="w-3 h-3" />
+                            Sent to Supplier
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Draft
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-2">
+                          <Tooltip 
+                            title={order.isSentToSupplier ? "Cannot edit: Already sent to supplier" : "Edit"} 
+                            arrow
+                          >
+                            <span>
+                              <button
+                                onClick={(e) => handleEdit(e, order)}
+                                disabled={order.isSentToSupplier}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                  order.isSentToSupplier 
+                                    ? 'text-gray-400 cursor-not-allowed opacity-50' 
+                                    : 'text-secondary hover:bg-blue-50'
+                                }`}
+                                title={order.isSentToSupplier ? "Cannot edit: Already sent to supplier" : "Update"}
+                              >
+                                <FiEdit2 className="w-4 h-4" />
+                              </button>
+                            </span>
+                          </Tooltip>
+                          <Tooltip 
+                            title={order.isSentToSupplier ? "Cannot delete: Already sent to supplier" : "Delete"} 
+                            arrow
+                          >
+                            <span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(order);
+                                }}
+                                disabled={order.isSentToSupplier || deletingId === order.poNumber}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                  order.isSentToSupplier 
+                                    ? 'text-gray-400 cursor-not-allowed opacity-50' 
+                                    : 'text-red-600 hover:bg-red-50'
+                                }`}
+                                title={order.isSentToSupplier ? "Cannot delete: Already sent to supplier" : "Delete"}
+                              >
+                                {deletingId === order.poNumber ? (
+                                  <CircularProgress size={16} sx={{ color: '#dc2626' }} />
+                                ) : (
+                                  <FiTrash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </span>
+                          </Tooltip>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="px-4 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-600">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} entries
+            </div>
+            <div className="flex flex-wrap gap-1 justify-center">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Previous
+              </button>
+              {getPageNumbers().map((page, idx) => (
+                page === '...' ? (
+                  <span key={idx} className="px-3 py-1">...</span>
+                ) : (
+                  <button
+                    key={idx}
+                    onClick={() => handlePageChange(page)}
+                    className={`px-3 py-1 border rounded text-sm ${
+                      currentPage === page
+                        ? 'bg-secondary text-white border-secondary'
+                        : 'border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )
+              ))}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default PurchaseOrderTable;

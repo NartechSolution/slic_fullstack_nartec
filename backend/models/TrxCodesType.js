@@ -62,10 +62,8 @@
 
 // module.exports = TrxCodesType;
 
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
-
 const CustomError = require("../exceptions/customError");
+const prisma = require("../db");
 
 class TrxCodesType {
   static async fetchAll() {
@@ -114,16 +112,29 @@ class TrxCodesType {
 
   static async bulkCreate(codesList) {
     try {
+      const { randomUUID } = require("crypto");
+      let createdCount = 0;
+
       for (const code of codesList) {
-        await prisma.trxCodesType.upsert({
+        // Check if a record with this TXN_CODE already exists
+        const existing = await prisma.trxCodesType.findFirst({
           where: { TXN_CODE: code.TXN_CODE },
-          update: {}, // No update is needed, but this is required
-          create: code,
         });
+
+        if (!existing) {
+          // Create new record with generated id
+          await prisma.trxCodesType.create({
+            data: {
+              id: randomUUID(),
+              ...code,
+            },
+          });
+          createdCount++;
+        }
       }
-      return { count: codesList.length }; // Adjust this return statement if needed
+      return { count: createdCount };
     } catch (error) {
-      throw new CustomError("Error creating transaction codes in bulk");
+      throw new CustomError(error);
     }
   }
 

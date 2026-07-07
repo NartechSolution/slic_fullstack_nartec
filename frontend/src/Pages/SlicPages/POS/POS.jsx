@@ -12,8 +12,7 @@ import ErpTeamRequest from "../../../utils/ErpTeamRequest";
 import { Autocomplete, TextField } from "@mui/material";
 import ExchangeItemPopUp from "./ExchangeItemPopUp";
 import ConfirmTransactionPopUp from "./ConfirmTransactionPopUp";
-import { FaExchangeAlt, FaTrash } from "react-icons/fa";
-import { MdRemoveCircleOutline } from "react-icons/md";
+import { FaExchangeAlt } from "react-icons/fa";
 import { MdRemoveCircle } from "react-icons/md";
 import html2pdf from "html2pdf.js";
 import MobileNumberPopUp from "./MobileNumberPopUp";
@@ -22,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { useTaxContext } from "../../../Contexts/TaxContext";
+import { useSlicToken } from "../../../Contexts/SlicTokenContext";
 
 const POS = () => {
   const { t, i18n } = useTranslation();
@@ -39,6 +39,7 @@ const POS = () => {
   const [selectedSalesType, setSelectedSalesType] = useState(
     "DIRECT SALES INVOICE"
   );
+  const { startTokenRefresh, stopTokenRefresh } = useSlicToken();
   const { taxAmount } = useTaxContext();
   // console.log(taxAmount);
 
@@ -51,8 +52,6 @@ const POS = () => {
     // const isBuy2Get1Customer = selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Buy 2 Get 1 Free") || 
     //                         selectedCustomeNameWithDirectInvoice?.CUST_CODE === "CL100948" ||
     //                         selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Miscelleneous Customers - Khobar Showroom");
-
-    // const isBuy2Get1Customer = true;
 
     if (!isBuy2Get1Customer || totalQty !== 3) {
       return 0;
@@ -79,28 +78,6 @@ const POS = () => {
       setSelectedRowData(DSalesNoInvoiceData[index]); // Save the row data from data (for sales invoices)
     }
   };
-
-  // useEffect(() => {
-  //   const checkSession = async () => {
-  //     try {
-  //       // const response = await fetch(
-  //       //   "http://localhost:1100/api/whatsapp/checkSession"
-  //       // );
-  //       const reponse = await newRequest.get("/whatsapp/checkSession");
-  //       console.log(reponse);
-  //       const data = reponse.data;
-  //       if (data.status === "failure" && data.qrCode) {
-  //         setQrCode(data.qrCode);
-  //         console.log("QR code:", data.qrCode);
-  //         setShowPopup(true);
-  //       }
-  //     } catch (error) {
-  //       console.error("Error checking session:", error);
-  //     }
-  //   };
-
-  //   checkSession();
-  // }, []);
 
   const handleClosePopup = () => {
     setShowPopup(false);
@@ -139,34 +116,6 @@ const POS = () => {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Function to generate invoice New number based on date and time
-  // const generateNewInvoiceNumber = () => {
-  //   const now = new Date();
-  //   const timestamp = Date.now();
-  //   return `${timestamp}`;
-  // };
-
-  // useEffect(() => {
-  //   const updateTime = () => {
-  //     const now = new Date();
-  //     setTodayDate(now.toISOString());
-  //     setCurrentTime(
-  //       now.toLocaleString("en-US", {
-  //         dateStyle: "short",
-  //         timeStyle: "medium",
-  //       })
-  //     );
-  //   };
-
-  //   setNewInvoiceNumber(generateInvoiceNumber());
-  //   updateTime();
-  //   const intervalId = setInterval(updateTime, 1000);
-
-  //   return () => clearInterval(intervalId);
-  // }, []);
-
-
-
   const [isExchangeClick, setIsExchangeClick] = useState(false);
   const [isExchangeDSalesClick, setIsExchangeDSalesClick] = useState(false);
   const handleItemClick = (action) => {
@@ -181,7 +130,6 @@ const POS = () => {
       setIsExchangeDSalesClick(true);
       // generateNewInvoiceNumber();
     }
-    // console.log(action);
     // console.log("isButtonClick", isExchangeClick);
   };
 
@@ -219,9 +167,19 @@ const POS = () => {
 
   }, []);
 
+  // Start token refresh when component mounts
+  useEffect(() => {
+    startTokenRefresh();
+
+    // Cleanup: stop refresh when component unmounts
+    return () => {
+      stopTokenRefresh();
+    };
+  }, [startTokenRefresh, stopTokenRefresh]);
+
   useEffect(() => {
     if (selectedPaymentMode) {
-      console.log("selected mode", selectedPaymentMode)
+      // console.log("selected mode", selectedPaymentMode)
     }
   }, [selectedPaymentMode])
 
@@ -246,12 +204,6 @@ const POS = () => {
   const [selectedTransactionCode, setSelectedTransactionCode] = useState("");
   const fetchTransactionCodes = async () => {
     try {
-      // const response = await newRequest.get(
-      //   `/transactions/v1/byLocationCode?locationCode=${selectedLocation?.LOCN_CODE}`
-      // );
-      // console.log(response.data?.data);
-      // setTransactionCodes(response.data?.data);
-
       const response = await newRequest.get(
         `/transactions/v1/byLocationCode?locationCode=${selectedLocation?.stockLocation}`
       );
@@ -270,7 +222,7 @@ const POS = () => {
       // console.log(codes)
       setTransactionCodes(codes);
     } catch (err) {
-      console.log(err);
+      // console.log(err);
       toast.error(err?.response?.data?.message || "Something went Wrong");
     }
   };
@@ -311,12 +263,6 @@ const POS = () => {
     setSelectedCustomerName(value);
   };
 
-  // useEffect(() => {
-  //   if (selectedTransactionCode?.TXN_CODE) {
-  //     fetchCustomerBasedonTransaction();
-  //   }
-  // }, [selectedTransactionCode?.TXN_CODE]);
-
   const [customerNameWithDirectInvoice, setCustomerNameWithDirectInvoice] =
     useState([]);
   const [
@@ -332,7 +278,6 @@ const POS = () => {
 
       // Filter customers whose CUST_CODE starts with "CL"
       const filteredCustomers = allCustomers.filter((customer) =>
-        // customer.CUST_CODE.startsWith("CL")
         customer.CUST_CODE.startsWith("CL") || customer.CUST_CODE.startsWith("EX")
       );
       // console.log(filteredCustomers);
@@ -356,7 +301,6 @@ const POS = () => {
 
       // Filter customers whose CUST_CODE starts with "CL"
       const filteredCustomers = allCustomers.filter((customer) =>
-        // customer.CUST_CODE.startsWith("CL")
         customer.CUST_CODE.startsWith("CL") || customer.CUST_CODE.startsWith("EX")
       );
       // btoc customer
@@ -392,199 +336,11 @@ const POS = () => {
     }
   }, [selectedTransactionCode?.TXN_CODE]);
 
-  // useEffect(() => {
-  //   fetchCustomerNames();
-  // }, []);
-
   useEffect(() => {
     if (selectedSalesType === "BTOC CUSTOMER") {
       fetchB2CCustomerNames();
     }
   }, [selectedSalesType]);
-
-
-  // Fetch barcode data from API
-  // const handleGetBarcodes = async (e) => {
-  //   e.preventDefault();
-
-  //   // Dynamically determine the CustomerCode based on the selected transaction code
-  //   const customerCode =
-  //   EX_TRANSACTION_CODES.includes(selectedTransactionCode?.TXN_CODE)
-  //     ? selectedCustomerName?.CUSTOMERCODE // For EX/AX transactions
-  //     : selectedCustomeNameWithDirectInvoice?.CUST_CODE; // For other transactions
-
-  //   // console.log("direct sales invoice ", customerCode)
-  //   if (!selectedTransactionCode?.TXN_CODE) {
-  //     toast.error("Please select a transaction code first.");
-  //     setIsExchangeItemPopupVisible(false);
-  //     return;
-  //   }
-  //   if (!selectedCustomeNameWithDirectInvoice?.CUST_CODE && !selectedCustomerName?.CUSTOMERCODE) {
-  //     toast.error("Please select a customer code first.");
-  //     setIsExchangeItemPopupVisible(false);
-  //     return;
-  //   }
-
-  //   // if(vat === "") {
-  //   //   toast.info("Please add Vat Dynamically for all transactions");
-  //   //   return;
-  //   // }
-
-  //   setIsLoading(true);
-  //   try {
-  //     const response = await newRequest.get(
-  //       `/itemCodes/v2/searchByGTIN?GTIN=${barcode}`
-  //     );
-  //     const data = response?.data?.data;
-
-  //     if (data) {
-  //       const { ItemCode, ProductSize, GTIN, EnglishName, ArabicName } = data;
-
-  //       // Call the second API
-  //       const secondApiBody = {
-  //         filter: {
-  //           P_COMP_CODE: "SLIC",
-  //           P_ITEM_CODE: ItemCode,
-  //           // P_CUST_CODE: selectedCustomeNameWithDirectInvoice?.CUST_CODE,
-  //           P_CUST_CODE: customerCode,
-  //           P_GRADE_CODE_1: ProductSize,
-  //         },
-  //         M_COMP_CODE: "SLIC",
-  //         M_USER_ID: "SYSADMIN",
-  //         APICODE: "PRICELIST",
-  //         M_LANG_CODE: "ENG",
-  //       };
-
-  //       try {
-  //         const secondApiResponse = await ErpTeamRequest.post(
-  //           "/slicuat05api/v1/getApi",
-  //           secondApiBody,
-  //           {
-  //             headers: {
-  //               Authorization: `Bearer ${token}`,
-  //             },
-  //           }
-  //         );
-  //         const secondApiData = secondApiResponse?.data;
-  //         // console.log(secondApiData);
-
-  //         let storedData = sessionStorage.getItem("secondApiResponses");
-  //         storedData = storedData ? JSON.parse(storedData) : {};
-
-  //         const itemRates = secondApiData.map(
-  //           (item) => item?.PRICELIST?.PLI_RATE
-  //         );
-
-  //         storedData[ItemCode] = itemRates;
-
-  //         sessionStorage.setItem(
-  //           "secondApiResponses",
-  //           JSON.stringify(storedData)
-  //         );
-
-  //         const itemPrice = itemRates.reduce((sum, rate) => sum + rate, 0);
-  //         const vat = itemPrice * taxAmount / 100;
-  //         const total = itemPrice + vat;
-
-  //         // Set data in state
-  //         setData((prevData) => {
-  //           const existingItemIndex = prevData.findIndex(
-  //             (item) => item.Barcode === GTIN
-  //           );
-
-  //           if (existingItemIndex !== -1) {
-  //             const updatedData = [...prevData];
-  //             updatedData[existingItemIndex] = {
-  //               ...updatedData[existingItemIndex],
-  //               Qty: updatedData[existingItemIndex].Qty + 1,
-  //               Total:
-  //                 (updatedData[existingItemIndex].Qty + 1) * (itemPrice + vat),
-  //             };
-  //             return updatedData;
-  //           } else {
-  //             return [
-  //               ...prevData,
-  //               {
-  //                 SKU: ItemCode,
-  //                 Barcode: GTIN,
-  //                 Description: EnglishName,
-  //                 DescriptionArabic: ArabicName,
-  //                 ItemSize: ProductSize,
-  //                 Qty: 1,
-  //                 ItemPrice: itemPrice,
-  //                 VAT: vat,
-  //                 Total: total,
-  //               },
-  //             ];
-  //           }
-  //         });
-
-  //         // Now, call the stock status API after second API success
-  //         const stockStatusBody = {
-  //           filter: {
-  //             M_COMP_CODE: "SLIC",
-  //             P_LOCN_CODE: selectedLocation?.stockLocation,
-  //             P_ITEM_CODE: ItemCode,
-  //             P_GRADE_1: ProductSize,
-  //             P_GRADE_2: "NA",
-  //           },
-  //           M_COMP_CODE: "SLIC",
-  //           M_USER_ID: "SYSADMIN",
-  //           APICODE: "STOCKSTATUS",
-  //           M_LANG_CODE: "ENG",
-  //         };
-
-  //         try {
-  //           const stockStatusResponse = await ErpTeamRequest.post(
-  //             "/slicuat05api/v1/getApi",
-  //             stockStatusBody,
-  //             {
-  //               headers: {
-  //                 Authorization: `Bearer ${token}`,
-  //               },
-  //             }
-  //           );
-
-  //           const stockData = stockStatusResponse?.data;
-  //           // console.log(stockData);
-
-  //           // Check the available stock
-  //           const availableStock = stockData[0]?.STOCKSTATUS?.FREE_STOCK;
-
-  //           // Update the grid with available stock info
-  //           setData((prevData) =>
-  //             prevData.map((item) =>
-  //               item.SKU === ItemCode
-  //                 ? { ...item, AvailableStock: availableStock }
-  //                 : item
-  //             )
-  //           );
-
-  //         } catch (stockStatusError) {
-  //           toast.error(
-  //             stockStatusError?.response?.data?.message ||
-  //               "An error occurred while fetching stock status"
-  //           );
-  //         }
-
-  //       } catch (secondApiError) {
-  //         toast.error(
-  //           secondApiError?.response?.data?.message ||
-  //             "An error occurred while calling the second API"
-  //         );
-  //       }
-
-  //       // Clear the barcode state after the response
-  //       setBarcode("");
-  //     } else {
-  //       setData([]);
-  //     }
-  //   } catch (error) {
-  //     toast.error(error?.response?.data?.message || "An error occurred");
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // };
 
   // Main barcode handling function
   const handleGetBarcodes = async (e) => {
@@ -644,6 +400,20 @@ const POS = () => {
           );
           const secondApiData = secondApiResponse?.data;
 
+          // Check if the response contains an error message even with 200 status
+          if (secondApiData?.Message && secondApiData.Message.includes("No Records Found")) {
+            toast.error(secondApiData.Message);
+            setBarcode("");
+            return;
+          }
+
+          // Check if secondApiData is an array and has data
+          if (!Array.isArray(secondApiData) || secondApiData.length === 0) {
+            toast.error("No price information found for this item");
+            setBarcode("");
+            return;
+          }
+
           let storedData = sessionStorage.getItem("secondApiResponses");
           storedData = storedData ? JSON.parse(storedData) : {};
 
@@ -684,7 +454,6 @@ const POS = () => {
                 ItemSize: ProductSize,
                 Qty: 1,
                 ItemPrice: itemPrice,
-                // VAT: vat,
                 VAT: (itemPrice * taxAmount) / 100,
               };
               newData = [...prevData, newItem];
@@ -692,11 +461,10 @@ const POS = () => {
 
             // Calculate total quantity across all items
             const totalQty = newData.reduce((sum, item) => sum + item.Qty, 0);
-            console.log("Total Quantity:", totalQty);
+            // console.log("Total Quantity:", totalQty);
 
             // Prevent more than 3 items
             const isBuy2Get1Customer = selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Buy 2 Get 1 Free");
-            // const isBuy2Get1Customer = true;
             if (isBuy2Get1Customer && totalQty > 3) {
               toast.error("Maximum 3 items allowed for Buy 2 Get 1 Free offer");
               setBarcode("");
@@ -707,12 +475,12 @@ const POS = () => {
             const discount = calculateDiscount(newData, totalQty);
             const discountPerItem = totalQty === 3 ? discount / totalQty : 0;
             setDiscountedTotal(discount);
-            console.log("discount", discount)
+            // console.log("discount", discount)
 
             // Update totals for all items including discount
             return newData.map(item => {
               const discountedPrice = item.ItemPrice - discountPerItem;
-              const newVat = (discountedPrice * taxAmount) / 100; // Recalculate VAT based on discounted price
+              const newVat = (discountedPrice * taxAmount) / 100;
 
               return {
                 ...item,
@@ -751,6 +519,19 @@ const POS = () => {
             );
 
             const stockData = stockStatusResponse?.data;
+
+            // Check if the stock status response contains an error message
+            if (stockData?.Message && stockData.Message.includes("No Records Found")) {
+              toast.error(stockData.Message);
+              return;
+            }
+
+            // Check if stockData is an array and has data
+            if (!Array.isArray(stockData) || stockData.length === 0) {
+              toast.error("No stock information found for this item");
+              return;
+            }
+
             const availableStock = stockData[0]?.STOCKSTATUS?.FREE_STOCK;
 
             // Update the grid with available stock info only for the current item
@@ -784,25 +565,41 @@ const POS = () => {
             });
 
           } catch (stockStatusError) {
-            toast.error(
+            const errorMessage =
+              stockStatusError?.response?.data ||
               stockStatusError?.response?.data?.message ||
-              "An error occurred while fetching stock status"
-            );
+              stockStatusError?.response?.data?.Message ||
+              stockStatusError?.message ||
+              "An error occurred while fetching stock status";
+
+            toast.error(errorMessage);
+            setBarcode("");
           }
 
-          // Clear the barcode state after the response
           setBarcode("");
         } catch (secondApiError) {
-          toast.error(
+          const errorMessage =
+            secondApiError?.response?.data ||
             secondApiError?.response?.data?.message ||
-            "An error occurred while calling the second API"
-          );
+            secondApiError?.response?.data?.Message ||
+            secondApiError?.message ||
+            "An error occurred while calling the second API";
+
+          toast.error(errorMessage);
+          setBarcode("");
         }
       } else {
         setData([]);
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "An error occurred");
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.Message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "An error occurred";
+
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -841,20 +638,15 @@ const POS = () => {
         `/itemCodes/v2/searchByGTIN?GTIN=${barcode}`
       );
       const data = response?.data?.data;
-      // console.log(data)
-      if (data) {
-        const { ItemCode, ProductSize, GTIN, EnglishName, ArabicName, id } =
-          data;
 
-        // call the second api later in their
+      if (data) {
+        const { ItemCode, ProductSize, GTIN, EnglishName, ArabicName, id } = data;
+
+        // call the second api
         const secondApiBody = {
           filter: {
             P_COMP_CODE: "SLIC",
             P_ITEM_CODE: ItemCode,
-            // P_CUST_CODE:
-            //   selectedSalesReturnType === "DIRECT RETURN"
-            //     ? selectedCustomeNameWithDirectInvoice?.CUST_CODE
-            //     : selectedCustomerName?.CUSTOMERCODE,
             P_CUST_CODE: customerCode,
             P_GRADE_CODE_1: ProductSize,
           },
@@ -875,7 +667,22 @@ const POS = () => {
             }
           );
           const secondApiData = secondApiResponse?.data;
-          console.log(secondApiData);
+
+          // Check if the response contains an error message even with 200 status
+          if (secondApiData?.Message && secondApiData.Message.includes("No Records Found")) {
+            toast.error(secondApiData.Message);
+            setBarcode("");
+            return;
+          }
+
+          // Check if secondApiData is an array and has data
+          if (!Array.isArray(secondApiData) || secondApiData.length === 0) {
+            toast.error("No price information found for this item");
+            setBarcode("");
+            return;
+          }
+
+          // console.log(secondApiData);
 
           let storedData = sessionStorage.getItem("secondApiResponses");
           storedData = storedData ? JSON.parse(storedData) : {};
@@ -883,20 +690,19 @@ const POS = () => {
           const itemRates = secondApiData.map(
             (item) => item?.PRICELIST?.PLI_RATE
           );
+
           // Store the array of rates under the respective ItemCode
           storedData[ItemCode] = itemRates;
-          // storedData[ItemCode] = secondApiData;
 
           sessionStorage.setItem(
             "secondApiResponses",
             JSON.stringify(storedData)
           );
 
-          // const itemPrice = secondApiData[0].ItemRate?.RATE;
-          const itemPrice = itemRates.reduce((sum, rate) => sum + rate, 0); // Sum of all item prices
+          const itemPrice = itemRates.reduce((sum, rate) => sum + rate, 0);
           const vat = itemPrice * taxAmount / 100;
           const total = itemPrice + vat;
-          console.log(itemPrice);
+          // console.log(itemPrice);
 
           setDSalesNoInvoiceData((prevData) => {
             const existingItemIndex = prevData.findIndex(
@@ -908,9 +714,9 @@ const POS = () => {
               const updatedData = [...prevData];
               updatedData[existingItemIndex] = {
                 ...updatedData[existingItemIndex],
-                Qty: updatedData[existingItemIndex].Qty + 1, // Increment quantity by 1
+                Qty: updatedData[existingItemIndex].Qty + 1,
                 Total:
-                  (updatedData[existingItemIndex].Qty + 1) * (itemPrice + vat), // Update total with the new quantity
+                  (updatedData[existingItemIndex].Qty + 1) * (itemPrice + vat),
               };
               return updatedData;
             } else {
@@ -932,24 +738,36 @@ const POS = () => {
               ];
             }
           });
+
+          setBarcode("");
+
         } catch (secondApiError) {
-          toast.error(
+          const errorMessage =
+            secondApiError?.response?.data ||
             secondApiError?.response?.data?.message ||
-            "An error occurred while calling the second API"
-          );
+            secondApiError?.response?.data?.Message ||
+            secondApiError?.message ||
+            "An error occurred while calling the second API";
+
+          toast.error(errorMessage);
+          setBarcode("");
         }
-        // barcode state empty once response is true
-        setBarcode("");
       } else {
         setDSalesNoInvoiceData([]);
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "An error occurred");
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.Message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "No item code found with the given GTIN";
+
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
-
 
   // Btoc Customer Function
   const handleGetBtocCustomerBarcodes = async (e) => {
@@ -965,12 +783,12 @@ const POS = () => {
         `/itemCodes/v2/searchByGTIN?GTIN=${barcode}`
       );
       const data = response?.data?.data;
-      // console.log(data)
+
       if (data) {
         const { ItemCode, ProductSize, GTIN, EnglishName, ArabicName, id } =
           data;
 
-        // call the second api later in their
+        // call the second api
         const secondApiBody = {
           filter: {
             P_COMP_CODE: "SLIC",
@@ -995,7 +813,22 @@ const POS = () => {
             }
           );
           const secondApiData = secondApiResponse?.data;
-          console.log(secondApiData);
+
+          // Check if the response contains an error message even with 200 status
+          if (secondApiData?.Message && secondApiData.Message.includes("No Records Found")) {
+            toast.error(secondApiData.Message);
+            setBarcode("");
+            return;
+          }
+
+          // Check if secondApiData is an array and has data
+          if (!Array.isArray(secondApiData) || secondApiData.length === 0) {
+            toast.error("No price information found for this item");
+            setBarcode("");
+            return;
+          }
+
+          // console.log(secondApiData);
 
           let storedData = sessionStorage.getItem("secondApiResponses");
           storedData = storedData ? JSON.parse(storedData) : {};
@@ -1005,19 +838,16 @@ const POS = () => {
           );
           // Store the array of rates under the respective ItemCode
           storedData[ItemCode] = itemRates;
-          // storedData[ItemCode] = secondApiData;
 
           sessionStorage.setItem(
             "secondApiResponses",
             JSON.stringify(storedData)
           );
 
-          // const itemPrice = secondApiData[0].ItemRate?.RATE;
-          const itemPrice = itemRates.reduce((sum, rate) => sum + rate, 0); // Sum of all item prices
-          // const itemPrice = 250.0; // Hardcoded for now, ideally fetched from the second API.
+          const itemPrice = itemRates.reduce((sum, rate) => sum + rate, 0);
           const vat = itemPrice * taxAmount / 100;
           const total = itemPrice + vat;
-          console.log(itemPrice);
+          // console.log(itemPrice);
 
           setDSalesNoInvoiceData((prevData) => {
             const existingItemIndex = prevData.findIndex(
@@ -1025,13 +855,12 @@ const POS = () => {
             );
 
             if (existingItemIndex !== -1) {
-              // If the item already exists, just update the Qty and Total
               const updatedData = [...prevData];
               updatedData[existingItemIndex] = {
                 ...updatedData[existingItemIndex],
-                Qty: updatedData[existingItemIndex].Qty + 1, // Increment quantity by 1
+                Qty: updatedData[existingItemIndex].Qty + 1,
                 Total:
-                  (updatedData[existingItemIndex].Qty + 1) * (itemPrice + vat), // Update total with the new quantity
+                  (updatedData[existingItemIndex].Qty + 1) * (itemPrice + vat),
               };
               return updatedData;
             } else {
@@ -1053,19 +882,31 @@ const POS = () => {
               ];
             }
           });
+          // clear the barcode
+          setBarcode("");
         } catch (secondApiError) {
-          toast.error(
+          const errorMessage =
+            secondApiError?.response?.data ||
             secondApiError?.response?.data?.message ||
-            "An error occurred while calling the second API"
-          );
+            secondApiError?.response?.data?.Message ||
+            secondApiError?.message ||
+            "An error occurred while calling the second API";
+
+          toast.error(errorMessage);
+          setBarcode("");
         }
-        // barcode state empty once response is true
-        setBarcode("");
       } else {
         setDSalesNoInvoiceData([]);
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "An error occurred");
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.Message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "An error occurred";
+
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -1081,19 +922,9 @@ const POS = () => {
   const [isCreatePopupVisible, setCreatePopupVisibility] = useState(false);
   const [storeDatagridData, setStoreDatagridData] = useState([]);
   const [storeInvoiceDatagridData, setStoreInvoiceDatagridData] = useState([]);
-  // const handleShowCreatePopup = () => {
-  //   setStoreDatagridData([...data]);
-  //   setStoreInvoiceDatagridData([...invoiceData]);
-
-  //   setCreatePopupVisibility(true);
-  // };
   const handleShowCreatePopup = () => {
     const isBuy2Get1Customer = selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Buy 2 Get 1 Free");
-    // const isBuy2Get1Customer = selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Buy 2 Get 1 Free") || 
-    //                         selectedCustomeNameWithDirectInvoice?.CUST_CODE === "CL100948" ||
-    //                         selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Miscelleneous Customers - Khobar Showroom");
 
-    // Store data with correct prices
     const updatedData = data.map(item => ({
       ...item,
       ItemPrice: isBuy2Get1Customer ? (item.DiscountedPrice || item.ItemPrice) : item.ItemPrice,
@@ -1133,19 +964,6 @@ const POS = () => {
     setSelectedRowData(rowData);
     setIsExchangeItemPopupVisible(true);
 
-    // if (selectedSalesReturnType === "DIRECT RETURN") {
-    //   toast.info(
-    //     "You don't select the Sales Return type return with exchange",
-    //     {}
-    //   );
-    //   setIsExchangeItemPopupVisible(false);
-    // } else {
-    //   setSelectedRowData(rowData);
-    //   setIsExchangeItemPopupVisible(true);
-    // }
-
-    // setSelectedRowData(rowData); // Store the selected row data to pass to the popup
-    // setIsExchangeItemPopupVisible(true);
   };
 
   const [
@@ -1179,13 +997,8 @@ const POS = () => {
     setMobileNo("");
     setRemarks("");
     setVat("");
-    // setSelectedCustomerName(null);
     setSelectedTransactionCode("");
     setInvoiceNumber(generateInvoiceNumber());
-
-    // setTotalAmountWithVat(0);
-    // setNetWithVat(0);
-    // setTotalVat(0);
 
     setNetWithOutExchange(0);
     setTotalWithOutExchange(0);
@@ -1265,9 +1078,6 @@ const POS = () => {
 
         // Check if customer is eligible for discount
         const isBuy2Get1Customer = selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Buy 2 Get 1 Free");
-        // const isBuy2Get1Customer = selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Buy 2 Get 1 Free") || 
-        //                     selectedCustomeNameWithDirectInvoice?.CUST_CODE === "CL100948" ||
-        //                     selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Miscelleneous Customers - Khobar Showroom");
         // Calculate total amount considering discounts if applicable
         const totalAmount = isBuy2Get1Customer ? parseFloat(netWithVat) : parseFloat(data.reduce((sum, item) => sum + (item.ItemPrice * item.Qty), 0));
 
@@ -1279,7 +1089,6 @@ const POS = () => {
           DeliveryLocationCode: selectedLocation?.stockLocation,
           ItemSysID: data[0]?.SKU,
           TransactionCode: selectedTransactionCode?.TXN_CODE,
-          // CustomerCode: selectedCustomeNameWithDirectInvoice?.CUST_CODE,
           CustomerCode: customerCode,
           SalesLocationCode: selectedLocation?.stockLocation,
           Remarks: remarks,
@@ -1290,8 +1099,6 @@ const POS = () => {
           VatNumber: vat,
           CustomerName: customerName,
           DocNo: newDocumentNo,
-          // PendingAmount: parseFloat(netWithVat),
-          // AdjAmount: parseFloat(netWithVat),
           PendingAmount: parseFloat(parseFloat(totalAmount).toFixed(2)),
           AdjAmount: parseFloat(parseFloat(totalAmount).toFixed(2)),
 
@@ -1309,7 +1116,6 @@ const POS = () => {
           InvoiceNo: invoiceNumber,
           Head_SYS_ID: `${newHeadSysId}`,
           TransactionCode: selectedTransactionCode?.TXN_CODE,
-          // CustomerCode: selectedCustomeNameWithDirectInvoice?.CUST_CODE,
           CustomerCode: customerCode,
           SalesLocationCode: selectedLocation?.stockLocation,
           Remarks: item.Description,
@@ -1318,8 +1124,6 @@ const POS = () => {
           ItemSKU: item.SKU,
           ItemUnit: "PCS",
           ItemSize: item.ItemSize,
-          // ITEMRATE: item.ItemPrice,
-          // ItemPrice: item.ItemPrice,
           ITEMRATE: isBuy2Get1Customer
             ? parseFloat((item.DiscountedPrice || item.ItemPrice).toFixed(2))
             : parseFloat(item.ItemPrice.toFixed(2)),
@@ -1357,14 +1161,9 @@ const POS = () => {
           // InvoiceNo: currentInvoiceNumber, 
           Head_SYS_ID: `${newHeadSysId}`,
           DeliveryLocationCode: selectedLocation?.stockLocation,
-          // ItemSysID: exchangeData[0]?.ItemCode,
           ItemSysID: masterItemSysID,
           // TransactionCode: selectedTransactionCode?.TXN_CODE,
           TransactionCode: transactionCode,
-          // CustomerCode:
-          //   selectedSalesReturnType === "DIRECT RETURN"
-          //     ? selectedCustomeNameWithDirectInvoice?.CUST_CODE
-          //     : selectedCustomerName?.CUSTOMERCODE,
           CustomerCode: customerCode,
           SalesLocationCode: selectedLocation?.stockLocation,
           Remarks: remarks,
@@ -1393,10 +1192,6 @@ const POS = () => {
           Head_SYS_ID: `${newHeadSysId}`,
           // TransactionCode: selectedTransactionCode?.TXN_CODE,
           TransactionCode: transactionCode,
-          // CustomerCode:
-          //   selectedSalesReturnType === "DIRECT RETURN"
-          //     ? selectedCustomeNameWithDirectInvoice?.CUST_CODE
-          //     : selectedCustomerName?.CUSTOMERCODE,
           CustomerCode: customerCode,
           SalesLocationCode: selectedLocation?.stockLocation,
           Remarks: item.Description,
@@ -1438,12 +1233,7 @@ const POS = () => {
           Head_SYS_ID: `${newHeadSysId}`,
           DeliveryLocationCode: selectedLocation?.stockLocation,
           ItemSysID: masterItemSysID,
-          // TransactionCode: selectedTransactionCode?.TXN_CODE,
           TransactionCode: transactionCode,
-          // CustomerCode:
-          //   selectedSalesReturnType === "DIRECT RETURN"
-          //     ? selectedCustomeNameWithDirectInvoice?.CUST_CODE
-          //     : selectedCustomerName?.CUSTOMERCODE,
           CustomerCode: customerCode,
           SalesLocationCode: selectedLocation?.stockLocation,
           Remarks: remarks,
@@ -1471,10 +1261,6 @@ const POS = () => {
           // InvoiceNo: currentInvoiceNumber,
           Head_SYS_ID: `${newHeadSysId}`,
           TransactionCode: transactionCode,
-          // CustomerCode:
-          //   selectedSalesReturnType === "DIRECT RETURN"
-          //     ? selectedCustomeNameWithDirectInvoice?.CUST_CODE
-          //     : selectedCustomerName?.CUSTOMERCODE,
           CustomerCode: customerCode,
           SalesLocationCode: selectedLocation?.stockLocation,
           Remarks: item.Description,
@@ -1509,16 +1295,10 @@ const POS = () => {
         // Construct the master and details data for DSALES NO INVOICE
         const master = {
           InvoiceNo: invoiceNumber,
-          // InvoiceNo: currentInvoiceNumber,
           Head_SYS_ID: `${newHeadSysId}`,
           DeliveryLocationCode: selectedLocation?.stockLocation,
           ItemSysID: masterItemSysID,
-          // TransactionCode: selectedTransactionCode?.TXN_CODE,
           TransactionCode: transactionCode,
-          // CustomerCode: 
-          // selectedSalesReturnType === "DIRECT RETURN"
-          //     ? selectedCustomeNameWithDirectInvoice?.CUST_CODE
-          //     : selectedCustomerName?.CUSTOMERCODE,
           CustomerCode: customerCode,
           SalesLocationCode: selectedLocation?.stockLocation,
           Remarks: remarks,
@@ -1543,13 +1323,8 @@ const POS = () => {
           DeliveryLocationCode: selectedLocation?.stockLocation,
           ItemSysID: item.SKU || item.ItemCode,
           InvoiceNo: invoiceNumber,
-          // InvoiceNo: currentInvoiceNumber,
           Head_SYS_ID: `${newHeadSysId}`,
           TransactionCode: transactionCode,
-          // CustomerCode: 
-          // selectedSalesReturnType === "DIRECT RETURN"
-          //     ? selectedCustomeNameWithDirectInvoice?.CUST_CODE
-          //     : selectedCustomerName?.CUSTOMERCODE,
           CustomerCode: customerCode,
           SalesLocationCode: selectedLocation?.stockLocation,
           Remarks: item.Description,
@@ -1576,14 +1351,14 @@ const POS = () => {
         "/invoice/v1/saveInvoice",
         invoiceAllData
       );
-      console.log("invoice body", invoiceAllData);
-      console.log("Record saved successfully:", saveInvoiceResponse.data);
+      // console.log("invoice body", invoiceAllData);
+      // console.log("Record saved successfully:", saveInvoiceResponse.data);
 
       toast.success(
         saveInvoiceResponse?.data?.message || "Invoice saved successfully"
       );
     } catch (error) {
-      console.error("Error saving record:", error);
+      // console.error("Error saving record:", error);
       toast.error("Error saving record");
     }
   };
@@ -1611,9 +1386,7 @@ const POS = () => {
 
   const [invoiceLoader, setInvoiceLoader] = useState(false);
   const [zatcaQrcode, setZatcaQrcode] = useState(null);
-  // const [zatchaQrcodeExchange, setZatchaQrcodeExchange] = useState(null);
   const handleInvoiceGenerator = async (e) => {
-    // e.preventDefault();
     setInvoiceLoader(true);
     let payload = {};
     try {
@@ -1648,21 +1421,17 @@ const POS = () => {
           return;
       }
       const res = await newRequest.post("/zatca/generateZatcaQRCode", payload);
-      // console.log('invoice', res?.data);
 
       const qrCodeDataFromApi = res?.data?.qrCodeData;
       console.log(qrCodeDataFromApi);
       setZatcaQrcode(qrCodeDataFromApi);
-      // setZatchaQrcodeExchange(qrCodeDataFromApi);
-      // handlePrintSalesInvoice(qrCodeDataFromApi);
 
-      // insertInvoiceRecord();
       setIsConfirmDisabled(false);
       setIsTenderCashEnabled(false);
       toast.success("Invoice generated successfully!");
       setInvoiceLoader(false);
     } catch (err) {
-      console.log(err);
+      // console.log(err);
       toast.error(
         err?.response?.data?.error ||
         "An error occurred while generating the invoice"
@@ -1705,35 +1474,6 @@ const POS = () => {
       setInvoiceLoader(false);
     }
   };
-
-  // Calculate totals for Net with VAT, Total VAT, and Total Amount with VAT
-  //   useEffect(() => {
-  //     const calculateTotals = () => {
-  //       let totalNet = 0;
-  //       let totalVat = 0;
-
-  //       data.forEach((item) => {
-  //         totalNet += item.ItemPrice * item.Qty;
-  //         totalVat += item.VAT * item.Qty;
-  //       });
-  //       // data.forEach((item) => {
-  //       //   const itemTotal = item.ItemPrice * item.Qty;
-  //       //   totalNet += itemTotal;
-  //       //   const vatRate = parseFloat(vat) / 100 || 0;
-  //       //   totalVat += itemTotal * vatRate;
-  //       // });
-
-  //       setNetWithVat(totalNet.toFixed(2));
-  //       setTotalVat(totalVat.toFixed(2));
-  //       setTotalAmountWithVat(totalNet + totalVat);
-  //     };
-
-  //     // calculateTotals();
-  //     if (data.length > 0) {
-  //       calculateTotals(); // Only calculate when there is data
-  //     }
-  //   // }, [data, vat]);
-  // }, [data]);
 
   // Direct Sales Invoice with discount 
   useEffect(() => {
@@ -1782,9 +1522,6 @@ const POS = () => {
 
     if (selectedSalesType === "DIRECT SALES INVOICE") {
       const isBuy2Get1Customer = selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Buy 2 Get 1 Free");
-      // const isBuy2Get1Customer = selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Buy 2 Get 1 Free") || 
-      //                       selectedCustomeNameWithDirectInvoice?.CUST_CODE === "CL100948" ||
-      //                       selectedCustomeNameWithDirectInvoice?.CUST_NAME?.includes("Miscelleneous Customers - Khobar Showroom");
 
       totalsContent = `
         <div>
@@ -1878,13 +1615,13 @@ const POS = () => {
       `;
     }
 
-    console.log("selectedSalesType", selectedSalesType);
-    console.log("customerName", customerName);
-    console.log("vat", vat);
-    console.log("invoiceNumber", invoiceNumber);
-    console.log("currentTime", currentTime);
-    console.log("invoiceData", invoiceData);
-    console.log("DSalesNoInvoiceData", DSalesNoInvoiceData);
+    // console.log("selectedSalesType", selectedSalesType);
+    // console.log("customerName", customerName);
+    // console.log("vat", vat);
+    // console.log("invoiceNumber", invoiceNumber);
+    // console.log("currentTime", currentTime);
+    // console.log("invoiceData", invoiceData);
+    // console.log("DSalesNoInvoiceData", DSalesNoInvoiceData);
 
     const html = `
       <html>
@@ -2183,8 +1920,6 @@ const POS = () => {
     // Wait until the print window has loaded fully
     printWindow.onload = () => {
       const qrCodeCanvas = printWindow.document.getElementById("qrcode-canvas");
-      // let newQR='ARBOYXJ0ZWMgU29sdXRpb25zAg8zMDA0NTY0MTY1MDAwMDMDFDIwMjQtMDgtMTdUMTI6MDA6MDBaBAcxMDAwLjAwBQMxNTAGQGQzMzlkZDlkZGZkZTQ5MDI1NmM3OTVjOTFlM2RmZjBiNGQ2MTAyYjhhMGM4OTYxYzhhNGExNDE1YjZhZGMxNjYHjjMwNDUwMjIxMDBjZjk1MjkwMzc2ZTM5MjgzOGE4ZGYwMjc2YTdiMjEyYmUzMjMyNzAxNjFlNWFjYWY0MGNjOTgwMGJjNzJjNTY4MDIyMDQzYzEyZjEzMTdiZjMxN2Q2YWZkNTAwNTgxNDRlMjdmOTczNWUzZDZlMDYzYWI0MTk2YWU5YWQyZDlhMWVhN2MIgjA0OWM2MDM2NmQxNDg5NTdkMzAwMWQzZDQxNGI0NGIxYjA1MGY0NWZlODJjNDBkZTE4ZWI3NWM2M2Y1YzU2MjRmNDM3NzY0MWFjY2JlZmJiNDlhNGE4MmM1ZDAxY2YyMDRkNTdhMzEzODE1N2RmZDJmNmFlOTIzYjkzMjZiZmI5NWI='
-      // Generate the QR code using the `qrcode` library
       QRCode.toCanvas(
         qrCodeCanvas,
         qrCodeData,
@@ -2199,7 +1934,6 @@ const POS = () => {
           }
         }
       );
-      // setIsOpenOtpPopupVisible(false);
       // console.log(qrCodeData);
     };
 
@@ -2517,7 +2251,6 @@ const POS = () => {
   const [directInvoiceWhatsAppLoader, setDirectInvoiceWhatsAppLoader] =
     useState(false);
   const sendWhatsAppInvoice = async () => {
-    // console.log(isReceiptPrinted)
     if (!isReceiptPrinted) {
       toast.error("Please print the receipt first!");
       return;
@@ -2548,13 +2281,13 @@ const POS = () => {
         }
       );
 
-      console.log(response?.data);
+      // console.log(response?.data);
       toast.success("Invoice sent to WhatsApp successfully!");
       setDirectInvoiceWhatsAppLoader(false);
     } catch (error) {
       toast.error(error?.response?.data?.error || "Error sending WhatsApp message");
       setDirectInvoiceWhatsAppLoader(false);
-      console.error("Error:", error);
+      // console.error("Error:", error);
     }
   };
 
@@ -2568,7 +2301,6 @@ const POS = () => {
     const printWindow = window.open("", "Print Window", "height=800,width=800");
 
     // Generate QR code data URL
-    // const qrCodeDataURL = await QRCode.toDataURL(`${invoiceNumber}`);
     const qrCodeDataURL = await QRCode.toDataURL(`${selectedSalesType === "DSALES NO INVOICE" || selectedSalesType === "BTOC CUSTOMER"
       ? invoiceNumber
       : searchInvoiceNumber}`);
@@ -2837,8 +2569,6 @@ const POS = () => {
     // Wait until the print window has loaded fully
     printWindow.onload = () => {
       const qrCodeCanvas = printWindow.document.getElementById("qrcode-canvas");
-      // let newQR='ARBOYXJ0ZWMgU29sdXRpb25zAg8zMDA0NTY0MTY1MDAwMDMDFDIwMjQtMDgtMTdUMTI6MDA6MDBaBAcxMDAwLjAwBQMxNTAGQGQzMzlkZDlkZGZkZTQ5MDI1NmM3OTVjOTFlM2RmZjBiNGQ2MTAyYjhhMGM4OTYxYzhhNGExNDE1YjZhZGMxNjYHjjMwNDUwMjIxMDBjZjk1MjkwMzc2ZTM5MjgzOGE4ZGYwMjc2YTdiMjEyYmUzMjMyNzAxNjFlNWFjYWY0MGNjOTgwMGJjNzJjNTY4MDIyMDQzYzEyZjEzMTdiZjMxN2Q2YWZkNTAwNTgxNDRlMjdmOTczNWUzZDZlMDYzYWI0MTk2YWU5YWQyZDlhMWVhN2MIgjA0OWM2MDM2NmQxNDg5NTdkMzAwMWQzZDQxNGI0NGIxYjA1MGY0NWZlODJjNDBkZTE4ZWI3NWM2M2Y1YzU2MjRmNDM3NzY0MWFjY2JlZmJiNDlhNGE4MmM1ZDAxY2YyMDRkNTdhMzEzODE1N2RmZDJmNmFlOTIzYjkzMjZiZmI5NWI='
-      // Generate the QR code using the `qrcode` library
       QRCode.toCanvas(
         qrCodeCanvas,
         qrCodeData,
@@ -2846,7 +2576,6 @@ const POS = () => {
         function (error) {
           if (error) console.error(error);
           else {
-            // Trigger the print dialog after the QR code is rendered
             setIsReceiptPrintedExchange(true);
             printWindow.print();
             printWindow.close();
@@ -3090,8 +2819,8 @@ const POS = () => {
       filename: "sales_invoice.pdf",
       image: { type: "jpeg", quality: 1.0 },
       html2canvas: {
-        scale: 2, // Increase scale to ensure higher fidelity
-        useCORS: true, // Ensure CORS handling for images like logos
+        scale: 2,
+        useCORS: true,
       },
       jsPDF: { unit: "in", format: [4, 16], orientation: "portrait" },
     };
@@ -3105,7 +2834,6 @@ const POS = () => {
   const [exhchangeWhatsAppInvoiceLoader, setExhchangeWhatsAppInvoiceLoader] =
     useState(false);
   const sendWhatsAppExchangeInvoice = async () => {
-    // console.log(isReceiptPrinted)
     if (!isReceiptPrintedExchange) {
       toast.error("Please print the receipt first!");
       return;
@@ -3136,13 +2864,13 @@ const POS = () => {
         }
       );
 
-      console.log(response?.data);
+      // console.log(response?.data);
       toast.success("Invoice sent to WhatsApp successfully!");
       setExhchangeWhatsAppInvoiceLoader(false);
     } catch (error) {
       toast.error(error?.response?.data?.error || "Error sending WhatsApp message");
       setExhchangeWhatsAppInvoiceLoader(false);
-      console.error("Error:", error);
+      // console.error("Error:", error);
     }
   };
 
@@ -3209,25 +2937,6 @@ const POS = () => {
     handleGetInvoiceDetails(searchInvoiceNumber);
   };
 
-  // Sales return Calculation without exhange
-  // useEffect(() => {
-  //   const calculateTotals = () => {
-  //     let totalNet = 0;
-  //     let totalVat = 0;
-
-  //     invoiceData.forEach((item) => {
-  //       totalNet += item.ItemPrice * item.Qty;
-  //       totalVat += item.VAT * item.Qty;
-  //     });
-
-  //     setNetWithOutExchange(totalNet.toFixed(2));
-  //     setTotalWithOutExchange(totalVat.toFixed(2));
-  //     setTotolAmountWithoutExchange(totalNet.toFixed(2) + totalVat.toFixed(2));
-  //   };
-
-  //   calculateTotals();
-  // }, [invoiceData]);
-
   // Sales return Calculation without exchange
   useEffect(() => {
     const calculateTotals = () => {
@@ -3237,7 +2946,7 @@ const POS = () => {
       invoiceData.forEach((item) => {
         // Calculate net amount (Item Price * Quantity)
         totalNet += parseFloat((item.ItemPrice * item.Qty).toFixed(2));
-        
+
         // Use the VAT directly from the item and multiply by quantity
         totalVat += parseFloat((item.VAT * item.Qty).toFixed(2));
       });
@@ -3334,29 +3043,6 @@ const POS = () => {
     });
   };
 
-  // exchange calculation
-  // useEffect(() => {
-  //   const calculateExchangeTotals = () => {
-  //     let totalNet = 0;
-  //     let totalVat = 0;
-
-  //     exchangeData.forEach((item) => {
-  //       totalNet += item.ItemPrice * item.Qty;
-  //       totalVat += item.VAT * item.Qty;
-  //     });
-  //     // console.log(exchangeData)
-
-  //     setNetWithVat(parseFloat(totalNet.toFixed(2)));
-  //     setTotalVat(parseFloat(totalVat.toFixed(2)));
-  //     setTotalAmountWithVat(parseFloat(totalNet.toFixed(2)) + parseFloat(totalVat.toFixed(2)));
-  //   };
-
-  //   // calculateTotals();
-  //   if (exchangeData.length > 0) {
-  //     calculateExchangeTotals(); // Only calculate when there is exchange data
-  //   }
-  // }, [exchangeData]);
-
   useEffect(() => {
     const calculateExchangeTotals = () => {
       let totalNet = 0;
@@ -3426,26 +3112,6 @@ const POS = () => {
     });
   };
 
-  // DSales No Invoice Calculation
-  // useEffect(() => {
-  //   const calculateTotals = () => {
-  //     let totalNet = 0;
-  //     let totalVat = 0;
-
-  //     DSalesNoInvoiceData.forEach((item) => {
-  //       totalNet += item.ItemPrice * item.Qty;
-  //       totalVat += item.VAT * item.Qty;
-  //     });
-  //     // console.log(exchangeData)
-
-  //     setNetWithOutVatDSalesNoInvoice(totalNet.toFixed(2));
-  //     setTotalWithOutVatDSalesNoInvoice(totalVat.toFixed(2));
-  //     setTotolAmountWithoutVatDSalesNoInvoice(totalNet.toFixed(2) + totalVat.toFixed(2));
-  //   };
-
-  //   calculateTotals();
-  // }, [DSalesNoInvoiceData]);
-
   useEffect(() => {
     const calculateTotals = () => {
       let totalNet = 0;
@@ -3466,31 +3132,6 @@ const POS = () => {
 
     calculateTotals();
   }, [DSalesNoInvoiceData, taxAmount]);
-
-  // DSALES No Invocie Exchange calculation
-  // useEffect(() => {
-  //   const calculateDSalesExchangeTotals = () => {
-  //     let totalNet = 0;
-  //     let totalVat = 0;
-
-  //     // console.log(dSalesNoInvoiceexchangeData);
-  //     dSalesNoInvoiceexchangeData.forEach((item) => {
-  //       totalNet += item.ItemPrice * item.Qty;
-  //       totalVat += item.VAT * item.Qty;
-  //     });
-  //     console.log(dSalesNoInvoiceexchangeData)
-
-
-  //     setNetWithVat(totalNet.toFixed(2));
-  //     setTotalVat(totalVat.toFixed(2));
-  //     setTotalAmountWithVat(totalNet.toFixed(2) + totalVat.toFixed(2));
-  //   };
-
-  //   // calculateTotals();
-  //   if (dSalesNoInvoiceexchangeData.length > 0) {
-  //     calculateDSalesExchangeTotals(); // Only calculate when there is exchange data
-  //   }
-  // }, [dSalesNoInvoiceexchangeData]);
 
   // DSALES No Invoice Exchange calculation
   useEffect(() => {
@@ -3591,17 +3232,6 @@ const POS = () => {
     // Set the mobile number
     setMobileNo(value);
 
-    // const value = e.target.value;
-    // setMobileNo(value);
-
-    // // Validate if the mobile number is exactly 10 digits long
-    // if (value.length === 10) {
-    //   setErrorMessage("");
-    // } else if (value.length < 10 && value.length > 0) {
-    //   setErrorMessage("Mobile must be 10 digits long.");
-    // } else {
-    //   setErrorMessage("");
-    // }
   };
 
   return (
@@ -3727,34 +3357,6 @@ const POS = () => {
               </select>
             </div>
 
-            {/* Select Return or Exchange */}
-            {/* {(selectedSalesType === "DIRECT SALES RETURN" ||
-               selectedSalesType === "DSALES NO INVOICE" ||
-                selectedSalesType === "BTOC CUSTOMER") && (
-              <div>
-                <label
-                  className={`block text-gray-700 ${
-                    i18n.language === "ar"
-                      ? "direction-rtl"
-                      : "text-start direction-ltr"
-                  }`}
-                >
-                  {t("Sale Return Type")} *
-                </label>
-                <select
-                  className="w-full mt-1 p-2 border rounded border-gray-400"
-                  value={selectedSalesReturnType}
-                  onChange={(e) => setSelectedSalesReturnType(e.target.value)}
-                >
-                  {selectedSalesType !== "BTOC CUSTOMER" && (
-                    <option value="DIRECT RETURN">{t("DIRECT RETURN")}</option>
-                  )}
-                  <option value="RETRUN WITH EXCHANGE">
-                    {t("RETURN WITH EXCHANGE")}
-                  </option>
-                </select>
-              </div>
-            )} */}
             <div>
               <label
                 className={`block text-gray-700 ${i18n.language === "ar"
@@ -3802,8 +3404,6 @@ const POS = () => {
                 readOnly
               />
             </div>
-            {/* </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4"> */}
             <div>
               <label
                 className={`block text-gray-700 ${i18n.language === "ar"
@@ -3832,7 +3432,7 @@ const POS = () => {
                   }
                   onInputChange={(event, value) => {
                     if (!value) {
-                      setSelectedCustomerName(""); // Clear selection when input is cleared
+                      setSelectedCustomerName("");
                     }
                   }}
                   renderInput={(params) => (
@@ -4067,15 +3667,6 @@ const POS = () => {
                     required
                   />
                 </div>
-                {/* <input
-                  type="number"
-                  className={`w-full mt-1 p-2 border rounded border-gray-400 bg-green-200 placeholder:text-black  ${
-                    i18n.language === "ar" ? "text-end" : "text-start"
-                  }`}
-                  placeholder={t("Mobile")}
-                  value={mobileNo}
-                  onChange={handleMobileChange}
-                /> */}
               </div>
               {selectedSalesType === "DIRECT SALES RETURN" && (
                 <button
@@ -5007,8 +4598,6 @@ const POS = () => {
                 >
                   {t("F3 - Tender Cash")}
                 </button>
-                {/* <button onClick={handlePrintSalesInvoice}>Print</button>
-                <button onClick={sendWhatsAppInvoice}>whatsApp Send</button> */}
               </div>
             </div>
           </div>

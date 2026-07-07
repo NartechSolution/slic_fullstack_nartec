@@ -1,107 +1,93 @@
 import React, { useEffect, useState } from "react";
 import SideNav from "../../../components/Sidebar/SideNav";
-import { useNavigate } from "react-router-dom";
-import { purchaseOrderDetailsColumn, salesOrderColumn, salesOrderDetailsColumn } from "../../../utils/datatablesource";
+import { salesOrderColumn, salesOrderDetailsColumn } from "../../../utils/datatablesource";
 import DataTable from "../../../components/Datatable/Datatable";
 import { toast } from "react-toastify";
 import newRequest from "../../../utils/userRequest";
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Swal from "sweetalert2";
-import { Button } from "@mui/material";
 import AddSalesOrderPopUp from "./AddSalesOrderPopUp";
 import UpdateSalesOrderPopUp from "./UpdateSalesOrderPopUp";
 import ErpTeamRequest from "../../../utils/ErpTeamRequest";
 import { useTranslation } from "react-i18next";
+import { useSlicToken } from "../../../Contexts/SlicTokenContext";
 
 const SalesOrder = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [data, setData] = useState([]);
-  const memberDataString = sessionStorage.getItem("slicUserData");
-  const memberData = JSON.parse(memberDataString);
-  // console.log(memberData)
+  const { startTokenRefresh, stopTokenRefresh } = useSlicToken();
+
   const token = JSON.parse(sessionStorage.getItem("slicLoginToken"));
 
   const [isLoading, setIsLoading] = useState(true);
-  const [secondGridData, setSecondGridData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]); // for the map markers
-  const navigate = useNavigate();
+  const [filteredData, setFilteredData] = useState([]);
   const [isSalesOrderDataLoading, setIsSalesOrderDataLoading] = useState(false);
 
-      const fetchData = async () => {
-        setIsLoading(true);
-        try {
-          // const response = await newRequest.get('/salesOrders/v1/all', {
-          //   headers: {
-          //     Authorization: `Bearer ${memberData?.data?.token}`,
-          //   },
-          // });
-          // console.log(response.data);
-          const res = await ErpTeamRequest.post(
-            '/slicuat05api/v1/getApi',
-            {
-              "filter": {
-                "P_SOH_DEL_LOCN_CODE": "FG102"
-              },
-              "M_COMP_CODE": "SLIC",
-              "M_USER_ID": "SYSADMIN",
-              "APICODE": "ListOfSO",
-              "M_LANG_CODE": "ENG"
+  const fetchData = async () => {
+    setIsLoading(true);
+      try {
+        const res = await ErpTeamRequest.post(
+          '/slicuat05api/v1/getApi',
+          {
+            "filter": {
+              "P_SOH_DEL_LOCN_CODE": "FG102"
             },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-          // console.log(res?.data);
-          
-          // Map the API response to the expected data structure
-          const mappedData = res.data.map(item => ({
-            HEAD_SYS_ID: item.ListOfSO.HEAD_SYS_ID,
-            DEL_LOCN: item.ListOfSO.DEL_LOCN,
-            SO_CUST_NAME: item.ListOfSO.SO_CUST_NAME,
-            SO_LOCN_CODE: item.ListOfSO.SO_LOCN_CODE,
-            SO_NUMBER: item.ListOfSO.SO_NUMBER,
-            STATUS: item.ListOfSO.STATUS,
-          }));
+            "M_COMP_CODE": "SLIC",
+            "M_USER_ID": "SYSADMIN",
+            "APICODE": "ListOfSO",
+            "M_LANG_CODE": "ENG"
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        // console.log(res?.data);
+        
+        const mappedData = res.data.map(item => ({
+          HEAD_SYS_ID: item.ListOfSO.HEAD_SYS_ID,
+          DEL_LOCN: item.ListOfSO.DEL_LOCN,
+          SO_CUST_NAME: item.ListOfSO.SO_CUST_NAME,
+          SO_LOCN_CODE: item.ListOfSO.SO_LOCN_CODE,
+          SO_NUMBER: item.ListOfSO.SO_NUMBER,
+          STATUS: item.ListOfSO.STATUS,
+        }));
 
-          setData(mappedData);
-          setIsLoading(false);
-        } catch (err) {
-          console.log(err);
-          setIsLoading(false);
-          toast.error(err?.response?.data?.message || "Something Is Wrong");
-      };
-    }
+        setData(mappedData);
+        setIsLoading(false);
+      } catch (err) {
+        // console.log(err);
+        setIsLoading(false);
+        toast.error(err?.response?.data?.message || "Something Is Wrong");
+    };
+  }
 
-    useEffect(() => {
-    fetchData(); // Calling the function within useEffect, not inside itself
+  // Start token refresh when component mounts
+  useEffect(() => {
+    startTokenRefresh();
+      
+    // Cleanup: stop refresh when component unmounts
+    return () => {
+      stopTokenRefresh();
+    };
+  }, [startTokenRefresh, stopTokenRefresh]);
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
 
   const handleRowClickInParent = async (item) => {
     // console.log(item)
     if (item.length === 0) {
-      setFilteredData(secondGridData);
       return;
     }
-    const filteredData = secondGridData.filter((singleItem) => {
-      return Number(singleItem?.ProvGLN) == Number(item[0]?.ProvGLN);
-    });
 
     // call api
     setIsSalesOrderDataLoading(true);
     try {
-      // const res = await newRequest.get(`/lineItems/v1/699}`, {
-      // const res = await newRequest.get(`/lineItems/v1/${item[0]?.SO_NUMBER}`, {
-      //   headers: {
-      //     Authorization: `Bearer ${memberData?.data?.token}`,
-      //   },
-      // });
-      // // console.log(res?.data)
-      // const filteredData = res?.data?.data ?? [];
       const res = await ErpTeamRequest.post(
         '/slicuat05api/v1/getApi',
         {
@@ -120,7 +106,7 @@ const SalesOrder = () => {
           },
         }
       );
-      console.log(res?.data);
+      // console.log(res?.data);
 
       // Map the response data to the expected structure for the second grid
       const mappedData = res?.data.map(item => ({
@@ -189,7 +175,7 @@ const SalesOrder = () => {
               reject(new Error("Failed to delete product"));
             }
           } catch (error) {
-            console.error("Error deleting product:", error);
+            // console.error("Error deleting product:", error);
             reject(error);
           }
         });

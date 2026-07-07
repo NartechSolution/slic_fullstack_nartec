@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../db");
 
 class Role {
   static async getRoleByName(roleName) {

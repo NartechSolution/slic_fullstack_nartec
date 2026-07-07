@@ -4,6 +4,7 @@ const User = require("../models/TblUsers");
 const response = require("../utils/response");
 const CustomError = require("../exceptions/customError");
 
+
 exports.signup = async (req, res, next) => {
   const { userLoginID, userPassword } = req.body;
   try {

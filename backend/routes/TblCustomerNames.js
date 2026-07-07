@@ -10,4 +10,5 @@ router.get("/v1/search", customerController.getSearch);
 
 router.post("/v1/sync", customerController.syncCustomers);
 
+
 module.exports = router;

@@ -39,25 +39,7 @@ function generateUUID() {
 
 exports.generateZatcaQrCode = [
   // Express Validator schema for validation
-  // checkSchema({
-  //   invoiceDate: {
-  //     isISO8601: {
-  //       errorMessage: "Invoice date must be a valid ISO 8601 date",
-  //     },
-  //   },
-  //   totalWithVat: {
-  //     isFloat: {
-  //       options: { gt: 0 },
-  //       errorMessage: "Total with VAT must be a positive number",
-  //     },
-  //   },
-  //   vatTotal: {
-  //     isFloat: {
-  //       options: { gt: 0 },
-  //       errorMessage: "VAT total must be a positive number",
-  //     },
-  //   },
-  // }),
+
   checkSchema({
     invoiceDate: {
       isISO8601: {

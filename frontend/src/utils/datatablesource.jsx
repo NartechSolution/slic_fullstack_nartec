@@ -92,16 +92,21 @@ export const GtinColumn = (t)=> [
   {
     field: "EnglishName",
     headerName: t("English Name"),
-    width: 280,
+    width: 200,
   },
   {
     field: "ArabicName",
     headerName: t("Arabic Name"),
-    width: 280,
+    width: 200,
   },
   {
     field: "ItemCode",
     headerName: t("Item Code"),
+    width: 180,
+  },
+  {
+    field: "ProductSize",
+    headerName: t("Product Size"),
     width: 180,
   },
   {
@@ -171,11 +176,6 @@ export const GtinColumn = (t)=> [
   //   headerName: "Product Unit",
   //   width: 180,
   // },
-  {
-    field: "ProductSize",
-    headerName: t("Product Size"),
-    width: 180,
-  },
 ];
 
 export const listOfEmployeeColumn = [
@@ -1027,7 +1027,54 @@ export const taxSettingsColumn =(t)=> [
       return params.value ? new Date(params.value) : null;
     },
   },
-  
-
-
 ]
+
+
+export const supplierColumn = (t) => [
+  {
+    field: "name",
+    headerName: t("Supplier Name"),
+    width: 250,
+  },
+  {
+    field: "email",
+    headerName: t("Email"),
+    width: 280,
+  },
+  {
+    field: "status",
+    headerName: t("Status"),
+    renderCell: (params) => {
+      const status = params.value?.toLowerCase();
+      const style = {
+        backgroundColor: 
+          status === "approved" ? "green" : 
+          status === "pending" ? "orange" : 
+          "red",
+        color: "white",
+        borderRadius: "30px",
+        padding: "2px 10px",
+        textTransform: "capitalize",
+        border: "1px solid white",
+      };
+      return <div style={style}>{params.value}</div>;
+    },
+    width: 150,
+  },
+  {
+    field: "createdAt",
+    headerName: t("Created At"),
+    renderCell: (params) => {
+      return new Date(params.value).toLocaleDateString();
+    },
+    width: 150,
+  },
+  {
+    field: "updatedAt",
+    headerName: t("Updated At"),
+    renderCell: (params) => {
+      return new Date(params.value).toLocaleDateString();
+    },
+    width: 150,
+  },
+];

@@ -144,7 +144,7 @@ const DataTable = ({
     'posHistoryId',
   ]
   const handleRowClick = (item) => {
-    console.log(item)
+    // console.log(item)
     // check if the uniqueId is in the ids array
     if (ids.includes(uniqueId)) {
       handleRowClickInParent(item);
