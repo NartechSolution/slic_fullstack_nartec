@@ -23,9 +23,10 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
       "/* QR Code and Content Wrapper */" +
       "#Qrcodeserails { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }" +
       "#itemcode { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 180px; }" +
-      "#inside-BRCode { flex-shrink: 0; display: flex; justify-content: center; align-items: center; }" +
+      "#inside-BRCode { flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; }" +
+      "#slic-logo { width: 55px; height: auto; display: block; }" +
       "#description { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; }" +
-      "#gtin { font-size: 9px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; }" +
+      "#gtin { font-size: 8px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; white-space: nowrap; }" +
       "#expiry { font-size: 9px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; }" +
       "#batch { font-size: 9px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; word-break: break-all; }" +
       "</style>" +
@@ -79,12 +80,13 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
             <div className="label-container hidden" key={index}>
               <div id="Qrcodeserails">
                 <div id="itemcode">
-                  {/* Left side - QR Code */}
+                  {/* Left side - SLIC Logo + QR Code */}
                   <div id="inside-BRCode">
+                    <img id="slic-logo" src={logo} alt="SLIC" />
                     <QRCodeSVG
                       value={`${barcode?.serialNo}`}
-                      width="60"
-                      height="55"
+                      width="55"
+                      height="50"
                       level="M"
                       includeMargin={false}
                     />
@@ -92,11 +94,11 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
 
                   {/* Right side - Data */}
                   <div id="description">
-                    <div id="gtin">SerialNo. : {barcode?.serialNo} {barcode?.side}</div>
-                    <div id="gtin">ItemCode : {barcode?.ItemCode}</div>
+                    <div id="gtin">STYLE : {barcode?.ItemCode}</div>
                     <div id="expiry">Size : {barcode?.size}</div>
                     <div id="batch">GTIN : {barcode?.GTIN}</div>
-                    <div id="batch">PO : {barcode?.poNumber}</div>
+                    <div id="batch">EN ISO-20347:2022</div>
+                    <div id="gtin">SerialNo. : {barcode?.serialNo}</div>
                   </div>
                 </div>
               </div>
