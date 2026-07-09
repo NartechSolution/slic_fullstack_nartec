@@ -1,6 +1,6 @@
 import React from "react";
 import { QRCodeSVG } from "qrcode.react";
-import logo from "../../../Images/sliclogo.png";
+import logo from "../../../Images/labelLogo.jpeg";
 
 const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
   // console.log(selectedRows)
@@ -15,17 +15,17 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
       "<style>" +
       "@page { size: 2in 1in; margin: 0; }" +
       "body { font-family: Arial, sans-serif; margin: 0; padding: 0; }" +
-      
+
       "/* Label Container - Each label on separate page */" +
-      ".label-container { width: 2in; height: 1in; position: relative; background: white; box-sizing: border-box; page-break-after: always; }" +
+      ".label-container { width: 2in; height: 1in; position: relative; background: white; box-sizing: border-box; overflow: hidden; page-break-after: always; }" +
       ".label-container:last-child { page-break-after: auto; }" +
-      
+
       "/* QR Code and Content Wrapper */" +
-      "#Qrcodeserails { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }" +
-      "#itemcode { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 180px; }" +
-      "#inside-BRCode { flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; }" +
-      "#slic-logo { width: 55px; height: auto; display: block; }" +
-      "#description { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; }" +
+      "#Qrcodeserails { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 3px; box-sizing: border-box; }" +
+      "#itemcode { display: flex; align-items: center; gap: 6px; width: 100%; height: 100%; }" +
+      "#inside-BRCode { flex-shrink: 0; width: 58px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; }" +
+      "#slic-logo { width: 54px; max-height: 32px; object-fit: contain; display: block; }" +
+      "#description { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }" +
       "#gtin { font-size: 8px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; white-space: nowrap; }" +
       "#expiry { font-size: 9px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; }" +
       "#batch { font-size: 9px; font-weight: 600; margin: 0; color: #333; line-height: 1.2; word-break: break-all; }" +
@@ -85,8 +85,7 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
                     <img id="slic-logo" src={logo} alt="SLIC" />
                     <QRCodeSVG
                       value={`${barcode?.serialNo}`}
-                      width="55"
-                      height="50"
+                      size={52}
                       level="M"
                       includeMargin={false}
                     />
@@ -97,7 +96,7 @@ const ControlledSerialsPrint = ({ selectedRows, onPrintComplete }) => {
                     <div id="gtin">STYLE : {barcode?.ItemCode}</div>
                     <div id="expiry">Size : {barcode?.size}</div>
                     <div id="batch">GTIN : {barcode?.GTIN}</div>
-                    <div id="batch">EN ISO-20347:2022</div>
+                    {/* <div id="batch">EN ISO-20347:2022</div> */}
                     <div id="gtin">SerialNo. : {barcode?.serialNo}</div>
                   </div>
                 </div>
