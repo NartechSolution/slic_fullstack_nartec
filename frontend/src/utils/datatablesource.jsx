@@ -588,11 +588,6 @@ export const usersColumn = (t)=> [
     },
     width: 180,
   },
-  {
-    field: "UserPassword",
-    headerName: t("User Password"),
-    width: 180,
-  },
 ];
 
 
