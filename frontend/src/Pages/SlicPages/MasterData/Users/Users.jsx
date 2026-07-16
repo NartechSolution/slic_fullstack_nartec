@@ -15,10 +15,11 @@ import { toast } from "react-toastify";
 import newRequest from "../../../../utils/userRequest";
 import Swal from "sweetalert2";
 import UpdateUserPopUp from "./UpdateUserPopUp";
+import CreateUserPopUp from "./CreateUserPopUp";
 import { useTranslation } from "react-i18next";
 
 const Users = () => {
-  
+
   const { t, i18n } = useTranslation();
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -141,8 +142,8 @@ const Users = () => {
 
         <div className="h-auto w-full">
           <div className="h-auto w-full p-0 bg-white shadow-xl rounded-md pb-10">
-            {/* <div
-              className={`flex justify-start items-center flex-wrap gap-2 py-7 px-5`}
+            <div
+              className={`flex justify-end items-center flex-wrap gap-2 px-5`}
             >
               <Button
                 variant="contained"
@@ -150,9 +151,9 @@ const Users = () => {
                 style={{ backgroundColor: "#CFDDE0", color: "#1D2F90" }}
                 startIcon={<PiBarcodeDuotone />}
               >
-                Add Users
+                {t("Add Users")}
               </Button>
-            </div> */}
+            </div>
 
             <div style={{ marginTop: "-15px" }}>
               <DataTable
@@ -191,6 +192,14 @@ const Users = () => {
               />
             </div>
           </div>
+
+          {isCreatePopupVisible && (
+            <CreateUserPopUp
+              isVisible={isCreatePopupVisible}
+              setVisibility={setCreatePopupVisibility}
+              refreshGTINData={fetchData}
+            />
+          )}
 
           {isUpdatePopupVisible && (
             <UpdateUserPopUp
