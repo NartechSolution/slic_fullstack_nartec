@@ -65,6 +65,12 @@
 const CustomError = require("../exceptions/customError");
 const prisma = require("../db");
 
+// 022C (Jubail Showroom) has no transaction codes of its own, it uses FG202's.
+// Only applied when reading transaction codes, invoices still post the real location.
+const TRX_CODE_LOCATION_ALIASES = { "022C": "FG202" };
+const resolveTrxCodeLocation = (locationCode) =>
+  TRX_CODE_LOCATION_ALIASES[locationCode] || locationCode;
+
 class TrxCodesType {
   static async fetchAll() {
     try {
@@ -84,8 +90,11 @@ class TrxCodesType {
       if (filters.TXN_CODE) whereClause.TXN_CODE = filters.TXN_CODE;
       if (filters.TXN_NAME) whereClause.TXN_NAME = filters.TXN_NAME;
       if (filters.TXN_TYPE) whereClause.TXN_TYPE = filters.TXN_TYPE;
+      // Locations without their own transaction codes read from their alias location
       if (filters.TXNLOCATIONCODE)
-        whereClause.TXNLOCATIONCODE = filters.TXNLOCATIONCODE;
+        whereClause.TXNLOCATIONCODE = resolveTrxCodeLocation(
+          filters.TXNLOCATIONCODE
+        );
       if (filters.CUSTOMERCODE) whereClause.CUSTOMERCODE = filters.CUSTOMERCODE;
 
       const trxCodes = await prisma.trxCodesType.findMany({
@@ -165,7 +174,8 @@ class TrxCodesType {
     try {
       const trxCodes = await prisma.trxCodesType.findMany({
         where: {
-          TXNLOCATIONCODE: locationCode,
+          // Locations without their own transaction codes read from their alias location
+          TXNLOCATIONCODE: resolveTrxCodeLocation(locationCode),
         },
       });
       return trxCodes;

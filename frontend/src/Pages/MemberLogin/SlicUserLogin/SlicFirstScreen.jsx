@@ -195,7 +195,7 @@ const SlicFirstScreen = () => {
     } else if (showroom === "Khobar Showroom") {
       locations = ["FG201", "FG504"];
     } else if (showroom === "Jubail Showroom") {
-      locations = ["FG202", "FG505"];
+      locations = ["FG202", "FG505", "022C"];
     } else if (showroom === "Riyadh Showroom") {
       locations = ["FG206"];
     }
