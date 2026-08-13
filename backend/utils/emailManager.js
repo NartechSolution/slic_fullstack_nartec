@@ -301,9 +301,76 @@ async function sendControlSerialNotificationEmail(options) {
   }
 }
 
+/**
+ * Send password reset OTP email
+ * Sends a one time password to the supplier so they can reset their password
+ *
+ * @param {Object} options - Email options
+ * @param {string} options.supplierEmail - Supplier's email address
+ * @param {string} options.supplierName - Supplier's company name
+ * @param {string} options.otp - The plain 6 digit OTP
+ * @param {number} options.expiryMinutes - How long the OTP stays valid
+ * @returns {Promise<Object>} - Email send result
+ * @throws {CustomError} - If email sending fails
+ */
+async function sendSupplierPasswordResetOtpEmail(options) {
+  const { supplierEmail, supplierName, otp, expiryMinutes } = options;
+
+  // Validate required parameters
+  if (!supplierEmail || !otp) {
+    const error = new CustomError(
+      "Missing required parameters for password reset OTP email"
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  try {
+    const subject = "SLIC Suppliers Portal - Password Reset Code";
+
+    const templateData = {
+      supplierName: supplierName || "Supplier",
+      supplierEmail: supplierEmail,
+      otp: otp,
+      expiryMinutes: expiryMinutes || 10,
+    };
+
+    const result = await sendTemplateEmail({
+      to: supplierEmail,
+      subject: subject,
+      template: "supplierPasswordResetOtp",
+      data: templateData,
+    });
+
+    console.log(`[Email Manager] Password reset OTP sent to ${supplierEmail}`);
+    console.log(`[Email Manager] Message ID: ${result.messageId}`);
+
+    return {
+      success: true,
+      messageId: result.messageId,
+      recipient: supplierEmail,
+      type: "password_reset_otp",
+    };
+  } catch (error) {
+    console.error(
+      `[Email Manager] Failed to send password reset OTP to ${supplierEmail}:`,
+      error.message || error
+    );
+
+    // The OTP is useless to the supplier if the email never arrives, so this
+    // failure has to bubble up to the caller (unlike the notification emails).
+    const customError = new CustomError(
+      "Unable to send the verification code right now. Please try again later."
+    );
+    customError.statusCode = 502;
+    throw customError;
+  }
+}
+
 module.exports = {
   sendSupplierStatusNotificationEmail,
   sendSupplierRegistrationEmail,
   sendAdminNewSupplierNotificationEmail,
   sendControlSerialNotificationEmail,
+  sendSupplierPasswordResetOtpEmail,
 };

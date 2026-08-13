@@ -1,11 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation } from "react-query";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import SideNav from "../../../components/Sidebar/SideNav";
 import { supplierColumn } from "../../../utils/datatablesource";
 import DeleteIcon from "@mui/icons-material/Delete";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { MdCheckCircle, MdCancel } from "react-icons/md";
+import SupplierDetailsPopup from "./SupplierDetailsPopup";
 import DataTable from "../../../components/Datatable/Datatable";
 import RightDashboardHeader from "../../../components/RightDashboardHeader/RightDashboardHeader";
 import newRequest from "../../../utils/userRequest";
@@ -13,6 +15,10 @@ import { useTranslation } from "react-i18next";
 
 const SupplierList = () => {
   const { t } = useTranslation();
+
+  // Supplier details popup state
+  const [isDetailsVisible, setIsDetailsVisible] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
 
   // React Query fetch function
   const fetchSuppliers = async () => {
@@ -90,6 +96,12 @@ const SupplierList = () => {
   });
 
   // Action handlers
+  const handleView = (row) => {
+    if (!row?.id) return;
+    setSelectedSupplier(row);
+    setIsDetailsVisible(true);
+  };
+
   const handleApprove = (row) => {
     Swal.fire({
       title: `${t('Are you sure?')}`,
@@ -150,11 +162,15 @@ const SupplierList = () => {
 
   const filterDropdownOptions = (row, dropDownOptions) => {
     if (row?.status === "approved") {
-      return dropDownOptions.filter((option) => option.label !== "Approve" && option.label !== "Reject");
+      return dropDownOptions.filter(
+        (option) => option.label !== t("Approve") && option.label !== t("Reject")
+      );
     }
-    if (row?.status === "pending") {
-      return dropDownOptions;
+    if (row?.status === "rejected") {
+      // A rejected supplier can still be viewed, approved later or removed
+      return dropDownOptions.filter((option) => option.label !== t("Reject"));
     }
+    return dropDownOptions;
   };
 
   return (
@@ -178,6 +194,16 @@ const SupplierList = () => {
                 getFilteredOptions={filterDropdownOptions}
                 checkboxSelection="disabled"
                 dropDownOptions={[
+                  {
+                    label: t("View"),
+                    icon: (
+                      <VisibilityIcon
+                        fontSize="small"
+                        style={{ color: "#1E3B8B" }}
+                      />
+                    ),
+                    action: handleView,
+                  },
                   {
                     label: t("Approve"),
                     icon: (
@@ -214,6 +240,13 @@ const SupplierList = () => {
             </div>
           </div>
         </div>
+
+        {/* Supplier details popup */}
+        <SupplierDetailsPopup
+          isVisible={isDetailsVisible}
+          setVisibility={setIsDetailsVisible}
+          supplier={selectedSupplier}
+        />
       </SideNav>
     </div>
   );

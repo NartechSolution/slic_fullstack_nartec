@@ -4,7 +4,33 @@ const response = require("../utils/response");
 const CustomError = require("../exceptions/customError");
 const {
   sendSupplierStatusNotificationEmail,
+  sendSupplierPasswordResetOtpEmail,
 } = require("../utils/emailManager");
+
+/**
+ * Mask an email address for display, e.g. supplier@abc.com -> su******@abc.com
+ * @param {string} email
+ * @returns {string}
+ */
+const maskEmail = (email) => {
+  if (!email || !email.includes("@")) return email;
+  const [name, domain] = email.split("@");
+  const visible = name.slice(0, 2);
+  return `${visible}${"*".repeat(Math.max(name.length - 2, 1))}@${domain}`;
+};
+
+/**
+ * Return the first express-validator error as a 422 CustomError, if any
+ */
+const getValidationError = (req) => {
+  const errors = validationResult(req);
+  if (errors.isEmpty()) return null;
+
+  const error = new CustomError(errors.errors[0].msg);
+  error.statusCode = 422;
+  error.data = errors;
+  return error;
+};
 
 /**
  * Register a new supplier
@@ -183,6 +209,91 @@ exports.updateSupplierStatus = async (req, res, next) => {
 
     res.status(200).json(
       response(200, true, "Supplier status updated successfully", supplier)
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Step 1 - Request a password reset OTP by email
+ * POST /api/suppliers/v1/forgot-password
+ * Also used to resend the code (a 60s cooldown is enforced in the model)
+ */
+exports.forgotPassword = async (req, res, next) => {
+  const { email } = req.body;
+  try {
+    const validationError = getValidationError(req);
+    if (validationError) return next(validationError);
+
+    const { supplier, otp, expiryMinutes } =
+      await Supplier.createPasswordResetOtp(email);
+
+    // If the email cannot be delivered the OTP is useless, so this throws
+    await sendSupplierPasswordResetOtpEmail({
+      supplierEmail: supplier.email,
+      supplierName: supplier.name,
+      otp: otp,
+      expiryMinutes: expiryMinutes,
+    });
+
+    res.status(200).json(
+      response(200, true, "A verification code has been sent to your email", {
+        email: maskEmail(supplier.email),
+        expiresInMinutes: expiryMinutes,
+        resendAfterSeconds: Supplier.OTP_RESEND_COOLDOWN_SECONDS,
+      })
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Step 2 - Verify the emailed OTP and get a short lived reset token
+ * POST /api/suppliers/v1/verify-otp
+ */
+exports.verifyPasswordResetOtp = async (req, res, next) => {
+  const { email, otp } = req.body;
+  try {
+    const validationError = getValidationError(req);
+    if (validationError) return next(validationError);
+
+    const result = await Supplier.verifyPasswordResetOtp(email, otp);
+
+    res.status(200).json(
+      response(200, true, "Verification code confirmed", {
+        email: result.email,
+        resetToken: result.resetToken,
+        expiresInMinutes: result.expiryMinutes,
+      })
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Step 3 - Set a new password using the verified reset token
+ * POST /api/suppliers/v1/reset-password
+ */
+exports.resetPassword = async (req, res, next) => {
+  const { email, resetToken, newPassword } = req.body;
+  try {
+    const validationError = getValidationError(req);
+    if (validationError) return next(validationError);
+
+    const supplier = await Supplier.resetPasswordWithToken(
+      email,
+      resetToken,
+      newPassword
+    );
+
+    res.status(200).json(
+      response(200, true, "Password reset successfully", {
+        id: supplier.id,
+        email: supplier.email,
+      })
     );
   } catch (error) {
     next(error);

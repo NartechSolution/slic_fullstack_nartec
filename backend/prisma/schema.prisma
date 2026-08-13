@@ -34,7 +34,7 @@ model TblItemCodes1S1Br {
   color               String?
   label               String?
 
-  controlledSerials ControlSerial[]
+  controlledSerials    ControlSerial[]
   controlSerialMasters ControlSerialMaster[]
 
   Created_at DateTime? @default(now()) @db.DateTime
@@ -57,7 +57,7 @@ model ControlSerialMaster {
   supplier   Supplier? @relation(fields: [supplierId], references: [id], onUpdate: NoAction, onDelete: NoAction)
 
   // PO-level status flags
-  isSentToSupplier Boolean @default(false)
+  isSentToSupplier Boolean   @default(false)
   // "pending" | "partial" | "received"
   receivedStatus   String    @default("pending")
   receivedAt       DateTime? // set to now() when status first changes away from "pending"
@@ -95,9 +95,9 @@ model ControlSerial {
   supplier   Supplier? @relation(fields: [supplierId], references: [id], onUpdate: NoAction, onDelete: NoAction)
 
   // Left/Right shoe tracking
-  side             String? // "R" or "L"
-  sideQty          Int?    // quantity this serial represents for that side
-  receivedSideQty  Int?    @default(0) // units received so far for this serial's side
+  side            String? // "R" or "L"
+  sideQty         Int? // quantity this serial represents for that side
+  receivedSideQty Int?    @default(0) // units received so far for this serial's side
 
   // Bin Location relation
   binLocationId String?
@@ -114,6 +114,16 @@ model Supplier {
   email    String?
   password String?
   status   String? // pending, approved, rejected
+
+  // Password reset (email OTP) fields
+  resetOtp          String? // bcrypt hash of the 6 digit OTP
+  resetOtpExpiresAt DateTime?
+  resetOtpAttempts  Int       @default(0)
+  resetOtpSentAt    DateTime?
+
+  // Short lived token issued once the OTP is verified
+  resetToken          String? // sha256 hash of the token handed to the client
+  resetTokenExpiresAt DateTime?
 
   controlSerials       ControlSerial[]
   controlSerialMasters ControlSerialMaster[]
@@ -163,7 +173,7 @@ model BinLocation {
 model TblBarSeriesNo {
   TblSysNoID   Int     @id @default(autoincrement())
   BarSeriesNo  String? @db.VarChar(10)
-  ssccSeriesNo Int?    // GS1 SSCC serial counter — auto-incremented on each label print batch
+  ssccSeriesNo Int? // GS1 SSCC serial counter — auto-incremented on each label print batch
 }
 
 model TblUsers {
@@ -706,8 +716,8 @@ model SerialEvent {
   occurredAt   DateTime @default(now())
 
   @@index([serialNumber], map: "IDX_SerialEvent_serialNumber")
-  @@index([eventType],    map: "IDX_SerialEvent_eventType")
-  @@index([occurredAt],   map: "IDX_SerialEvent_occurredAt")
+  @@index([eventType], map: "IDX_SerialEvent_eventType")
+  @@index([occurredAt], map: "IDX_SerialEvent_occurredAt")
 }
 
 /// Stores the pairing of two shoe serials (left + right) into a Finished Good barcode.
@@ -724,9 +734,8 @@ model MergeRecord {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([serial1],  map: "IDX_MergeRecord_serial1")
-  @@index([serial2],  map: "IDX_MergeRecord_serial2")
+  @@index([serial1], map: "IDX_MergeRecord_serial1")
+  @@index([serial2], map: "IDX_MergeRecord_serial2")
   @@index([fgSerial], map: "IDX_MergeRecord_fgSerial")
   @@index([poNumber], map: "IDX_MergeRecord_poNumber")
 }
-
