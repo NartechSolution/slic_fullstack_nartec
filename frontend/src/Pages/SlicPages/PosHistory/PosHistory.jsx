@@ -228,6 +228,11 @@ const PosHistory = () => {
     // Generate QR code data URL
     const qrCodeDataURL = await QRCode.toDataURL(`${InvoiceNo}`);
 
+    // ZATCA QR as an image (instead of drawing on a canvas inside the print window)
+    const zatcaQrCodeDataURL = await QRCode.toDataURL(qrCodeDataFromApi, {
+      width: 380,
+    });
+
     const formattedDate = new Date(
       invoiceHeader?.TransactionDate
     ).toLocaleDateString("en-US", {
@@ -489,7 +494,7 @@ const PosHistory = () => {
           </div>
 
           <div class="qr-section">
-            <canvas id="qrcode-canvas"></canvas>
+            <img src="${zatcaQrCodeDataURL}" alt="ZATCA QR Code" width="380" height="380" />
           </div>
 
           <div class="receipt-footer">This invoice is generated as per ZATCA</div>
@@ -508,27 +513,25 @@ const PosHistory = () => {
     printWindow.document.write(html);
     printWindow.document.close();
 
-    // Wait until the print window has loaded fully
-    printWindow.onload = () => {
-      const qrCodeCanvas = printWindow.document.getElementById("qrcode-canvas");
-      // let newQR='ARBOYXJ0ZWMgU29sdXRpb25zAg8zMDA0NTY0MTY1MDAwMDMDFDIwMjQtMDgtMTdUMTI6MDA6MDBaBAcxMDAwLjAwBQMxNTAGQGQzMzlkZDlkZGZkZTQ5MDI1NmM3OTVjOTFlM2RmZjBiNGQ2MTAyYjhhMGM4OTYxYzhhNGExNDE1YjZhZGMxNjYHjjMwNDUwMjIxMDBjZjk1MjkwMzc2ZTM5MjgzOGE4ZGYwMjc2YTdiMjEyYmUzMjMyNzAxNjFlNWFjYWY0MGNjOTgwMGJjNzJjNTY4MDIyMDQzYzEyZjEzMTdiZjMxN2Q2YWZkNTAwNTgxNDRlMjdmOTczNWUzZDZlMDYzYWI0MTk2YWU5YWQyZDlhMWVhN2MIgjA0OWM2MDM2NmQxNDg5NTdkMzAwMWQzZDQxNGI0NGIxYjA1MGY0NWZlODJjNDBkZTE4ZWI3NWM2M2Y1YzU2MjRmNDM3NzY0MWFjY2JlZmJiNDlhNGE4MmM1ZDAxY2YyMDRkNTdhMzEzODE1N2RmZDJmNmFlOTIzYjkzMjZiZmI5NWI='
-      // Generate the QR code using the `qrcode` library
-      QRCode.toCanvas(
-        qrCodeCanvas,
-        qrCodeDataFromApi,
-        { width: 380 },
-        function (error) {
-          if (error) console.error(error);
-          else {
-            // Trigger the print dialog after the QR code is rendered
-            printWindow.print();
-            printWindow.close();
-          }
+    // Wait for all images to load before printing
+    const images = printWindow.document.getElementsByTagName("img");
+    const imagePromises = Array.from(images).map((img) => {
+      return new Promise((resolve) => {
+        if (img.complete) {
+          resolve();
+        } else {
+          img.onload = resolve;
+          img.onerror = resolve;
         }
-      );
-      // setIsOpenOtpPopupVisible(false);
-      // console.log(qrCodeData);
-    };
+      });
+    });
+
+    Promise.all(imagePromises).then(() => {
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 300);
+    });
   };
 
   return (

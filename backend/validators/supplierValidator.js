@@ -67,9 +67,63 @@ const updateValidation = [
     .normalizeEmail(),
 ];
 
+/**
+ * Validation rules for requesting a password reset OTP
+ */
+const forgotPasswordValidation = [
+  body("email")
+    .trim()
+    .isEmail()
+    .withMessage("Valid email is required")
+    .normalizeEmail(),
+];
+
+/**
+ * Validation rules for verifying a password reset OTP
+ */
+const verifyOtpValidation = [
+  body("email")
+    .trim()
+    .isEmail()
+    .withMessage("Valid email is required")
+    .normalizeEmail(),
+
+  body("otp")
+    .trim()
+    .notEmpty()
+    .withMessage("Verification code is required")
+    .isLength({ min: 6, max: 6 })
+    .withMessage("Verification code must be 6 digits")
+    .isNumeric()
+    .withMessage("Verification code must contain digits only"),
+];
+
+/**
+ * Validation rules for resetting the password with a verified token
+ */
+const resetPasswordValidation = [
+  body("email")
+    .trim()
+    .isEmail()
+    .withMessage("Valid email is required")
+    .normalizeEmail(),
+
+  body("resetToken")
+    .trim()
+    .notEmpty()
+    .withMessage("Reset token is required"),
+
+  body("newPassword")
+    .isLength({ min: 6 })
+    .withMessage("Password must be at least 6 characters long"),
+];
+
 module.exports = {
   registerValidation,
   loginValidation,
   statusValidation,
   updateValidation,
+  forgotPasswordValidation,
+  verifyOtpValidation,
+  resetPasswordValidation,
 };
