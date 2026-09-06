@@ -4,6 +4,8 @@ import CircularProgress from "@mui/material/CircularProgress";
 import SearchIcon from "@mui/icons-material/Search";
 import { useTranslation } from "react-i18next";
 import CheckCircle from "@mui/icons-material/CheckCircle";
+import CloseIcon from "@mui/icons-material/Close";
+import { Chip } from "@mui/material";
 import newRequest from "../../../utils/userRequest";
 import { toast } from "react-toastify";
 import imageLiveUrl from "../../../utils/urlConverter/imageLiveUrl";
@@ -12,14 +14,18 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
-  const [selectedItem, setSelectedItem] = useState(null);
+  // Multiple item codes can be selected, and selections survive a new search
+  const [selectedItems, setSelectedItems] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const isSelected = (item) =>
+    selectedItems.some((selected) => selected.ItemCode === item.ItemCode);
 
   const handleClose = () => {
     setVisibility(false);
     setSearchQuery("");
     setSearchResults([]);
-    setSelectedItem(null);
+    setSelectedItems([]);
   };
 
   const handleSearch = async () => {
@@ -30,10 +36,19 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
       const response = await newRequest.get(
         `/itemCodes/v1/itemCodes/search?search=${searchQuery}`
       );
-      
+
       if (response?.data?.success) {
-        setSearchResults(response.data.data);
-        if (response.data.data.length === 0) {
+        // The same ItemCode is returned once per size — show each code only once
+        const seen = new Set();
+        const unique = [];
+        (response.data.data || []).forEach((row) => {
+          if (row?.ItemCode && !seen.has(row.ItemCode)) {
+            seen.add(row.ItemCode);
+            unique.push(row);
+          }
+        });
+        setSearchResults(unique);
+        if (unique.length === 0) {
           toast.info(t("No results found"));
         }
       } else {
@@ -56,9 +71,22 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
     }
   };
 
+  // Toggle an item code in/out of the selection
+  const handleToggleItem = (item) => {
+    setSelectedItems((prev) =>
+      prev.some((selected) => selected.ItemCode === item.ItemCode)
+        ? prev.filter((selected) => selected.ItemCode !== item.ItemCode)
+        : [...prev, item]
+    );
+  };
+
+  const handleRemoveSelected = (itemCode) => {
+    setSelectedItems((prev) => prev.filter((selected) => selected.ItemCode !== itemCode));
+  };
+
   const handleContinue = () => {
-    if (selectedItem) {
-      onContinue(selectedItem);
+    if (selectedItems.length > 0) {
+      onContinue(selectedItems);
       handleClose();
     }
   };
@@ -68,7 +96,7 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
       {isVisible && (
         <div className="popup-overlay z-50">
           <div className="popup-container h-auto sm:w-[50%] w-full flex flex-col" style={{ maxHeight: "90vh" }}>
-            
+
             {/* Header */}
             <div className="flex justify-between w-full px-3 bg-secondary rounded-t-lg">
               <h2 className="text-white sm:text-lg text-base font-body font-semibold">
@@ -95,7 +123,7 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
 
             {/* Scrollable Content */}
             <div className="w-full flex-1 overflow-y-auto px-4 py-4 bg-gray-50">
-              <div className="flex items-end gap-3 mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+              <div className="flex items-end gap-3 mb-4 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                 <div className="flex-1">
                   <label className={`text-secondary font-semibold text-sm mb-1 block ${i18n.language==='ar'?'text-end':'text-start'}`}>
                     {t("Search Item Code")}
@@ -120,24 +148,57 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
                 </Button>
               </div>
 
+              {/* Selected item codes — kept while searching for more */}
+              {selectedItems.length > 0 && (
+                <div className="mb-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-secondary font-semibold text-sm">
+                      {t("Selected Item Codes")} ({selectedItems.length})
+                    </span>
+                    <button
+                      type="button"
+                      className="text-xs text-red-600 hover:underline"
+                      onClick={() => setSelectedItems([])}
+                    >
+                      {t("Clear all")}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedItems.map((item) => (
+                      <Chip
+                        key={item.ItemCode}
+                        label={item.ItemCode}
+                        onDelete={() => handleRemoveSelected(item.ItemCode)}
+                        deleteIcon={<CloseIcon />}
+                        size="small"
+                        style={{ backgroundColor: "#e8effb", color: "#021F69", fontWeight: 600 }}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {t("Search again to add more item codes. All selected codes carry over to the next step.")}
+                  </p>
+                </div>
+              )}
+
               {searchResults.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
                   {searchResults.map((item) => (
                     <div
                       key={item.id}
                       className={`relative rounded-lg p-3 cursor-pointer transition-all duration-200 group ${
-                        selectedItem?.id === item.id
+                        isSelected(item)
                           ? "bg-white ring-2 ring-secondary shadow-lg"
                           : "bg-white border border-gray-200 hover:border-secondary hover:shadow-md"
                       }`}
-                      onClick={() => setSelectedItem(item)}
+                      onClick={() => handleToggleItem(item)}
                     >
                       <div className="flex justify-between items-start gap-3">
                         {/* Product Image */}
                         <div className="flex-shrink-0">
                           {item.image ? (
-                            <img 
-                              src={imageLiveUrl(item.image)} 
+                            <img
+                              src={imageLiveUrl(item.image)}
                               alt={item.EnglishName || item.ItemCode}
                               className="w-24 h-24 object-cover rounded-lg border border-gray-200"
                             />
@@ -155,13 +216,13 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
                              <div className="bg-blue-50 text-secondary px-2 py-0.5 rounded text-xs font-bold border border-blue-100">
                                {item.ItemCode}
                              </div>
-                             {selectedItem?.id === item.id && (
+                             {isSelected(item) && (
                                 <span className="bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1">
                                   <CheckCircle fontSize="inherit" /> {t("Selected")}
                                 </span>
                              )}
                           </div>
-                          
+
                           <div className="space-y-1.5 mb-2">
                             <div className="flex items-start gap-2 text-sm">
                               <span className="text-gray-500 min-w-[90px] text-xs">{t("English Name")}:</span>
@@ -172,7 +233,7 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
                               <span className="font-medium text-gray-800 truncate">{item.ArabicName || '-'}</span>
                             </div>
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-2 border-t border-gray-100">
                             <div className="flex flex-col">
                               <span className="text-gray-400 text-xs uppercase tracking-wide">{t("GTIN")}</span>
@@ -188,12 +249,12 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
                             </div>
                           </div>
                         </div>
-                        
+
                         <div className={`flex-shrink-0 transition-colors ${
-                             selectedItem?.id === item.id ? "text-secondary" : "text-gray-300 group-hover:text-secondary"
+                             isSelected(item) ? "text-secondary" : "text-gray-300 group-hover:text-secondary"
                         }`}>
-                           {selectedItem?.id === item.id ? (
-                               <CheckCircle style={{ fontSize: '28px', color: "#021F69" }} /> 
+                           {isSelected(item) ? (
+                               <CheckCircle style={{ fontSize: '28px', color: "#021F69" }} />
                            ) : (
                                <div className="w-6 h-6 rounded-full border-2 border-gray-300 group-hover:border-secondary"></div>
                            )}
@@ -213,18 +274,21 @@ const CreateControlSerials = ({ isVisible, setVisibility, onContinue }) => {
             </div>
 
             {/* Fixed Footer */}
-            <div className="w-full p-4 bg-white border-t border-gray-200 rounded-b-lg flex justify-end gap-3 z-10">
+            <div className="w-full p-4 bg-white border-t border-gray-200 rounded-b-lg flex justify-end items-center gap-3 z-10">
+               <span className="text-sm text-gray-600">
+                 {selectedItems.length} {t("item code(s) selected")}
+               </span>
                <Button
                  variant="contained"
                  style={{ backgroundColor: "#021F69", color: "#ffffff", paddingLeft: "30px", paddingRight: "30px" }}
                  onClick={handleContinue}
-                 disabled={!selectedItem}
+                 disabled={selectedItems.length === 0}
                  className="shadow-md"
                >
                  {t("Continue")}
                </Button>
             </div>
-            
+
           </div>
         </div>
       )}

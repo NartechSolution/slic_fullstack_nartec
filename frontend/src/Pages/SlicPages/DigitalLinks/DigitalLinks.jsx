@@ -118,11 +118,21 @@ const DigitalLinks = () => {
     totalPages: totalPages
   };
 
-  // Transform purchase orders data (enriched size summary)
+  // Transform purchase orders data (enriched size summary).
+  // A PO can cover several item codes, so each row is one item code + size pair.
   const ordersData = (poDetails?.sizeSummary || []).map((summaryItem, index) => {
-    // Find a representative record for this size to get other details
-    const representativeRecord = poDetails.records?.find(r => r.size === summaryItem.size);
-    
+    // Find a representative record for this item code + size to get other details
+    const representativeRecord =
+      poDetails.records?.find(
+        r => r.size === summaryItem.size && r.product?.ItemCode === summaryItem.itemCode
+      ) || poDetails.records?.find(r => r.size === summaryItem.size);
+
+    const itemCode = summaryItem.itemCode || representativeRecord?.product?.ItemCode || 'N/A';
+
+    // Each item code has its own master, so read its sent flag rather than the PO's first one
+    const masterForItem =
+      poDetails.masters?.find(m => m.itemCode === itemCode) || poDetails.master;
+
     return {
       id: representativeRecord?.id || `summary-${index}`,
       poNumber: poDetails.poNumber || 'N/A',
@@ -130,11 +140,11 @@ const DigitalLinks = () => {
       rightQty: summaryItem.rightQty || 0,
       leftQty: summaryItem.leftQty || 0,
       receivedQty: summaryItem.receivedQty || 0,
-      ItemCode: representativeRecord?.product?.ItemCode || 'N/A',
+      ItemCode: itemCode,
       ProductSize: summaryItem.size || 'N/A',
       size: summaryItem.size || 'N/A',
-      isSentToSupplier: poDetails.master?.isSentToSupplier,
-      supplierName: representativeRecord?.supplier?.name || 'N/A',
+      isSentToSupplier: masterForItem?.isSentToSupplier,
+      supplierName: representativeRecord?.supplier?.name || masterForItem?.supplier?.name || 'N/A',
       createdAt: representativeRecord?.createdAt ? new Date(representativeRecord.createdAt).toLocaleString() : 'N/A',
       updatedAt: representativeRecord?.updatedAt ? new Date(representativeRecord.updatedAt).toLocaleString() : 'N/A'
     };
