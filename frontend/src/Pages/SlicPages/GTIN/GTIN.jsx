@@ -132,14 +132,14 @@ const GTIN = () => {
   // Create Control Serials Popup Logic
   const [isCreateControlSerialsPopupVisible, setCreateControlSerialsPopupVisibility] = useState(false);
   const [isAddControlSerialPopupVisible, setAddControlSerialPopupVisibility] = useState(false);
-  const [selectedItemForControlSerial, setSelectedItemForControlSerial] = useState(null);
+  const [selectedItemsForControlSerial, setSelectedItemsForControlSerial] = useState([]);
 
   const handleShowCreateControlSerialsPopup = () => {
     setCreateControlSerialsPopupVisibility(true);
   };
 
-  const handleContinueToControlSerial = (item) => {
-    setSelectedItemForControlSerial(item);
+  const handleContinueToControlSerial = (items) => {
+    setSelectedItemsForControlSerial(Array.isArray(items) ? items : [items]);
     setCreateControlSerialsPopupVisibility(false);
     setAddControlSerialPopupVisibility(true);
   };
@@ -555,7 +555,7 @@ const GTIN = () => {
             <AddControlSerialPopup
               isVisible={isAddControlSerialPopupVisible}
               setVisibility={setAddControlSerialPopupVisibility}
-              itemCode={selectedItemForControlSerial?.ItemCode}
+              itemCodes={selectedItemsForControlSerial}
             />
           )}
 

@@ -135,10 +135,14 @@ const PoNumberTable = () => {
         }
     };
     
+    // A PO can cover several item codes — fall back to the single one for older responses
+    const poItemCodes = (po) =>
+        po.itemCodes?.length ? po.itemCodes : [po.product?.ItemCode].filter(Boolean);
+
     const filteredPOs = Array.isArray(poList) ? poList.filter(po =>
         po.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (po.product && po.product.ItemCode?.toLowerCase().includes(searchTerm.toLowerCase()))
+        poItemCodes(po).some(code => code?.toLowerCase().includes(searchTerm.toLowerCase()))
     ) : [];
 
     // Pagination - Use server-side values directly
@@ -375,8 +379,21 @@ const PoNumberTable = () => {
                                                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {po.leftQty || 0}
                                                     </td>
-                                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                        {po.product?.ItemCode || "N/A"}
+                                                    <td className="px-6 py-3 text-sm text-gray-500">
+                                                        {poItemCodes(po).length === 0 ? (
+                                                            "N/A"
+                                                        ) : (
+                                                            <div className="flex flex-wrap gap-1 max-w-[220px]">
+                                                                {poItemCodes(po).map((code) => (
+                                                                    <span
+                                                                        key={code}
+                                                                        className="bg-blue-50 text-blue-800 border border-blue-100 rounded px-1.5 py-0.5 text-xs font-medium"
+                                                                    >
+                                                                        {code}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {po.supplier?.name || "N/A"}

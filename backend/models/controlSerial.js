@@ -50,6 +50,22 @@ class ControlSerialMasterModel {
   }
 
   /**
+   * Find every master for a PO number — one PO can hold several item codes,
+   * and each item code gets its own master.
+   * @param {string} poNumber
+   */
+  static async findAllByPoNumber(poNumber) {
+    return await prisma.controlSerialMaster.findMany({
+      where: { poNumber },
+      include: {
+        product: { select: { id: true, ItemCode: true, ProductSize: true, GTIN: true } },
+        supplier: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  /**
    * Get all masters with pagination and filtering
    */
   static async findAllWithPagination({
@@ -871,6 +887,12 @@ class ControlSerialModel {
       const allMastersForPo = masters.filter(m => m.poNumber === po);
       const isSentToSupplier = allMastersForPo.every(m => m.isSentToSupplier);
 
+      // A PO can cover several item codes (one master each) — expose them all,
+      // otherwise the row would name only the most recent one
+      const itemCodes = [
+        ...new Set(allMastersForPo.map(m => m.product?.ItemCode).filter(Boolean)),
+      ];
+
       let receivedStatus;
       if (receivedQty === 0) receivedStatus = "pending";
       else if (receivedQty >= totalQty) receivedStatus = "received";
@@ -881,6 +903,7 @@ class ControlSerialModel {
         poNumber: po,
         ItemCode: latestMaster.productId,
         product: latestMaster.product,
+        itemCodes,
         supplier: latestMaster.supplier,
         isSentToSupplier,
         receivedStatus,
@@ -1083,33 +1106,59 @@ class ControlSerialModel {
   }
 
   /**
-   * Get size summary for a PO number — unit-based with R/L breakdown
+   * Get size summary for a PO number — unit-based with R/L breakdown.
+   * A single PO can cover several item codes, so the summary is grouped by
+   * item code AND size; merging on size alone would collapse different item
+   * codes into one row and add their quantities together.
    */
   static async getSizeSummaryByPoNumber(poNumber) {
     const rows = await prisma.controlSerial.groupBy({
-      by: ["size", "side"],
+      by: ["size", "side", "ItemCode"],
       where: { poNumber },
       _count: { id: true },
       _sum: { sideQty: true, receivedSideQty: true },
     });
 
-    // Consolidate by size
+    // ControlSerial.ItemCode holds a productId — resolve it to the item code string
+    const productIds = [...new Set(rows.map((r) => r.ItemCode).filter(Boolean))];
+    const products = productIds.length
+      ? await prisma.tblItemCodes1S1Br.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, ItemCode: true },
+        })
+      : [];
+    const itemCodeByProductId = new Map(products.map((p) => [p.id, p.ItemCode]));
+
+    // Consolidate by item code + size
     const map = {};
     for (const r of rows) {
       const sz = r.size || "unknown";
-      if (!map[sz]) {
-        map[sz] = { size: sz, qty: 0, rightQty: 0, leftQty: 0, receivedQty: 0 };
+      const productId = r.ItemCode || null;
+      const itemCode = (productId && itemCodeByProductId.get(productId)) || "unknown";
+      const key = `${itemCode}||${sz}`;
+      if (!map[key]) {
+        map[key] = {
+          size: sz,
+          itemCode,
+          productId,
+          qty: 0,
+          rightQty: 0,
+          leftQty: 0,
+          receivedQty: 0,
+        };
       }
       const units = (r._sum?.sideQty || 0) || r._count.id;
       const recUnits = r._sum?.receivedSideQty || 0;
-      map[sz].qty += units;
-      map[sz].receivedQty += recUnits;
-      if (r.side === "R") map[sz].rightQty += units;
-      else if (r.side === "L") map[sz].leftQty += units;
+      map[key].qty += units;
+      map[key].receivedQty += recUnits;
+      if (r.side === "R") map[key].rightQty += units;
+      else if (r.side === "L") map[key].leftQty += units;
     }
 
-    return Object.values(map).sort((a, b) =>
-      String(a.size).localeCompare(String(b.size), undefined, { numeric: true })
+    return Object.values(map).sort(
+      (a, b) =>
+        String(a.itemCode).localeCompare(String(b.itemCode)) ||
+        String(a.size).localeCompare(String(b.size), undefined, { numeric: true })
     );
   }
 }

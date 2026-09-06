@@ -1071,8 +1071,9 @@ exports.getControlSerialDetailsByPONumber = async (req, res, next) => {
     const allRecords = await ControlSerialModel.getControlSerialsByPONumberGroupedBySize(poNumber);
     const totalQty = sizeSummary.reduce((sum, item) => sum + item.qty, 0);
 
-    // Also get master record if exists
-    const master = await ControlSerialMasterModel.findByPoNumber(poNumber);
+    // One master per item code on this PO
+    const allMasters = await ControlSerialMasterModel.findAllByPoNumber(poNumber);
+    const master = allMasters[0] || null;
 
     res.status(200).json(
       generateResponse(200, true, "Control serial details retrieved successfully", {
@@ -1080,6 +1081,17 @@ exports.getControlSerialDetailsByPONumber = async (req, res, next) => {
         totalQty,
         sizeSummary,
         records: allRecords,
+        masters: allMasters.map((m) => ({
+          id: m.id,
+          productId: m.productId,
+          itemCode: m.product?.ItemCode || null,
+          supplier: m.supplier || null,
+          isSentToSupplier: m.isSentToSupplier,
+          receivedStatus: m.receivedStatus,
+          isArchived: m.isArchived,
+          createdAt: m.createdAt,
+        })),
+        // Kept for backward compatibility with callers that expect a single master
         master: master ? {
           id: master.id,
           isSentToSupplier: master.isSentToSupplier,

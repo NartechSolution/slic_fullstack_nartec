@@ -11,7 +11,33 @@ import { useTranslation } from "react-i18next";
 import { useQueryClient } from "react-query";
 import { useNavigate } from "react-router-dom";
 
-const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode }) => {
+let rowSeq = 0;
+const uid = () => `${Date.now()}-${++rowSeq}`;
+
+const newSizeRow = () => ({ id: uid(), size: "", rightQty: 10, leftQty: 10 });
+
+const newItemGroup = (code) => ({
+  id: uid(),
+  itemCode: code,
+  sizeQuantities: [newSizeRow()],
+});
+
+// Accepts a string, an item object, or a mixed array and returns unique item codes
+const toUniqueCodes = (input) => {
+  const list = Array.isArray(input) ? input : input ? [input] : [];
+  const seen = new Set();
+  const codes = [];
+  list.forEach((entry) => {
+    const code = typeof entry === "string" ? entry : entry?.ItemCode;
+    if (code && !seen.has(code)) {
+      seen.add(code);
+      codes.push(code);
+    }
+  });
+  return codes;
+};
+
+const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode, itemCodes }) => {
   const { t, i18n } = useTranslation();
   const [poNumber, setPoNumber] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState(null);
@@ -20,13 +46,19 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
   const [supplierData, setSupplierData] = useState([]);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  
-  // Array to store multiple size-qty pairs with left/right
-  const [sizeQuantities, setSizeQuantities] = useState([
-    { id: 1, size: "", rightQty: 10, leftQty: 10 }
-  ]);
 
-  // Generate size options from 30 to 49
+  // One group per item code, each with its own size/quantity rows
+  const [itemGroups, setItemGroups] = useState([]);
+
+  // Inline item-code search (to add more item codes without leaving the popup)
+  const [itemSearchInput, setItemSearchInput] = useState("");
+  const [itemOptions, setItemOptions] = useState([]);
+  const [itemSearchLoading, setItemSearchLoading] = useState(false);
+
+  // Per-item-code failures from the last submit, keyed by item code
+  const [submitErrors, setSubmitErrors] = useState({});
+
+  // Generate size options from 30 to 50
   const sizeOptions = Array.from({ length: 21 }, (_, i) => ({
     label: `${30 + i}`,
     value: `${30 + i}`
@@ -36,7 +68,10 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     setVisibility(false);
     setPoNumber("");
     setSelectedSupplier(null);
-    setSizeQuantities([{ id: 1, size: "", rightQty: 10, leftQty: 10 }]);
+    setItemGroups([]);
+    setItemSearchInput("");
+    setItemOptions([]);
+    setSubmitErrors({});
   };
 
   const fetchAllSupplierData = async () => {
@@ -45,7 +80,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
       const response = await newRequest.get(
         '/suppliers/v1?page=1&limit=100&status=approved'
       );
-      
+
       const mappedData = response.data.data.suppliers.map(supplier => ({
         label: `${supplier.name} (${supplier.email})`,
         value: supplier.id,
@@ -68,40 +103,127 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     }
   }, [isVisible]);
 
-  // Add new size-qty pair
-  const handleAddSizeQty = () => {
-    setSizeQuantities([
-      ...sizeQuantities,
-      { id: Date.now(), size: "", rightQty: 10, leftQty: 10 }
-    ]);
+  // Seed the groups from whatever the caller passed in (array or single code)
+  useEffect(() => {
+    if (!isVisible) return;
+    const codes = toUniqueCodes(itemCodes?.length ? itemCodes : itemCode);
+    setItemGroups(codes.map((code) => newItemGroup(code)));
+  }, [isVisible, itemCode, itemCodes]);
+
+  // Debounced item code search
+  useEffect(() => {
+    const query = itemSearchInput.trim();
+    if (query.length < 2) {
+      setItemOptions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setItemSearchLoading(true);
+      try {
+        const response = await newRequest.get(
+          `/itemCodes/v1/itemCodes/search?search=${encodeURIComponent(query)}`
+        );
+        const rows = response?.data?.data || [];
+        // The same ItemCode is returned once per size — show each code only once
+        const seen = new Set();
+        const unique = [];
+        rows.forEach((row) => {
+          if (row?.ItemCode && !seen.has(row.ItemCode)) {
+            seen.add(row.ItemCode);
+            unique.push(row);
+          }
+        });
+        setItemOptions(unique);
+      } catch (err) {
+        setItemOptions([]);
+      } finally {
+        setItemSearchLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [itemSearchInput]);
+
+  // Add a new item code group
+  const handleAddItemCode = (option) => {
+    const code = typeof option === "string" ? option : option?.ItemCode;
+    if (!code) return;
+
+    if (itemGroups.some((group) => group.itemCode === code)) {
+      toast.info(t("This item code is already added"));
+      return;
+    }
+
+    setItemGroups((prev) => [...prev, newItemGroup(code)]);
+    setItemSearchInput("");
+    setItemOptions([]);
   };
 
-  // Remove size-qty pair
-  const handleRemoveSizeQty = (id) => {
-    if (sizeQuantities.length > 1) {
-      setSizeQuantities(sizeQuantities.filter(item => item.id !== id));
-    }
+  // Remove an item code group
+  const handleRemoveItemCode = (groupId) => {
+    setItemGroups((prev) => prev.filter((group) => group.id !== groupId));
+  };
+
+  // Add new size-qty pair to a specific item code
+  const handleAddSizeQty = (groupId) => {
+    setItemGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId
+          ? { ...group, sizeQuantities: [...group.sizeQuantities, newSizeRow()] }
+          : group
+      )
+    );
+  };
+
+  // Remove size-qty pair from a specific item code
+  const handleRemoveSizeQty = (groupId, rowId) => {
+    setItemGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId && group.sizeQuantities.length > 1
+          ? { ...group, sizeQuantities: group.sizeQuantities.filter((row) => row.id !== rowId) }
+          : group
+      )
+    );
   };
 
   // Update size for a specific pair
-  const handleSizeChange = (id, value) => {
-    setSizeQuantities(sizeQuantities.map(item =>
-      item.id === id ? { ...item, size: value } : item
-    ));
+  const handleSizeChange = (groupId, rowId, value) => {
+    setItemGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId
+          ? {
+              ...group,
+              sizeQuantities: group.sizeQuantities.map((row) =>
+                row.id === rowId ? { ...row, size: value } : row
+              ),
+            }
+          : group
+      )
+    );
   };
 
-  // Update field for a specific pair
-  const handleFieldChange = (id, field, value) => {
-    setSizeQuantities(sizeQuantities.map(item =>
-      item.id === id ? { ...item, [field]: Number(value) } : item
-    ));
+  // Update quantity field for a specific pair
+  const handleFieldChange = (groupId, rowId, field, value) => {
+    setItemGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId
+          ? {
+              ...group,
+              sizeQuantities: group.sizeQuantities.map((row) =>
+                row.id === rowId ? { ...row, [field]: Number(value) } : row
+              ),
+            }
+          : group
+      )
+    );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!itemCode) {
-      toast.error(t("Item code is required"));
+
+    if (itemGroups.length === 0) {
+      toast.error(t("Please add at least one item code"));
       return;
     }
 
@@ -115,52 +237,100 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
       return;
     }
 
-    // Validate all quantities
-    const invalidQty = sizeQuantities.some(item => item.rightQty <= 0 && item.leftQty <= 0);
-    if (invalidQty) {
-      toast.error(t("Right or Left quantity must be greater than 0 for each size"));
-      return;
-    }
+    for (const group of itemGroups) {
+      // Validate all sizes are filled
+      if (group.sizeQuantities.some((row) => !String(row.size || "").trim())) {
+        toast.error(`${group.itemCode}: ${t("Please fill in all size fields")}`);
+        return;
+      }
 
-    // Validate all sizes are filled
-    const emptySizes = sizeQuantities.some(item => !item.size.trim());
-    if (emptySizes) {
-      toast.error(t("Please fill in all size fields"));
-      return;
+      // Validate quantities
+      if (group.sizeQuantities.some((row) => (row.rightQty || 0) <= 0 && (row.leftQty || 0) <= 0)) {
+        toast.error(`${group.itemCode}: ${t("Right or Left quantity must be greater than 0 for each size")}`);
+        return;
+      }
+
+      // Validate no duplicate size within the same item code
+      const sizes = group.sizeQuantities.map((row) => row.size);
+      if (new Set(sizes).size !== sizes.length) {
+        toast.error(`${group.itemCode}: ${t("Duplicate sizes are not allowed for the same item code")}`);
+        return;
+      }
     }
 
     setLoading(true);
+    setSubmitErrors({});
 
-    try {
-      const response = await newRequest.post("/controlSerials", {
-        ItemCode: itemCode,
-        supplierId: selectedSupplier.id,
-        poNumber: poNumber,
-        sizeQuantities: sizeQuantities.map(item => ({
-          rightQty: item.rightQty,
-          leftQty: item.leftQty,
-          size: item.size
-        }))
-      });
-      
-      toast.success(response?.data?.message || t("Control serials added successfully"));
+    const succeeded = [];
+    const failed = [];
+
+    // One request (and therefore one control serial master) per item code
+    for (const group of itemGroups) {
+      try {
+        await newRequest.post("/controlSerials", {
+          ItemCode: group.itemCode,
+          supplierId: selectedSupplier.id,
+          poNumber: poNumber,
+          sizeQuantities: group.sizeQuantities.map((row) => ({
+            rightQty: row.rightQty,
+            leftQty: row.leftQty,
+            size: row.size
+          }))
+        });
+        succeeded.push(group.itemCode);
+      } catch (err) {
+        failed.push({
+          itemCode: group.itemCode,
+          message:
+            err?.response?.data?.message ||
+            err?.response?.data?.error ||
+            t("Error in adding control serials")
+        });
+      }
+    }
+
+    setLoading(false);
+
+    // Toasts stack up and disappear — also keep the reason on each failed card
+    setSubmitErrors(
+      failed.reduce((acc, item) => ({ ...acc, [item.itemCode]: item.message }), {})
+    );
+    failed.forEach((item) => toast.error(`${item.itemCode}: ${item.message}`));
+
+    if (succeeded.length > 0) {
+      toast.success(
+        `${t("Control serials added successfully for")} ${succeeded.length} ${t("item code(s)")}`
+      );
       queryClient.invalidateQueries(['poNumbersWithQty']);
-      setLoading(false);
-      navigate('/po-number');
-      handleClosePopup();
-    } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.error || t("Error in adding control serials"));
-      setLoading(false);
+      if (typeof refreshData === "function") refreshData();
+
+      if (failed.length === 0) {
+        navigate('/po-number');
+        handleClosePopup();
+      } else {
+        // Keep only the failed item codes on screen so they can be retried
+        setItemGroups((prev) => prev.filter((group) => !succeeded.includes(group.itemCode)));
+      }
     }
   };
 
-  // Total units (R + L across all sizes)
-  const totalQuantity = sizeQuantities.reduce((sum, item) => sum + (item.rightQty || 0) + (item.leftQty || 0), 0);
+  // Serials + units per item code (2 serials per size: 1 Right + 1 Left, skipping zero-qty sides)
+  const groupTotals = (group) =>
+    group.sizeQuantities.reduce(
+      (acc, row) => ({
+        serials: acc.serials + ((row.rightQty || 0) > 0 ? 1 : 0) + ((row.leftQty || 0) > 0 ? 1 : 0),
+        units: acc.units + (row.rightQty || 0) + (row.leftQty || 0),
+      }),
+      { serials: 0, units: 0 }
+    );
 
-  // Unique control serial records that will be created (2 per size: 1 Right + 1 Left, skipping zero-qty sides)
-  const totalSerials = sizeQuantities.reduce((sum, item) => {
-    return sum + ((item.rightQty || 0) > 0 ? 1 : 0) + ((item.leftQty || 0) > 0 ? 1 : 0);
-  }, 0);
+  const grandTotals = itemGroups.reduce(
+    (acc, group) => {
+      const totals = groupTotals(group);
+      return { serials: acc.serials + totals.serials, units: acc.units + totals.units };
+    },
+    { serials: 0, units: 0 }
+  );
 
   return (
     <div>
@@ -177,7 +347,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                     {t("Add Control Serials")}
                   </h2>
                   <div className="flex items-center space-x-3">
-                    <button 
+                    <button
                       className="text-white hover:text-gray-300 focus:outline-none"
                       onClick={handleClosePopup}
                     >
@@ -223,8 +393,8 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                 <div className="space-y-4">
                   {/* PO Number */}
                   <div className="w-full font-body sm:text-base text-sm flex flex-col gap-2">
-                    <label 
-                      htmlFor="poNumber" 
+                    <label
+                      htmlFor="poNumber"
                       className={`text-secondary font-semibold ${i18n.language==='ar'?'text-end':'text-start'}`}
                     >
                       {t("PO Number")} *:
@@ -242,7 +412,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
 
                   {/* Supplier */}
                   <div className="w-full font-body sm:text-base text-sm flex flex-col gap-2">
-                    <label 
+                    <label
                       className={`text-secondary font-semibold ${i18n.language==='ar'?'text-end':'text-start'}`}
                     >
                       {t("Supplier")} *:
@@ -290,157 +460,263 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                     )}
                   </div>
 
-                  {/* Item Code */}
+                  {/* Add Item Code */}
                   <div className="w-full font-body sm:text-base text-sm flex flex-col gap-2">
-                    <label 
-                      htmlFor="itemCode" 
+                    <label
                       className={`text-secondary font-semibold ${i18n.language==='ar'?'text-end':'text-start'}`}
                     >
-                      {t("Item Code")}
+                      {t("Add Item Code")}
                     </label>
-                    <input
-                      type="text"
-                      id="itemCode"
-                      value={itemCode}
-                      readOnly
-                      className={`border w-full rounded-md border-secondary bg-gray-100 p-2 ${i18n.language==='ar'?'text-end':'text-start'}`}
-                    />
-                  </div>
-
-                  {/* Size & Quantity Pairs */}
-                  <div className="w-full font-body sm:text-base text-sm flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <label className={`text-secondary font-semibold ${i18n.language==='ar'?'text-end':'text-start'}`}>
-                        {t("Size & Quantity")} *
-                      </label>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<AddIcon />}
-                        onClick={handleAddSizeQty}
-                        style={{ 
-                          borderColor: "#021F69", 
-                          color: "#021F69",
-                          textTransform: "none"
-                        }}
-                      >
-                        {t("Add Size")}
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3 mt-2">
-                      {sizeQuantities.map((item, index) => (
-                        <div 
-                          key={item.id} 
-                          className="border border-gray-300 rounded-lg p-4 bg-gray-50 shadow-sm hover:shadow-md transition-shadow"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1 grid grid-cols-3 gap-3">
-                              <div className="flex flex-col gap-1">
-                                <label className="text-xs font-semibold text-gray-700">
-                                  {t("Size")}
-                                </label>
-                                <Autocomplete
-                                  options={sizeOptions}
-                                  getOptionLabel={(option) => option.label || ""}
-                                  value={sizeOptions.find(opt => opt.value === item.size) || null}
-                                  onChange={(event, newValue) => {
-                                    handleSizeChange(item.id, newValue?.value || "");
-                                  }}
-                                  renderInput={(params) => (
-                                    <TextField
-                                      {...params}
-                                      placeholder={t("Select size")}
-                                      variant="outlined"
-                                      size="small"
-                                      sx={{
-                                        '& .MuiOutlinedInput-root': {
-                                          '& fieldset': {
-                                            borderColor: '#d1d5db',
-                                          },
-                                          '&:hover fieldset': {
-                                            borderColor: '#021F69',
-                                          },
-                                          '&.Mui-focused fieldset': {
-                                            borderColor: '#021F69',
-                                          },
-                                        },
-                                      }}
-                                      required
-                                    />
-                                  )}
-                                  sx={{ width: '100%' }}
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-xs font-semibold text-gray-700">
-                                  {t("Quantity Right")}
-                                </label>
-                                <input
-                                  type="number"
-                                  value={item.rightQty}
-                                  onChange={(e) => handleFieldChange(item.id, "rightQty", e.target.value)}
-                                  placeholder={t("Right")}
-                                  min="0"
-                                  className="border rounded-md border-gray-300 p-2 text-sm focus:border-secondary focus:outline-none"
-                                  required
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-xs font-semibold text-gray-700">
-                                  {t("Quantity Left")}
-                                </label>
-                                <input
-                                  type="number"
-                                  value={item.leftQty}
-                                  onChange={(e) => handleFieldChange(item.id, "leftQty", e.target.value)}
-                                  placeholder={t("Left")}
-                                  min="0"
-                                  className="border rounded-md border-gray-300 p-2 text-sm focus:border-secondary focus:outline-none"
-                                  required
-                                />
-                              </div>
-                            </div>
-                            {sizeQuantities.length > 1 && (
-                              <IconButton
-                                onClick={() => handleRemoveSizeQty(item.id)}
-                                size="small"
-                                style={{ color: "#dc2626", marginTop: "20px" }}
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            )}
+                    <Autocomplete
+                      options={itemOptions}
+                      getOptionLabel={(option) =>
+                        typeof option === "string" ? option : option?.ItemCode || ""
+                      }
+                      filterOptions={(options) => options}
+                      isOptionEqualToValue={(option, value) => option?.ItemCode === value?.ItemCode}
+                      value={null}
+                      inputValue={itemSearchInput}
+                      onInputChange={(event, newInputValue, reason) => {
+                        if (reason !== "reset") setItemSearchInput(newInputValue);
+                      }}
+                      onChange={(event, newValue) => handleAddItemCode(newValue)}
+                      loading={itemSearchLoading}
+                      noOptionsText={
+                        itemSearchInput.trim().length < 2
+                          ? t("Type at least 2 characters")
+                          : t("No results found")
+                      }
+                      renderOption={(props, option) => (
+                        <li {...props} key={option.ItemCode}>
+                          <div className="flex flex-col">
+                            <span className="font-semibold">{option.ItemCode}</span>
+                            <span className="text-xs text-gray-600">
+                              {option.EnglishName || option.ArabicName || "-"}
+                            </span>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <p className="text-xs text-gray-500 mt-2">
-                      {t("Add multiple sizes with their quantities. Click")} <strong>"{t("Add Size")}"</strong> {t("to add more.")}
+                        </li>
+                      )}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          placeholder={t("Search item code to add")}
+                          variant="outlined"
+                          size="small"
+                          InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                              <>
+                                {itemSearchLoading ? <CircularProgress color="inherit" size={18} /> : null}
+                                {params.InputProps.endAdornment}
+                              </>
+                            ),
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              '& fieldset': {
+                                borderColor: '#021F69',
+                              },
+                            },
+                          }}
+                        />
+                      )}
+                      sx={{ width: '100%' }}
+                    />
+                    <p className="text-xs text-gray-500">
+                      {t("You can add multiple item codes. Each item code gets its own sizes and quantities.")}
                     </p>
                   </div>
+
+                  {/* Partial-submit banner — the successful item codes are already saved */}
+                  {Object.keys(submitErrors).length > 0 && (
+                    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      {Object.keys(submitErrors).length} {t("item code(s) could not be created and are still listed below. Fix the reason shown on each, then submit again.")}
+                    </div>
+                  )}
+
+                  {/* Item Codes with their Size & Quantity Pairs */}
+                  {itemGroups.length === 0 ? (
+                    <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center text-gray-500 text-sm">
+                      {t("No item code added yet. Search above to add one.")}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {itemGroups.map((group, groupIndex) => {
+                        const totals = groupTotals(group);
+                        return (
+                          <div
+                            key={group.id}
+                            className="border border-secondary/30 rounded-lg bg-white shadow-sm"
+                          >
+                            {/* Item code header */}
+                            <div className="flex justify-between items-center gap-2 px-4 py-3 border-b border-gray-200 bg-blue-50 rounded-t-lg">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xs text-gray-500">#{groupIndex + 1}</span>
+                                <span className="text-secondary font-semibold truncate">
+                                  {t("Item Code")}: {group.itemCode}
+                                </span>
+                                <span className="text-xs text-gray-600 whitespace-nowrap">
+                                  ({totals.serials} {t("serial(s)")}, {totals.units} {t("units")})
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={<AddIcon />}
+                                  onClick={() => handleAddSizeQty(group.id)}
+                                  style={{
+                                    borderColor: "#021F69",
+                                    color: "#021F69",
+                                    textTransform: "none"
+                                  }}
+                                >
+                                  {t("Add Size")}
+                                </Button>
+                                {itemGroups.length > 1 && (
+                                  <IconButton
+                                    onClick={() => handleRemoveItemCode(group.id)}
+                                    size="small"
+                                    title={t("Remove item code")}
+                                    style={{ color: "#dc2626" }}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Why this item code did not go through on the last submit */}
+                            {submitErrors[group.itemCode] && (
+                              <div className="mx-4 mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                                <strong>{t("Not created")}:</strong> {submitErrors[group.itemCode]}
+                              </div>
+                            )}
+
+                            {/* Size rows */}
+                            <div className="space-y-3 p-4">
+                              {group.sizeQuantities.map((row) => (
+                                <div
+                                  key={row.id}
+                                  className="border border-gray-300 rounded-lg p-4 bg-gray-50 shadow-sm hover:shadow-md transition-shadow"
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <div className="flex-1 grid grid-cols-3 gap-3">
+                                      <div className="flex flex-col gap-1">
+                                        <label className="text-xs font-semibold text-gray-700">
+                                          {t("Size")}
+                                        </label>
+                                        <Autocomplete
+                                          options={sizeOptions}
+                                          getOptionLabel={(option) => option.label || ""}
+                                          value={sizeOptions.find(opt => opt.value === row.size) || null}
+                                          onChange={(event, newValue) => {
+                                            handleSizeChange(group.id, row.id, newValue?.value || "");
+                                          }}
+                                          renderInput={(params) => (
+                                            <TextField
+                                              {...params}
+                                              placeholder={t("Select size")}
+                                              variant="outlined"
+                                              size="small"
+                                              sx={{
+                                                '& .MuiOutlinedInput-root': {
+                                                  '& fieldset': {
+                                                    borderColor: '#d1d5db',
+                                                  },
+                                                  '&:hover fieldset': {
+                                                    borderColor: '#021F69',
+                                                  },
+                                                  '&.Mui-focused fieldset': {
+                                                    borderColor: '#021F69',
+                                                  },
+                                                },
+                                              }}
+                                              required
+                                            />
+                                          )}
+                                          sx={{ width: '100%' }}
+                                        />
+                                      </div>
+                                      <div className="flex flex-col gap-1">
+                                        <label className="text-xs font-semibold text-gray-700">
+                                          {t("Quantity Right")}
+                                        </label>
+                                        <input
+                                          type="number"
+                                          value={row.rightQty}
+                                          onChange={(e) => handleFieldChange(group.id, row.id, "rightQty", e.target.value)}
+                                          placeholder={t("Right")}
+                                          min="0"
+                                          className="border rounded-md border-gray-300 p-2 text-sm focus:border-secondary focus:outline-none"
+                                          required
+                                        />
+                                      </div>
+                                      <div className="flex flex-col gap-1">
+                                        <label className="text-xs font-semibold text-gray-700">
+                                          {t("Quantity Left")}
+                                        </label>
+                                        <input
+                                          type="number"
+                                          value={row.leftQty}
+                                          onChange={(e) => handleFieldChange(group.id, row.id, "leftQty", e.target.value)}
+                                          placeholder={t("Left")}
+                                          min="0"
+                                          className="border rounded-md border-gray-300 p-2 text-sm focus:border-secondary focus:outline-none"
+                                          required
+                                        />
+                                      </div>
+                                    </div>
+                                    {group.sizeQuantities.length > 1 && (
+                                      <IconButton
+                                        onClick={() => handleRemoveSizeQty(group.id, row.id)}
+                                        size="small"
+                                        style={{ color: "#dc2626", marginTop: "20px" }}
+                                      >
+                                        <DeleteIcon />
+                                      </IconButton>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-gray-500">
+                    {t("Add multiple sizes with their quantities. Click")} <strong>"{t("Add Size")}"</strong> {t("to add more.")}
+                  </p>
 
                   {/* Summary */}
                   <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                     <p className="text-sm text-blue-800">
                       <strong>{t("Summary")}:</strong>{" "}
-                      <strong>{totalSerials}</strong> {t("unique control serial(s) will be generated")} ({totalQuantity} {t("total units")}) {t("for item")} <strong>{itemCode}</strong>
+                      <strong>{grandTotals.serials}</strong> {t("unique control serial(s) will be generated")} ({grandTotals.units} {t("total units")}) {t("for")} <strong>{itemGroups.length}</strong> {t("item code(s)")}
                     </p>
                     <p className="text-xs text-blue-700 mt-1 italic">
                       {t("Note: each size generates up to 2 serials — one for Right shoes, one for Left shoes.")}
                     </p>
-                    {sizeQuantities.length > 0 && (
-                      <div className="mt-2 text-xs text-blue-700">
-                        {sizeQuantities.map((item) => {
-                          const serialsForSize = ((item.rightQty || 0) > 0 ? 1 : 0) + ((item.leftQty || 0) > 0 ? 1 : 0);
-                          return (
-                            <div key={item.id}>
-                              • {t("Size")} <strong>{item.size || "___"}</strong>: R={item.rightQty || 0}, L={item.leftQty || 0}
-                              {" → "}
-                              <strong>{serialsForSize}</strong> {t("serial(s)")}, {(item.rightQty || 0) + (item.leftQty || 0)} {t("units")}
-                            </div>
-                          );
-                        })}
+                    {itemGroups.length > 0 && (
+                      <div className="mt-2 text-xs text-blue-700 space-y-2">
+                        {itemGroups.map((group) => (
+                          <div key={group.id}>
+                            <div className="font-semibold">{group.itemCode}</div>
+                            {group.sizeQuantities.map((row) => {
+                              const serialsForSize =
+                                ((row.rightQty || 0) > 0 ? 1 : 0) + ((row.leftQty || 0) > 0 ? 1 : 0);
+                              return (
+                                <div key={row.id} className="ps-3">
+                                  • {t("Size")} <strong>{row.size || "___"}</strong>: R={row.rightQty || 0}, L={row.leftQty || 0}
+                                  {" → "}
+                                  <strong>{serialsForSize}</strong> {t("serial(s)")}, {(row.rightQty || 0) + (row.leftQty || 0)} {t("units")}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -450,7 +726,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                       variant="contained"
                       style={{ backgroundColor: "#021F69", color: "#ffffff" }}
                       type="submit"
-                      disabled={loading}
+                      disabled={loading || itemGroups.length === 0}
                       className="w-full"
                       endIcon={
                         loading ? (
