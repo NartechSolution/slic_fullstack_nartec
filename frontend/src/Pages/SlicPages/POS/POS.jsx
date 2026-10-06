@@ -3190,6 +3190,20 @@ const POS = () => {
     const scannedCustomerCode = invoiceHeaderData?.CustomerCode;
 
     if (scannedCustomerCode) {
+      // EX/AX transactions use the location-based customer list (CUSTOMERCODE), not the general one
+      if (EX_TRANSACTION_CODES.includes(selectedTransactionCode?.TXN_CODE)) {
+        const matchingCustomer = searchCustomerName.find(
+          (customer) => customer.CUSTOMERCODE === scannedCustomerCode
+        );
+
+        if (matchingCustomer) {
+          setSelectedCustomerName(matchingCustomer);
+        } else {
+          toast.error("No matching customer found. Please select manually.");
+        }
+        return;
+      }
+
       const matchingCustomer = customerNameWithDirectInvoice.find(
         (customer) => customer.CUST_CODE === scannedCustomerCode
       );
