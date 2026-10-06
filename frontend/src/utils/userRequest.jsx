@@ -20,6 +20,7 @@
 
 import axios from "axios";
 import { baseUrl } from './config.jsx';
+import { attachApiErrorTracking } from './apiErrorHandler.jsx';
 
 const newRequest = axios.create({
     baseURL: baseUrl,
@@ -39,5 +40,7 @@ newRequest.interceptors.request.use((config) => {
     }
     return config;
 });
+
+attachApiErrorTracking(newRequest);
 
 export default newRequest;

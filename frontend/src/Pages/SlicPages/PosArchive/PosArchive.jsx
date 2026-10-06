@@ -3,7 +3,7 @@ import SideNav from "../../../components/Sidebar/SideNav";
 import { posArchiveColumns } from "../../../utils/datatablesource";
 import DataTable from "../../../components/Datatable/Datatable";
 import newRequest from "../../../utils/userRequest";
-import { toast } from "react-toastify";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useTranslation } from "react-i18next";
@@ -25,7 +25,7 @@ const PosArchive = () => {
       setIsLoading(false);
     } catch (err) {
       setIsLoading(false);
-      toast.error(err?.response?.data?.message || "Something went Wrong");
+      showApiError(err, { title: "Loading archived invoices failed" });
     }
   };
 
@@ -50,11 +50,7 @@ const PosArchive = () => {
       setFilteredData(res?.data || []);
     } catch (err) {
       // console.log(err);
-      toast.error(
-        err?.response?.data?.error ||
-          err?.response?.data?.message ||
-          "Something went wrong"
-      );
+      showApiError(err, { title: "Loading archived invoice details failed" });
       setFilteredData([]);
     } finally {
       setIsPurchaseOrderDataLoading(false);

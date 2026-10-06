@@ -4,6 +4,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { toast } from "react-toastify";
 import ErpTeamRequest from "../../../utils/ErpTeamRequest";
 import newRequest from "../../../utils/userRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import { useTranslation } from "react-i18next";
 
 const F3TenderCashPopUp = ({
@@ -224,7 +225,9 @@ const F3TenderCashPopUp = ({
 
       // If either documentNo or headSysId is missing, show an error and don't proceed
       if (!documentNo) {
-        toast.error("Error in Sales Invoice API: Missing Document No");
+        showApiError(res, {
+          title: "Sales Invoice API did not return a Document No",
+        });
         setLoading(false);
         return;
       }
@@ -283,7 +286,9 @@ const F3TenderCashPopUp = ({
 
           // If bankDocumentNo is missing, show an error and stop
           if (!bankDocumentNo) {
-            toast.error("Error in Bank API: Missing Document No");
+            showApiError(bankRes, {
+              title: "Bank Receipt (BRV) API did not return a Document No",
+            });
             setLoading(false);
             return;
           }
@@ -292,6 +297,9 @@ const F3TenderCashPopUp = ({
           insertInvoiceRecord(documentNo, headSysId, bankheadSysId);
         } catch (error) {
           console.error("Error in Bank API:", error);
+          showApiError(error, {
+            title: "Bank Receipt (BRV) failed — invoice saved without a bank receipt",
+          });
           // On API error, call insertInvoiceRecord without bankheadSysId
           insertInvoiceRecord(documentNo, headSysId);
 
@@ -320,7 +328,7 @@ const F3TenderCashPopUp = ({
       setLoading(false);
     } catch (err) {
       console.log(err);
-      toast.error(err?.response?.data?.message || "Something went wrong");
+      showApiError(err, { title: "Direct Sales Invoice failed" });
       setLoading(false);
     }
   };
@@ -347,11 +355,10 @@ const F3TenderCashPopUp = ({
       );
     } catch (err) {
       // console.error("Error archiving invoice:", err);
-      toast.error(
-        err?.response?.data?.error ||
-          err?.response?.data?.message ||
-          "Error In Archived The Data"
-      );
+      showApiError(err, {
+        title: "Archiving the original invoice failed",
+        fallbackMessage: "Error In Archived The Data",
+      });
     }
   };
 
@@ -455,12 +462,14 @@ const F3TenderCashPopUp = ({
         );
         console.log("Invoice Response (EXIN):", exinRes?.data);
 
-        const exinDocumentNo = exinRes?.data?.message["Document No"];
-        const exinHeadSysId = exinRes?.data?.message["Ref-No/SysID"];
-        const exinTransactionCode = exinRes?.data?.message["Transaction Code"];
+        const exinDocumentNo = exinRes?.data?.message?.["Document No"];
+        const exinHeadSysId = exinRes?.data?.message?.["Ref-No/SysID"];
+        const exinTransactionCode = exinRes?.data?.message?.["Transaction Code"];
 
         if (!exinDocumentNo || !exinHeadSysId) {
-          toast.error("Error in Invoice API: Missing Document No or SysID");
+          showApiError(exinRes, {
+            title: "Exchange Invoice API did not return a Document No or SysID",
+          });
           setLoading(false);
           return;
         }
@@ -488,14 +497,14 @@ const F3TenderCashPopUp = ({
         );
         console.log("Sales Return Response (EXSR):", exsrRes?.data);
 
-        const exsrDocumentNo = exsrRes?.data?.message["Document No"];
-        const exsrHeadSysId = exsrRes?.data?.message["Ref-No/SysID"];
-        const exsrTransactionCode = exsrRes?.data?.message["Transaction Code"];
+        const exsrDocumentNo = exsrRes?.data?.message?.["Document No"];
+        const exsrHeadSysId = exsrRes?.data?.message?.["Ref-No/SysID"];
+        const exsrTransactionCode = exsrRes?.data?.message?.["Transaction Code"];
 
         if (!exsrDocumentNo || !exsrHeadSysId) {
-          toast.error(
-            "Error in Sales Return API: Missing Document No or SysID"
-          );
+          showApiError(exsrRes, {
+            title: "Sales Return API did not return a Document No or SysID",
+          });
           setLoading(false);
           return;
         }
@@ -570,16 +579,18 @@ const F3TenderCashPopUp = ({
             bankHeadSysId = bankRes?.data?.message?.["Document No"];
 
             if (!bankDocumentNo) {
-              toast.error("Error in Bank API: Missing Document No");
+              showApiError(bankRes, {
+                title: "Bank Receipt (BRV) API did not return a Document No",
+              });
               setLoading(false);
               return;
             }
           } catch (error) {
             // Handle the API error gracefully
             console.error("Error in Bank API:", error);
-            toast.error(
-              "Bank API call failed. Proceeding without bankHeadSysId."
-            );
+            showApiError(error, {
+              title: "Bank Receipt (BRV) failed — continuing without a bank receipt",
+            });
 
             // Log the error using /createErrorLogs API
             try {
@@ -637,14 +648,14 @@ const F3TenderCashPopUp = ({
         );
         console.log("Sales Return Response:", res?.data);
 
-        const documentNo = res?.data?.message["Document No"];
-        const headSysId = res?.data?.message["Ref-No/SysID"];
-        const transactionCode = res?.data?.message["Transaction Code"];
+        const documentNo = res?.data?.message?.["Document No"];
+        const headSysId = res?.data?.message?.["Ref-No/SysID"];
+        const transactionCode = res?.data?.message?.["Transaction Code"];
 
         if (!documentNo || !headSysId) {
-          toast.error(
-            "Error in Sales Return API: Missing Document No or SysID"
-          );
+          showApiError(res, {
+            title: "Sales Return API did not return a Document No or SysID",
+          });
           setLoading(false);
           return;
         }
@@ -707,7 +718,9 @@ const F3TenderCashPopUp = ({
           bankHeadSysId = bankRes?.data?.message?.["Document No"];
 
           if (!bankDocumentNo) {
-            toast.error("Error in Bank API: Missing Document No");
+            showApiError(bankRes, {
+              title: "Bank Receipt (BRV) API did not return a Document No",
+            });
             setLoading(false);
             return;
           }
@@ -734,7 +747,7 @@ const F3TenderCashPopUp = ({
       }
     } catch (err) {
       console.log(err);
-      toast.error(err?.response?.data?.message || "Something went wrong");
+      showApiError(err, { title: "Sales Return failed" });
       setLoading(false);
     }
   };
@@ -838,12 +851,14 @@ const F3TenderCashPopUp = ({
         );
         console.log("Invoice Response (EXIN):", exinRes?.data);
 
-        const exinDocumentNo = exinRes?.data?.message["Document No"];
-        const exinHeadSysId = exinRes?.data?.message["Ref-No/SysID"];
-        const exinTransactionCode = exinRes?.data?.message["Transaction Code"];
+        const exinDocumentNo = exinRes?.data?.message?.["Document No"];
+        const exinHeadSysId = exinRes?.data?.message?.["Ref-No/SysID"];
+        const exinTransactionCode = exinRes?.data?.message?.["Transaction Code"];
 
         if (!exinDocumentNo || !exinHeadSysId) {
-          toast.error("Error in Invoice API: Missing Document No or SysID");
+          showApiError(exinRes, {
+            title: "Exchange Invoice API did not return a Document No or SysID",
+          });
           setLoading(false);
           return;
         }
@@ -868,14 +883,14 @@ const F3TenderCashPopUp = ({
         );
         console.log("Sales Return Response (EXSR):", exsrRes?.data);
 
-        const exsrDocumentNo = exsrRes?.data?.message["Document No"];
-        const exsrHeadSysId = exsrRes?.data?.message["Ref-No/SysID"];
-        const exsrTransactionCode = exsrRes?.data?.message["Transaction Code"];
+        const exsrDocumentNo = exsrRes?.data?.message?.["Document No"];
+        const exsrHeadSysId = exsrRes?.data?.message?.["Ref-No/SysID"];
+        const exsrTransactionCode = exsrRes?.data?.message?.["Transaction Code"];
 
         if (!exsrDocumentNo || !exsrHeadSysId) {
-          toast.error(
-            "Error in Sales Return API: Missing Document No or SysID"
-          );
+          showApiError(exsrRes, {
+            title: "Sales Return API did not return a Document No or SysID",
+          });
           setLoading(false);
           return;
         }
@@ -951,16 +966,18 @@ const F3TenderCashPopUp = ({
             bankHeadSysId = bankApiResponse?.data?.message?.["Document No"];
 
             if (!bankDocumentNo) {
-              toast.error("Error in Bank API: Missing Document No");
+              showApiError(bankApiResponse, {
+                title: "Bank Receipt (BRV) API did not return a Document No",
+              });
               setLoading(false);
               return;
             }
           } catch (error) {
             // Handle the API error gracefully
             console.error("Error in Bank API:", error);
-            toast.error(
-              "Bank API call failed. Proceeding without bankHeadSysId."
-            );
+            showApiError(error, {
+              title: "Bank Receipt (BRV) failed — continuing without a bank receipt",
+            });
 
             // Log the error using /createErrorLogs API
             try {
@@ -1016,14 +1033,14 @@ const F3TenderCashPopUp = ({
         );
         console.log("Sales Return Response:", res?.data);
 
-        const documentNo = res?.data?.message["Document No"];
-        const headSysId = res?.data?.message["Ref-No/SysID"];
-        const transactionCode = res?.data?.message["Transaction Code"];
+        const documentNo = res?.data?.message?.["Document No"];
+        const headSysId = res?.data?.message?.["Ref-No/SysID"];
+        const transactionCode = res?.data?.message?.["Transaction Code"];
 
         if (!documentNo || !headSysId) {
-          toast.error(
-            "Error in Sales Return API: Missing Document No or SysID"
-          );
+          showApiError(res, {
+            title: "Sales Return API did not return a Document No or SysID",
+          });
           setLoading(false);
           return;
         }
@@ -1083,7 +1100,9 @@ const F3TenderCashPopUp = ({
           bankHeadSysId = bankApiRes?.data?.message?.["Document No"];
 
           if (!bankDocumentNo) {
-            toast.error("Error in Bank API: Missing Document No");
+            showApiError(bankApiRes, {
+              title: "Bank Receipt (BRV) API did not return a Document No",
+            });
             setLoading(false);
             return;
           }
@@ -1110,7 +1129,12 @@ const F3TenderCashPopUp = ({
       setLoading(false);
     } catch (err) {
       console.log(err);
-      toast.error(err?.response?.data?.message || "Something went wrong");
+      showApiError(err, {
+        title:
+          selectedSalesType === "BTOC CUSTOMER"
+            ? "B2C Customer transaction failed"
+            : "DSales No Invoice transaction failed",
+      });
       setLoading(false);
     }
   };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import CircularProgress from "@mui/material/CircularProgress";
-import { toast } from "react-toastify";
 import newRequest from "../../../utils/userRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import { useTranslation } from "react-i18next";
 
 
@@ -32,7 +32,10 @@ const MobileNumberPopUp = ({ isVisible, setVisibility, mobileNo, onSelectInvoice
 
       setInvoiceNumbers(sortedInvoices);
     } catch (err) {
-      toast.error(err?.response?.data?.error || err?.response?.data?.message || "Error fetching invoice numbers");
+      showApiError(err, {
+        title: "Loading invoices for this mobile number failed",
+        fallbackMessage: "Error fetching invoice numbers",
+      });
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import newRequest from "../../../utils/userRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import SendIcon from "@mui/icons-material/Send";
@@ -62,9 +63,10 @@ const AddBankDepositNoPopUp = ({
       refreshGTINData();
       resetComboBox();
     } catch (error) {
-      toast.error(
-        error?.response?.data?.message || "Failed to Add Bank Deposit Number"
-      );
+      showApiError(error, {
+        title: "Saving the bank deposit number failed",
+        fallbackMessage: "Failed to Add Bank Deposit Number",
+      });
       //   console.log(error);
       setLoading(false);
     }

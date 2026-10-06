@@ -9,6 +9,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import sliclogo from "../../../Images/sliclogo.png";
 import QRCode from "qrcode";
 import ErpTeamRequest from "../../../utils/ErpTeamRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import { Autocomplete, TextField } from "@mui/material";
 import ExchangeItemPopUp from "./ExchangeItemPopUp";
 import ConfirmTransactionPopUp from "./ConfirmTransactionPopUp";
@@ -223,7 +224,7 @@ const POS = () => {
       setTransactionCodes(codes);
     } catch (err) {
       // console.log(err);
-      toast.error(err?.response?.data?.message || "Something went Wrong");
+      showApiError(err, { title: "Loading transaction codes failed" });
     }
   };
 
@@ -254,7 +255,7 @@ const POS = () => {
       setSearchCustomerName(allCustomers);
     } catch (err) {
       // console.log(err);
-      toast.error(err?.response?.data?.message || "Something went Wrong");
+      showApiError(err, { title: "Loading customers for this transaction failed" });
     }
   };
 
@@ -287,7 +288,7 @@ const POS = () => {
       // setBtocCustomer(filteredCustomers);
     } catch (err) {
       // console.log(err);
-      toast.error(err?.response?.data?.message || "Something went Wrong");
+      showApiError(err, { title: "Loading customer names failed" });
     }
   };
 
@@ -307,7 +308,7 @@ const POS = () => {
       setBtocCustomer(filteredCustomers);
     } catch (err) {
       // console.log(err);
-      toast.error(err?.response?.data?.message || "Something went Wrong");
+      showApiError(err, { title: "Loading B2C customers failed" });
     }
   };
 
@@ -402,14 +403,19 @@ const POS = () => {
 
           // Check if the response contains an error message even with 200 status
           if (secondApiData?.Message && secondApiData.Message.includes("No Records Found")) {
-            toast.error(secondApiData.Message);
+            showApiError(secondApiResponse, {
+              title: "Price List (PRICELIST): no price found for this item",
+            });
             setBarcode("");
             return;
           }
 
           // Check if secondApiData is an array and has data
           if (!Array.isArray(secondApiData) || secondApiData.length === 0) {
-            toast.error("No price information found for this item");
+            showApiError(secondApiResponse, {
+              title: "Price List (PRICELIST) API returned no price",
+              fallbackMessage: "No price information found for this item",
+            });
             setBarcode("");
             return;
           }
@@ -522,13 +528,18 @@ const POS = () => {
 
             // Check if the stock status response contains an error message
             if (stockData?.Message && stockData.Message.includes("No Records Found")) {
-              toast.error(stockData.Message);
+              showApiError(stockStatusResponse, {
+                title: "Stock Status (STOCKSTATUS): no stock record found",
+              });
               return;
             }
 
             // Check if stockData is an array and has data
             if (!Array.isArray(stockData) || stockData.length === 0) {
-              toast.error("No stock information found for this item");
+              showApiError(stockStatusResponse, {
+                title: "Stock Status (STOCKSTATUS) API returned no stock",
+                fallbackMessage: "No stock information found for this item",
+              });
               return;
             }
 
@@ -565,41 +576,24 @@ const POS = () => {
             });
 
           } catch (stockStatusError) {
-            const errorMessage =
-              stockStatusError?.response?.data ||
-              stockStatusError?.response?.data?.message ||
-              stockStatusError?.response?.data?.Message ||
-              stockStatusError?.message ||
-              "An error occurred while fetching stock status";
-
-            toast.error(errorMessage);
+            showApiError(stockStatusError, {
+              title: "Stock Status (STOCKSTATUS) request failed",
+            });
             setBarcode("");
           }
 
           setBarcode("");
         } catch (secondApiError) {
-          const errorMessage =
-            secondApiError?.response?.data ||
-            secondApiError?.response?.data?.message ||
-            secondApiError?.response?.data?.Message ||
-            secondApiError?.message ||
-            "An error occurred while calling the second API";
-
-          toast.error(errorMessage);
+          showApiError(secondApiError, {
+            title: "Price List (PRICELIST) request failed",
+          });
           setBarcode("");
         }
       } else {
         setData([]);
       }
     } catch (error) {
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.Message ||
-        error?.response?.data?.error ||
-        error?.message ||
-        "An error occurred";
-
-      toast.error(errorMessage);
+      showApiError(error, { title: "Item lookup by barcode (GTIN) failed" });
     } finally {
       setIsLoading(false);
     }
@@ -670,14 +664,19 @@ const POS = () => {
 
           // Check if the response contains an error message even with 200 status
           if (secondApiData?.Message && secondApiData.Message.includes("No Records Found")) {
-            toast.error(secondApiData.Message);
+            showApiError(secondApiResponse, {
+              title: "Price List (PRICELIST): no price found for this item",
+            });
             setBarcode("");
             return;
           }
 
           // Check if secondApiData is an array and has data
           if (!Array.isArray(secondApiData) || secondApiData.length === 0) {
-            toast.error("No price information found for this item");
+            showApiError(secondApiResponse, {
+              title: "Price List (PRICELIST) API returned no price",
+              fallbackMessage: "No price information found for this item",
+            });
             setBarcode("");
             return;
           }
@@ -742,28 +741,19 @@ const POS = () => {
           setBarcode("");
 
         } catch (secondApiError) {
-          const errorMessage =
-            secondApiError?.response?.data ||
-            secondApiError?.response?.data?.message ||
-            secondApiError?.response?.data?.Message ||
-            secondApiError?.message ||
-            "An error occurred while calling the second API";
-
-          toast.error(errorMessage);
+          showApiError(secondApiError, {
+            title: "Price List (PRICELIST) request failed",
+          });
           setBarcode("");
         }
       } else {
         setDSalesNoInvoiceData([]);
       }
     } catch (error) {
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.Message ||
-        error?.response?.data?.error ||
-        error?.message ||
-        "No item code found with the given GTIN";
-
-      toast.error(errorMessage);
+      showApiError(error, {
+        title: "Item lookup by barcode (GTIN) failed",
+        fallbackMessage: "No item code found with the given GTIN",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -816,14 +806,19 @@ const POS = () => {
 
           // Check if the response contains an error message even with 200 status
           if (secondApiData?.Message && secondApiData.Message.includes("No Records Found")) {
-            toast.error(secondApiData.Message);
+            showApiError(secondApiResponse, {
+              title: "Price List (PRICELIST): no price found for this item",
+            });
             setBarcode("");
             return;
           }
 
           // Check if secondApiData is an array and has data
           if (!Array.isArray(secondApiData) || secondApiData.length === 0) {
-            toast.error("No price information found for this item");
+            showApiError(secondApiResponse, {
+              title: "Price List (PRICELIST) API returned no price",
+              fallbackMessage: "No price information found for this item",
+            });
             setBarcode("");
             return;
           }
@@ -885,28 +880,16 @@ const POS = () => {
           // clear the barcode
           setBarcode("");
         } catch (secondApiError) {
-          const errorMessage =
-            secondApiError?.response?.data ||
-            secondApiError?.response?.data?.message ||
-            secondApiError?.response?.data?.Message ||
-            secondApiError?.message ||
-            "An error occurred while calling the second API";
-
-          toast.error(errorMessage);
+          showApiError(secondApiError, {
+            title: "Price List (PRICELIST) request failed",
+          });
           setBarcode("");
         }
       } else {
         setDSalesNoInvoiceData([]);
       }
     } catch (error) {
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.Message ||
-        error?.response?.data?.error ||
-        error?.message ||
-        "An error occurred";
-
-      toast.error(errorMessage);
+      showApiError(error, { title: "Item lookup by barcode (GTIN) failed" });
     } finally {
       setIsLoading(false);
     }
@@ -1359,7 +1342,10 @@ const POS = () => {
       );
     } catch (error) {
       // console.error("Error saving record:", error);
-      toast.error("Error saving record");
+      showApiError(error, {
+        title: "Saving the invoice record to the POS database failed",
+        fallbackMessage: "Error saving record",
+      });
     }
   };
 
@@ -1432,10 +1418,10 @@ const POS = () => {
       setInvoiceLoader(false);
     } catch (err) {
       // console.log(err);
-      toast.error(
-        err?.response?.data?.error ||
-        "An error occurred while generating the invoice"
-      );
+      showApiError(err, {
+        title: "Generating the ZATCA invoice QR code failed",
+        fallbackMessage: "An error occurred while generating the invoice",
+      });
       setInvoiceLoader(false);
     }
   };
@@ -1466,10 +1452,10 @@ const POS = () => {
       toast.success("Invoice generated successfully!");
     } catch (err) {
       console.log(err);
-      toast.error(
-        err?.response?.data?.errors[0] ||
-        "An error occurred while generating the invoice"
-      );
+      showApiError(err, {
+        title: "Generating the ZATCA exchange invoice QR code failed",
+        fallbackMessage: "An error occurred while generating the invoice",
+      });
     } finally {
       setInvoiceLoader(false);
     }
@@ -2285,7 +2271,10 @@ const POS = () => {
       toast.success("Invoice sent to WhatsApp successfully!");
       setDirectInvoiceWhatsAppLoader(false);
     } catch (error) {
-      toast.error(error?.response?.data?.error || "Error sending WhatsApp message");
+      showApiError(error, {
+        title: "Sending the invoice on WhatsApp failed",
+        fallbackMessage: "Error sending WhatsApp message",
+      });
       setDirectInvoiceWhatsAppLoader(false);
       // console.error("Error:", error);
     }
@@ -2868,7 +2857,10 @@ const POS = () => {
       toast.success("Invoice sent to WhatsApp successfully!");
       setExhchangeWhatsAppInvoiceLoader(false);
     } catch (error) {
-      toast.error(error?.response?.data?.error || "Error sending WhatsApp message");
+      showApiError(error, {
+        title: "Sending the invoice on WhatsApp failed",
+        fallbackMessage: "Error sending WhatsApp message",
+      });
       setExhchangeWhatsAppInvoiceLoader(false);
       // console.error("Error:", error);
     }
@@ -2926,7 +2918,7 @@ const POS = () => {
         setInvoiceData([]);
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "An error occurred");
+      showApiError(error, { title: "Loading invoice details failed" });
     } finally {
       setInvoiceDataLoader(false);
     }

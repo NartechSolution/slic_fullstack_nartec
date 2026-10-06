@@ -6,8 +6,8 @@ import DataTable from "../../../components/Datatable/Datatable";
 import EditIcon from "@mui/icons-material/Edit";
 import { useTranslation } from "react-i18next";
 import newRequest from "../../../utils/userRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import { Autocomplete, CircularProgress, debounce, TextField } from "@mui/material";
-import { toast } from "react-toastify";
 import axios from "axios";
 import { useTaxContext } from "../../../Contexts/TaxContext";
 
@@ -58,6 +58,7 @@ const PosBrvMatchedReceipts = () => {
       setMatchReceiptsList(name)
     } catch (error) {
         console.log(error);
+        showApiError(error, { title: "Loading matched BRV receipts failed" });
     }
   };
 
@@ -110,7 +111,7 @@ const PosBrvMatchedReceipts = () => {
     } catch (err) {
       console.log(err);
       setIsLoading(false);
-      toast.error(err?.response?.data?.message || "An error occurred");
+      showApiError(err, { title: "Loading matched receipt invoices failed" });
     }
   };
 

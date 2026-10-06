@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { posHistoryInvoiceColumns } from "../../../utils/datatablesource";
 import DataTable from "../../../components/Datatable/Datatable";
 import newRequest from "../../../utils/userRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import { toast } from "react-toastify";
 import EditIcon from "@mui/icons-material/Edit";
 import {
@@ -75,7 +76,7 @@ const PosHistory = () => {
       setIsLoading(false);
     } catch (err) {
       setIsLoading(false);
-      toast.error(err?.response?.data?.message || "Something went Wrong");
+      showApiError(err, { title: "Loading customers with pending receipts failed" });
     }
   };
 
@@ -93,9 +94,10 @@ const PosHistory = () => {
       setIsLoading(false);
     } catch (err) {
       setIsLoading(false);
-      toast.error(
-        err?.response?.data?.error || "Failed to fetch POS invoice data"
-      );
+      showApiError(err, {
+        title: "Loading POS invoices failed",
+        fallbackMessage: "Failed to fetch POS invoice data",
+      });
     }
   };
 
@@ -208,10 +210,10 @@ const PosHistory = () => {
       toast.success("Invoice generated and ready to print!");
     } catch (err) {
       console.error(err);
-      toast.error(
-        err?.response?.data?.errors[0]?.msg ||
-          "An error occurred while generating the invoice"
-      );
+      showApiError(err, {
+        title: "Generating the invoice for printing failed",
+        fallbackMessage: "An error occurred while generating the invoice",
+      });
     }
   };
 

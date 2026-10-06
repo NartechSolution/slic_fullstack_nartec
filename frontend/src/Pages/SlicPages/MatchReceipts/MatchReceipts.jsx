@@ -6,6 +6,7 @@ import DataTable from "../../../components/Datatable/Datatable";
 import EditIcon from "@mui/icons-material/Edit";
 import { useTranslation } from "react-i18next";
 import newRequest from "../../../utils/userRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import {
   Autocomplete,
   Button,
@@ -125,6 +126,7 @@ const PosBulkMatchReceipts = () => {
       setMatchReceiptsList(name);
     } catch (error) {
       console.log(error);
+      showApiError(error, { title: "Loading BRV receipts failed" });
     }
   };
 
@@ -175,7 +177,7 @@ const PosBulkMatchReceipts = () => {
     } catch (err) {
       console.log(err);
       setIsLoading(false);
-      toast.error(err?.response?.data?.message || "An error occurred");
+      showApiError(err, { title: "Loading receipt invoices failed" });
     }
   };
 
@@ -259,10 +261,10 @@ const PosBulkMatchReceipts = () => {
 
       toast.success("Invoice generated and ready to print!");
     } catch (err) {
-      toast.error(
-        err?.response?.data?.errors[0]?.msg ||
-        "An error occurred while generating the invoice"
-      );
+      showApiError(err, {
+        title: "Generating the invoice for printing failed",
+        fallbackMessage: "An error occurred while generating the invoice",
+      });
     }
   };
 
@@ -588,6 +590,7 @@ const PosBulkMatchReceipts = () => {
 
   const handleMatchingTransactions = async () => {
     setMatchingTransactionLaoder(true);
+    let response;
 
     const payload = {
       url: newERPBaseUrl,
@@ -622,7 +625,7 @@ const PosBulkMatchReceipts = () => {
     };
 
     try {
-      const response = await ErpTeamRequest.post(
+      response = await ErpTeamRequest.post(
         "/slicuat05api/v1/postData",
         payload,
         {
@@ -654,11 +657,11 @@ const PosBulkMatchReceipts = () => {
         throw new Error("Message property missing from API response");
       }
     } catch (error) {
-      toast.error(
-        error?.response?.data?.error ||
-        error.message ||
-        "Error in matching transactions."
-      );
+      showApiError(error, {
+        title: "Matching transactions (BULKBRVMATCHAPI) failed",
+        fallbackMessage: "Error in matching transactions.",
+        response,
+      });
       console.error("Matching transaction error:", error);
     }
 

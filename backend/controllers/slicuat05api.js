@@ -117,7 +117,10 @@ exports.slicLogin = async (req, res) => {
       return res.status(error.response.status).json(error.response.data);
     }
     // Return a generic error if no response is available
-    res.status(500).json({ message: 'Unexpected error' });
+    res.status(500).json({
+      message: `Could not reach SLIC ERP API: ${error.message || 'Unexpected error'}`,
+      code: error.code,
+    });
   }
 };
 
@@ -151,7 +154,10 @@ exports.slicGetApi = async (req, res) => {
       return res.status(error.response.status).json(error.response.data);
     }
     // Return a generic error if no response is available
-    res.status(500).json({ message: 'Unexpected error' });
+    res.status(500).json({
+      message: `Could not reach SLIC ERP API: ${error.message || 'Unexpected error'}`,
+      code: error.code,
+    });
   }
 };
 
@@ -187,6 +193,9 @@ exports.slicPostData = async (req, res) => {
       return res.status(error.response.status).json(error.response.data);
     }
     // Return a generic error if no response is available
-    res.status(500).json({ message: 'Unexpected error' });
+    res.status(500).json({
+      message: `Could not reach SLIC ERP API: ${error.message || 'Unexpected error'}`,
+      code: error.code,
+    });
   }
 };

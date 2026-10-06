@@ -7,6 +7,7 @@ import {
 } from "../../../utils/datatablesource";
 import DataTable from "../../../components/Datatable/Datatable";
 import newRequest from "../../../utils/userRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import { toast } from "react-toastify";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -96,9 +97,10 @@ const PosBulkCashReceipts = () => {
       setIsLoading(false);
     } catch (err) {
       setIsLoading(false);
-      toast.error(
-        err?.response?.data?.error || "Failed to fetch POS invoice data"
-      );
+      showApiError(err, {
+        title: "Loading POS invoices failed",
+        fallbackMessage: "Failed to fetch POS invoice data",
+      });
     }
   };
 
@@ -236,9 +238,10 @@ const PosBulkCashReceipts = () => {
 
     console.log(requestData);
 
+    let receiptResponse;
     try {
       setLoading(true);
-      const receiptResponse = await ErpTeamRequest.post(
+      receiptResponse = await ErpTeamRequest.post(
         "/slicuat05api/v1/postData",
         requestData,
         {
@@ -283,9 +286,10 @@ const PosBulkCashReceipts = () => {
         // I call the print pdf function here
         handlePrintPDF();
       } catch (batchErr) {
-        toast.error(
-          batchErr?.response?.data?.message || "Failed to create POS Invoice Batch."
-        );
+        showApiError(batchErr, {
+          title: "Creating the POS invoice batch failed",
+          fallbackMessage: "Failed to create POS Invoice Batch.",
+        });
       }
 
       setLoading(false);
@@ -296,7 +300,11 @@ const PosBulkCashReceipts = () => {
       setRemainingAmount(0);
     } catch (err) {
       setLoading(false);
-      toast.error(err?.response?.data?.message || "Failed to generate receipt.");
+      showApiError(err, {
+        title: "Bulk Cash Receipt (BULKBRVCASHAPI) failed",
+        fallbackMessage: "Failed to generate receipt.",
+        response: receiptResponse,
+      });
     }
   };
 
@@ -358,10 +366,10 @@ const PosBulkCashReceipts = () => {
 
       toast.success("Invoice generated and ready to print!");
     } catch (err) {
-      toast.error(
-        err?.response?.data?.errors[0]?.msg ||
-        "An error occurred while generating the invoice"
-      );
+      showApiError(err, {
+        title: "Generating the invoice for printing failed",
+        fallbackMessage: "An error occurred while generating the invoice",
+      });
     }
   };
 
