@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import newRequest from "../../../utils/userRequest";
 import ErpTeamRequest from "../../../utils/ErpTeamRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import { IoBarcodeSharp } from "react-icons/io5";
 import CircularProgress from "@mui/material/CircularProgress";
 import { toast } from "react-toastify";
@@ -64,8 +65,9 @@ const ExchangeItemPopUp = ({ isVisible, setVisibility, addExchangeData, selected
           M_LANG_CODE: "ENG",
         };
 
+        let secondApiResponse;
         try {
-          const secondApiResponse = await ErpTeamRequest.post(
+          secondApiResponse = await ErpTeamRequest.post(
             "/slicuat05api/v1/getApi",
             secondApiBody,
             {
@@ -142,10 +144,10 @@ const ExchangeItemPopUp = ({ isVisible, setVisibility, addExchangeData, selected
             }
           });
         } catch (secondApiError) {
-          toast.error(
-            secondApiError?.response?.data?.message ||
-              "An error occurred while calling the second API"
-          );
+          showApiError(secondApiError, {
+            title: "Price List (PRICELIST) request failed",
+            response: secondApiResponse,
+          });
         }
         // barcode state empty once response is true
         setBarcode("");
@@ -153,7 +155,7 @@ const ExchangeItemPopUp = ({ isVisible, setVisibility, addExchangeData, selected
         setData([]);
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "An error occurred");
+      showApiError(error, { title: "Item lookup by barcode (GTIN) failed" });
     } finally {
       setIsLoading(false);
     }
@@ -190,8 +192,9 @@ const ExchangeItemPopUp = ({ isVisible, setVisibility, addExchangeData, selected
         "M_LANG_CODE": "ENG"
     };
   
+    let stockStatusResponse;
     try {
-      const stockStatusResponse = await ErpTeamRequest.post(
+      stockStatusResponse = await ErpTeamRequest.post(
         "/slicuat05api/v1/getApi",
         stockStatusBody,
         {
@@ -240,11 +243,22 @@ const ExchangeItemPopUp = ({ isVisible, setVisibility, addExchangeData, selected
         handleCloseCreatePopup();
       } else {
         // If stock is not available, show an error message
-        toast.error("Stock not Available");
+        if (availableStock == null) {
+          // The API didn't return stock data at all – show what it sent instead
+          showApiError(stockStatusResponse, {
+            title: "Stock Status (STOCKSTATUS) API returned no stock data",
+            fallbackMessage: "Stock not Available",
+          });
+        } else {
+          toast.error("Stock not Available");
+        }
       }
     } catch (err) {
       console.log(err);
-      toast.error(err?.response?.data?.message || "Something went wrong");
+      showApiError(err, {
+        title: "Stock Status (STOCKSTATUS) request failed",
+        response: stockStatusResponse,
+      });
     }
   };  
   

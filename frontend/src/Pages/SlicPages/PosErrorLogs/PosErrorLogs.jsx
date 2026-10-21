@@ -5,8 +5,8 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import DataTable from "../../../components/Datatable/Datatable";
 import RightDashboardHeader from "../../../components/RightDashboardHeader/RightDashboardHeader";
 import { DataTableContext } from "../../../Contexts/DataTableContext";
-import { toast } from "react-toastify";
 import newRequest from "../../../utils/userRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import { useTranslation } from "react-i18next";
 
 const PosErrorLogs = () => {
@@ -37,7 +37,10 @@ const PosErrorLogs = () => {
       setData(response?.data?.data || []);
     } catch (err) {
       console.log(err);
-      toast.error(err?.response?.data?.error || "failed to load data");
+      showApiError(err, {
+        title: "Loading POS error logs failed",
+        fallbackMessage: "failed to load data",
+      });
     } finally {
       setIsLoading(false);
     }

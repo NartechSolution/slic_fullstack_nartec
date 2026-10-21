@@ -6,6 +6,7 @@ import {
 } from "@mui/material";
 import React, { useState, useEffect } from "react";
 import ErpTeamRequest from "../../../utils/ErpTeamRequest";
+import { showApiError } from "../../../utils/apiErrorHandler";
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
 
@@ -23,8 +24,9 @@ const ConfirmTransactionPopUp = ({
   const [locations, setLocations] = useState([]);
   const [selectedPaymentModels, setSelectedPaymentModels] = useState(null);
   const getAllPaymentsModels = async () => {
+    let res;
     try {
-      const res = await ErpTeamRequest.post(
+      res = await ErpTeamRequest.post(
         "/slicuat05api/v1/getApi",
         {
           filter: {},
@@ -48,11 +50,10 @@ const ConfirmTransactionPopUp = ({
       setLocations(paymentModes);
     } catch (error) {
       console.log(error);
-      toast.error(
-        error?.response?.data ||
-          error?.response?.data?.message ||
-          "Something went wrong!"
-      );
+      showApiError(error, {
+        title: "Loading payment modes (ZATCAPAYMENTMODE) failed",
+        response: res,
+      });
     }
   };
 
@@ -60,8 +61,9 @@ const ConfirmTransactionPopUp = ({
   const [selectedExamption, setSelectedExamption] = useState(null);
 
   const getAllExamptions = async () => {
+    let res;
     try {
-      const res = await ErpTeamRequest.post(
+      res = await ErpTeamRequest.post(
         "/slicuat05api/v1/getApi",
         {
           filter: {},
@@ -85,11 +87,10 @@ const ConfirmTransactionPopUp = ({
       setExamptionsTypes(exemptionReasons);
     } catch (error) {
       console.log(error);
-      toast.error(
-        error?.response?.data ||
-          error?.response?.data?.message ||
-          "Something went wrong!"
-      );
+      showApiError(error, {
+        title: "Loading tax exemption reasons (TAXEXEMPTIONREASON) failed",
+        response: res,
+      });
     }
   };
 
