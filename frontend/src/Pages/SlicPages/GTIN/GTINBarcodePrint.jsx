@@ -1,6 +1,6 @@
 import React from "react";
 import { QRCodeSVG } from "qrcode.react";
-import logo from "../../../Images/sliclogo.png";
+import logo from "../../../Images/slic-logo.png";
 
 const GTINBarcodePrint = ({ selectedRows, onPrintComplete }) => {
   const handlePrint = () => {

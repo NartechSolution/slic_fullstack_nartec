@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import sliclogo from "../../../Images/sliclogo.png";
+import sliclogo from "../../../Images/slic-logo.png";
 import QRCode from "qrcode";
 import ExcelJS from "exceljs";
 
@@ -201,7 +201,7 @@ const ExportControlSerials = ({ serials }) => {
 
     // Add logo
     if (sliclogo) {
-      doc.addImage(sliclogo, "PNG", 14, 10, 30, 15);
+      doc.addImage(sliclogo, "PNG", 14, 8, 21, 18);
     }
 
     // Title

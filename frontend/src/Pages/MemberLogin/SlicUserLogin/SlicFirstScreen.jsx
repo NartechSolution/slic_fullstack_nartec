@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
-import sliclogo from "../../../Images/sliclogo.png";
+import sliclogo from "../../../Images/slic-logo.png";
 import warehouse from "../../../Images/warehouse.png";
 import gtinmanagement from "../../../Images/gtinmanagement.png";
 import supplychain from "../../../Images/supplychain.png";

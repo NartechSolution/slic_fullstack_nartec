@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import F3TenderCashPopUp from "./F3TenderCashPopUp";
 import F3ResponsePopUp from "./F3ResponsePopUp";
 import CircularProgress from "@mui/material/CircularProgress";
-import sliclogo from "../../../Images/sliclogo.png";
+import sliclogo from "../../../Images/slic-logo.png";
 import QRCode from "qrcode";
 import ErpTeamRequest from "../../../utils/ErpTeamRequest";
 import { Autocomplete, TextField } from "@mui/material";
