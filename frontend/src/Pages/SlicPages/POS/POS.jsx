@@ -1711,7 +1711,7 @@ const POS = () => {
           <div class="invoice-header">
             <img src="${sliclogo}" alt="SLIC Logo" width="120"/>
             <div>Saudi Leather Industries Factory Co.</div>
-            <div>شركة مصنع الجلود السعودية</div>
+            <div>الشركة السعودية للصناعات الجلديه</div>
             <div>VAT#: 300456416500003</div>
             <div>CR#: 2050011041</div>
             <div>CR#: ٢٠٥٠٠١١٠٤١</div>
@@ -2033,7 +2033,7 @@ const POS = () => {
           <div class="invoice-header">
             <img class="invoice-logo" src="${sliclogo}" alt="SLIC Logo" width="120"/>
             <div>Saudi Leather Industries Factory Co.</div>
-            <div>شركة مصنع الجلود السعودية</div>
+            <div>الشركة السعودية للصناعات الجلديه</div>
             <div>VAT#: 300456416500003</div>
             <div>CR#: 2050011041</div>
             <div>CR#: ٢٠٥٠٠١١٠٤١</div>
@@ -2433,7 +2433,7 @@ const POS = () => {
           <div class="invoice-header">
             <img src="${sliclogo}" alt="SLIC Logo" width="120"/>
             <div>Saudi Leather Industries Factory Co.</div>
-            <div>شركة مصنع الجلود السعودية</div>
+            <div>الشركة السعودية للصناعات الجلديه</div>
             <div>VAT#: 300456416500003</div>
             <div>CR#: 2050011041</div>
             <div>CR#: ٢٠٥٠٠١١٠٤١</div>
@@ -2684,7 +2684,7 @@ const POS = () => {
           <div class="invoice-header">
             <img class="invoice-logo" src="${sliclogo}" alt="SLIC Logo" width="120"/>
             <div>Saudi Leather Industries Factory Co.</div>
-            <div>شركة مصنع الجلود السعودية</div>
+            <div>الشركة السعودية للصناعات الجلديه</div>
             <div>VAT#: 300456416500003</div>
             <div>CR#: 2050011041</div>
             <div>CR#: ٢٠٥٠٠١١٠٤١</div>
