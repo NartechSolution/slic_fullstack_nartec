@@ -18,7 +18,7 @@ import {
 } from "@mui/material";
 import ErpTeamRequest from "../../../utils/ErpTeamRequest";
 import QRCode from "qrcode";
-import sliclogo from "../../../Images/sliclogo.png";
+import sliclogo from "../../../Images/slic-logo.png";
 import { useTranslation } from "react-i18next";
 import { newERPBaseUrl } from "../../../utils/config";
 import { useTaxContext } from "../../../Contexts/TaxContext";

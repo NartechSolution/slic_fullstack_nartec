@@ -11,7 +11,7 @@ import {
   TextField,
 } from "@mui/material";
 import QRCode from "qrcode";
-import sliclogo from "../../../Images/sliclogo.png";
+import sliclogo from "../../../Images/slic-logo.png";
 import { useTranslation } from "react-i18next";
 import { useTaxContext } from "../../../Contexts/TaxContext";
 

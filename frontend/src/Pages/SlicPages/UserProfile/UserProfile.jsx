@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import SideNav from "../../../components/Sidebar/SideNav";
 import RightDashboardHeader from "../../../components/RightDashboardHeader/RightDashboardHeader";
-import sliclogo from "../../../Images/sliclogo.png"
+import sliclogo from "../../../Images/slic-logo.png"
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useTranslation } from "react-i18next";

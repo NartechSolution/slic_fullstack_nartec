@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import { toast } from "react-toastify";
 import QRCode from "qrcode";
-import sliclogo from "../../../Images/sliclogo.png";
+import sliclogo from "../../../Images/slic-logo.png";
 import AddBankDepositNoPopUp from "./AddBankDepositNoPopUp";
 import ErpTeamRequest from "../../../utils/ErpTeamRequest";
 import { newERPBaseUrl } from "../../../utils/config";

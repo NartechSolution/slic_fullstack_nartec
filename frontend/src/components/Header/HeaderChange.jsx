@@ -1,5 +1,5 @@
 import React from 'react'
-import sliclogo from "../../Images/sliclogo.png"
+import sliclogo from "../../Images/slic-logo.png"
 import { useNavigate } from 'react-router-dom'
 
 const HeaderChange = () => {

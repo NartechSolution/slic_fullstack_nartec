@@ -1,7 +1,7 @@
 import React from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import sliclogo from "../../Images/sliclogo.png";
+import sliclogo from "../../Images/slic-logo.png";
 import dashboard from "../../Images/dashboard.png"
 import barcode from "../../Images/barcode.png"
 import userprofile from "../../Images/userprofile.png"
