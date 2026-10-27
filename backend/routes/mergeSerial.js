@@ -3,7 +3,7 @@
  * =========================================
  * GET    /api/merge-serial             — list all merge records
  * POST   /api/merge-serial/validate    — validate a single serial (existence + state)
- * POST   /api/merge-serial/merge       — one unit of a serial → create FG barcode
+ * POST   /api/merge-serial/merge       — pair two serials → create FG barcode
  * GET    /api/merge-serial/:fgSerial   — get FG merge details (public)
  */
 
@@ -29,8 +29,8 @@ router.post("/validate", isAuth, mergeController.validateSerial);
 
 /**
  * POST /api/merge-serial/merge
- * @summary Create one Finished Good barcode from one unit (pair) of a serial
- * @body { serialNumber: string, mergedBy?: string }
+ * @summary Merge two serials (2 units) into one Finished Good barcode (1 pair)
+ * @body { serial1: string, serial2: string, mergedBy?: string }
  */
 router.post("/merge", isAuth, mergeController.mergeSerials);
 
