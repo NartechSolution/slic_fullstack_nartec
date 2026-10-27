@@ -67,8 +67,7 @@ const ExportControlSerials = ({ serials }) => {
       "S.No": index + 1,
       "Status": serial.status || "N/A",
       "Serial Number": serial.serialNumber || "N/A",
-      "Side": serial.side === "R" ? "Right" : serial.side === "L" ? "Left" : "N/A",
-      "Side Qty": serial.sideQty ?? "N/A",
+      "Qty": serial.qty ?? "N/A",
       "Item Code": serial.ItemCode || "N/A",
       "Item Name": serial.itemName || serial.product?.EnglishName || "N/A",
       "GTIN": serial.gtin || serial.product?.GTIN || "N/A",
@@ -96,8 +95,7 @@ const ExportControlSerials = ({ serials }) => {
       { header: "S.No",          key: "sno",          width: 8 },
       { header: "Status",        key: "status",       width: 14 },
       { header: "Serial Number", key: "serialNumber", width: 20 },
-      { header: "Side",          key: "side",         width: 10 },
-      { header: "Side Qty",      key: "sideQty",      width: 10 },
+      { header: "Qty",           key: "qty",          width: 10 },
       { header: "QR Code",       key: "qr",           width: 14 },
       { header: "Item Code",     key: "itemCode",     width: 16 },
       { header: "Item Name",     key: "itemName",     width: 22 },
@@ -136,8 +134,7 @@ const ExportControlSerials = ({ serials }) => {
         sno:          item["S.No"],
         status:       item["Status"],
         serialNumber: item["Serial Number"],
-        side:         item["Side"],
-        sideQty:      item["Side Qty"],
+        qty:          item["Qty"],
         qr:           "",
         itemCode:     item["Item Code"],
         itemName:     item["Item Name"],
@@ -171,7 +168,7 @@ const ExportControlSerials = ({ serials }) => {
         });
 
         ws.addImage(imageId, {
-          tl: { col: 5.2, row: rowIndex - 1 + 0.25 },
+          tl: { col: 4.2, row: rowIndex - 1 + 0.25 },
           ext: { width: 55, height: 55 },
           editAs: "oneCell",
         });
@@ -219,13 +216,12 @@ const ExportControlSerials = ({ serials }) => {
     const QR_CELL_SIZE = 12; // smaller size for PDF cell
     const ROW_HEIGHT = QR_CELL_SIZE + 2;
 
-    // S.No | Status | Serial Number | Side | Side Qty | QR Code | Item Code | Item Name | GTIN | Upper | Sole | Width | Color | Size | Created At
+    // S.No | Status | Serial Number | Qty | QR Code | Item Code | Item Name | GTIN | Upper | Sole | Width | Color | Size | Created At
     const headers = [
       "S.No",
       "Status",
       "Serial Number",
-      "Side",
-      "Side Qty",
+      "Qty",
       "QR Code",
       "Item Code",
       "Item Name",
@@ -242,8 +238,7 @@ const ExportControlSerials = ({ serials }) => {
       item["S.No"],
       item["Status"],
       item["Serial Number"],
-      item["Side"],
-      item["Side Qty"],
+      item["Qty"],
       "",             // QR Code cell — image drawn via didDrawCell
       item["Item Code"],
       item["Item Name"],
@@ -276,25 +271,24 @@ const ExportControlSerials = ({ serials }) => {
         0:  { cellWidth: 10 },                                  // S.No
         1:  { cellWidth: "auto" },                              // Status
         2:  { cellWidth: 30 },                                  // Serial Number
-        3:  { cellWidth: 12 },                                  // Side
-        4:  { cellWidth: 14 },                                  // Side Qty
-        5:  { cellWidth: QR_CELL_SIZE + 4, halign: "center" }, // QR Code
-        6:  { cellWidth: 20 },                                  // Item Code
-        7:  { cellWidth: "auto" },                              // Item Name
-        8:  { cellWidth: 26 },                                  // GTIN
-        9:  { cellWidth: "auto" },                              // Upper
-        10: { cellWidth: "auto" },                              // Sole
-        11: { cellWidth: 14 },                                  // Width
-        12: { cellWidth: 16 },                                  // Color
-        13: { cellWidth: 12 },                                  // Size
-        14: { cellWidth: 20 },                                  // Created At
+        3:  { cellWidth: 14 },                                  // Qty
+        4:  { cellWidth: QR_CELL_SIZE + 4, halign: "center" }, // QR Code
+        5:  { cellWidth: 20 },                                  // Item Code
+        6:  { cellWidth: "auto" },                              // Item Name
+        7:  { cellWidth: 26 },                                  // GTIN
+        8:  { cellWidth: "auto" },                              // Upper
+        9:  { cellWidth: "auto" },                              // Sole
+        10: { cellWidth: 14 },                                  // Width
+        11: { cellWidth: 16 },                                  // Color
+        12: { cellWidth: 12 },                                  // Size
+        13: { cellWidth: 20 },                                  // Created At
       },
       margin: { top: 10, left: 10, right: 10 },
       theme: "grid",
       tableWidth: "auto",
       didDrawCell: (data) => {
-        // QR Code is now at column index 5
-        if (data.section === "body" && data.column.index === 5) {
+        // QR Code is at column index 4
+        if (data.section === "body" && data.column.index === 4) {
           const rowIndex = data.row.index;
           const qrUrl = qrDataUrls[rowIndex];
           if (qrUrl) {

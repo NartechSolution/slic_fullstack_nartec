@@ -258,7 +258,7 @@ const SupplierDetailsPopup = ({ isVisible, setVisibility, supplier }) => {
                                       {t("Size")}
                                     </th>
                                     <th className="text-start px-2 py-1.5 text-white font-semibold">
-                                      {t("Side")}
+                                      {t("Qty")}
                                     </th>
                                     <th className="text-start px-2 py-1.5 text-white font-semibold">
                                       {t("Received")}
@@ -283,7 +283,7 @@ const SupplierDetailsPopup = ({ isVisible, setVisibility, supplier }) => {
                                           {item?.size || "-"}
                                         </td>
                                         <td className="px-2 py-1.5">
-                                          {item?.side || "-"}
+                                          {item?.sideQty ?? "-"}
                                         </td>
                                         <td className="px-2 py-1.5">
                                           <span

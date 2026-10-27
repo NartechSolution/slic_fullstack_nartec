@@ -338,9 +338,7 @@ const PoNumberTable = () => {
                                     <thead className="bg-gray-50">
                                         <tr>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO Number</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Qty</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Right Qty</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Left Qty</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Code</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent To Supplier</th>
@@ -352,7 +350,7 @@ const PoNumberTable = () => {
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {filteredPOs.length === 0 ? (
                                             <tr>
-                                                <td colSpan="10" className="px-6 py-4 text-center text-gray-500">
+                                                <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
                                                     No POs found.
                                                 </td>
                                             </tr>
@@ -372,12 +370,6 @@ const PoNumberTable = () => {
                                                     </td>
                                                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {po.totalQty}
-                                                    </td>
-                                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                        {po.rightQty || 0}
-                                                    </td>
-                                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                        {po.leftQty || 0}
                                                     </td>
                                                     <td className="px-6 py-3 text-sm text-gray-500">
                                                         {poItemCodes(po).length === 0 ? (
