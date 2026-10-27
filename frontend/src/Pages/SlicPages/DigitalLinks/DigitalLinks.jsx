@@ -100,8 +100,7 @@ const DigitalLinks = () => {
     isSentToSupplier: serial.isSentToSupplier || 'N/A',
     supplierName: serial.supplier?.name || 'N/A',
     supplierEmail: serial.supplier?.email || 'N/A',
-    side: serial.side || null,
-    sideQty: serial.sideQty || null,
+    qty: serial.sideQty || null,
   }));
 
   // Calculate pagination on frontend
@@ -137,8 +136,6 @@ const DigitalLinks = () => {
       id: representativeRecord?.id || `summary-${index}`,
       poNumber: poDetails.poNumber || 'N/A',
       qty: summaryItem.qty,
-      rightQty: summaryItem.rightQty || 0,
-      leftQty: summaryItem.leftQty || 0,
       receivedQty: summaryItem.receivedQty || 0,
       ItemCode: itemCode,
       ProductSize: summaryItem.size || 'N/A',

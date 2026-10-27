@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom";
 let rowSeq = 0;
 const uid = () => `${Date.now()}-${++rowSeq}`;
 
-const newSizeRow = () => ({ id: uid(), size: "", rightQty: 10, leftQty: 10 });
+const newSizeRow = () => ({ id: uid(), size: "", qty: 10 });
 
 const newItemGroup = (code) => ({
   id: uid(),
@@ -245,8 +245,8 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
       }
 
       // Validate quantities
-      if (group.sizeQuantities.some((row) => (row.rightQty || 0) <= 0 && (row.leftQty || 0) <= 0)) {
-        toast.error(`${group.itemCode}: ${t("Right or Left quantity must be greater than 0 for each size")}`);
+      if (group.sizeQuantities.some((row) => (row.qty || 0) <= 0)) {
+        toast.error(`${group.itemCode}: ${t("Quantity must be greater than 0 for each size")}`);
         return;
       }
 
@@ -272,8 +272,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
           supplierId: selectedSupplier.id,
           poNumber: poNumber,
           sizeQuantities: group.sizeQuantities.map((row) => ({
-            rightQty: row.rightQty,
-            leftQty: row.leftQty,
+            qty: row.qty,
             size: row.size
           }))
         });
@@ -314,12 +313,12 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     }
   };
 
-  // Serials + units per item code (2 serials per size: 1 Right + 1 Left, skipping zero-qty sides)
+  // Serials + units per item code (1 serial per size, skipping zero-qty sizes)
   const groupTotals = (group) =>
     group.sizeQuantities.reduce(
       (acc, row) => ({
-        serials: acc.serials + ((row.rightQty || 0) > 0 ? 1 : 0) + ((row.leftQty || 0) > 0 ? 1 : 0),
-        units: acc.units + (row.rightQty || 0) + (row.leftQty || 0),
+        serials: acc.serials + ((row.qty || 0) > 0 ? 1 : 0),
+        units: acc.units + (row.qty || 0),
       }),
       { serials: 0, units: 0 }
     );
@@ -601,7 +600,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                                   className="border border-gray-300 rounded-lg p-4 bg-gray-50 shadow-sm hover:shadow-md transition-shadow"
                                 >
                                   <div className="flex items-start gap-3">
-                                    <div className="flex-1 grid grid-cols-3 gap-3">
+                                    <div className="flex-1 grid grid-cols-2 gap-3">
                                       <div className="flex flex-col gap-1">
                                         <label className="text-xs font-semibold text-gray-700">
                                           {t("Size")}
@@ -640,28 +639,14 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                                       </div>
                                       <div className="flex flex-col gap-1">
                                         <label className="text-xs font-semibold text-gray-700">
-                                          {t("Quantity Right")}
+                                          {t("Qty")}
                                         </label>
                                         <input
                                           type="number"
-                                          value={row.rightQty}
-                                          onChange={(e) => handleFieldChange(group.id, row.id, "rightQty", e.target.value)}
-                                          placeholder={t("Right")}
-                                          min="0"
-                                          className="border rounded-md border-gray-300 p-2 text-sm focus:border-secondary focus:outline-none"
-                                          required
-                                        />
-                                      </div>
-                                      <div className="flex flex-col gap-1">
-                                        <label className="text-xs font-semibold text-gray-700">
-                                          {t("Quantity Left")}
-                                        </label>
-                                        <input
-                                          type="number"
-                                          value={row.leftQty}
-                                          onChange={(e) => handleFieldChange(group.id, row.id, "leftQty", e.target.value)}
-                                          placeholder={t("Left")}
-                                          min="0"
+                                          value={row.qty}
+                                          onChange={(e) => handleFieldChange(group.id, row.id, "qty", e.target.value)}
+                                          placeholder={t("Qty")}
+                                          min="1"
                                           className="border rounded-md border-gray-300 p-2 text-sm focus:border-secondary focus:outline-none"
                                           required
                                         />
@@ -697,24 +682,20 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                       <strong>{grandTotals.serials}</strong> {t("unique control serial(s) will be generated")} ({grandTotals.units} {t("total units")}) {t("for")} <strong>{itemGroups.length}</strong> {t("item code(s)")}
                     </p>
                     <p className="text-xs text-blue-700 mt-1 italic">
-                      {t("Note: each size generates up to 2 serials — one for Right shoes, one for Left shoes.")}
+                      {t("Note: each size generates 1 serial carrying its quantity.")}
                     </p>
                     {itemGroups.length > 0 && (
                       <div className="mt-2 text-xs text-blue-700 space-y-2">
                         {itemGroups.map((group) => (
                           <div key={group.id}>
                             <div className="font-semibold">{group.itemCode}</div>
-                            {group.sizeQuantities.map((row) => {
-                              const serialsForSize =
-                                ((row.rightQty || 0) > 0 ? 1 : 0) + ((row.leftQty || 0) > 0 ? 1 : 0);
-                              return (
-                                <div key={row.id} className="ps-3">
-                                  • {t("Size")} <strong>{row.size || "___"}</strong>: R={row.rightQty || 0}, L={row.leftQty || 0}
-                                  {" → "}
-                                  <strong>{serialsForSize}</strong> {t("serial(s)")}, {(row.rightQty || 0) + (row.leftQty || 0)} {t("units")}
-                                </div>
-                              );
-                            })}
+                            {group.sizeQuantities.map((row) => (
+                              <div key={row.id} className="ps-3">
+                                • {t("Size")} <strong>{row.size || "___"}</strong>: {t("Qty")}={row.qty || 0}
+                                {" → "}
+                                <strong>{(row.qty || 0) > 0 ? 1 : 0}</strong> {t("serial(s)")}, {row.qty || 0} {t("units")}
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </div>

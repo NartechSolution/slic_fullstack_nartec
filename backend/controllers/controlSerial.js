@@ -79,25 +79,19 @@ exports.createControlSerials = async (req, res, next) => {
       throw error;
     }
 
-    // Validate and consolidate sizes — now supports rightQty/leftQty
+    // Validate and consolidate sizes (duplicate sizes are summed)
     const consolidatedMap = new Map();
     for (const item of sizeQuantities) {
       if (!item.size) continue;
-      const rQty = Number(item.rightQty) || Number(item.qty) || 0;
-      const lQty = Number(item.leftQty) || 0;
-      if (rQty <= 0 && lQty <= 0) continue;
+      const qty = Number(item.qty) || 0;
+      if (qty <= 0) continue;
 
-      const existing = consolidatedMap.get(item.size) || { rightQty: 0, leftQty: 0 };
-      consolidatedMap.set(item.size, {
-        rightQty: existing.rightQty + rQty,
-        leftQty: existing.leftQty + lQty,
-      });
+      consolidatedMap.set(item.size, (consolidatedMap.get(item.size) || 0) + qty);
     }
 
-    const validSizeQuantities = Array.from(consolidatedMap.entries()).map(([size, qtys]) => ({
+    const validSizeQuantities = Array.from(consolidatedMap.entries()).map(([size, qty]) => ({
       size,
-      rightQty: qtys.rightQty,
-      leftQty: qtys.leftQty,
+      qty,
     }));
 
     if (validSizeQuantities.length === 0) {
@@ -148,45 +142,25 @@ exports.createControlSerials = async (req, res, next) => {
 
     const master = await masterPromise;
 
-    // ── Step 4: Generate 2 serial objects per size (1 Right + 1 Left) ──
+    // ── Step 4: Generate 1 serial object per size carrying its qty ──
     const serials = [];
 
     let totalQty = 0;
-    for (const { size, rightQty, leftQty } of validSizeQuantities) {
+    for (const { size, qty } of validSizeQuantities) {
       const product = sizeProductMap.get(size);
-      totalQty += rightQty + leftQty;
+      totalQty += qty;
 
-      // Right serial
-      if (rightQty > 0) {
-        if (currentNum > 999999) throw new Error("Series number exceeds maximum value (999999)");
-        serials.push({
-          serialNumber: `${ItemCode}${currentNum.toString().padStart(6, "0")}`,
-          ItemCode: product.id,
-          supplierId,
-          poNumber,
-          size,
-          masterId: master.id,
-          side: "R",
-          sideQty: rightQty,
-        });
-        currentNum++;
-      }
-
-      // Left serial
-      if (leftQty > 0) {
-        if (currentNum > 999999) throw new Error("Series number exceeds maximum value (999999)");
-        serials.push({
-          serialNumber: `${ItemCode}${currentNum.toString().padStart(6, "0")}`,
-          ItemCode: product.id,
-          supplierId,
-          poNumber,
-          size,
-          masterId: master.id,
-          side: "L",
-          sideQty: leftQty,
-        });
-        currentNum++;
-      }
+      if (currentNum > 999999) throw new Error("Series number exceeds maximum value (999999)");
+      serials.push({
+        serialNumber: `${ItemCode}${currentNum.toString().padStart(6, "0")}`,
+        ItemCode: product.id,
+        supplierId,
+        poNumber,
+        size,
+        masterId: master.id,
+        sideQty: qty,
+      });
+      currentNum++;
     }
 
     // ── Step 5: Bulk raw-SQL INSERT (1 000 rows/chunk, 50 parallel) ─────────
@@ -317,66 +291,33 @@ exports.receiveWithQty = async (req, res, next) => {
       throw error;
     }
 
-    // Build per-size summary based on UNITS (sideQty) — not serial count
-    const sizeSummary = {};
+    // Build per-size planned units (sideQty) — not serial count
+    const sizeTotals = {};
     for (const serial of master.serials) {
       const sz = serial.size || "unknown";
-      if (!sizeSummary[sz]) {
-        sizeSummary[sz] = { rTotal: 0, lTotal: 0, rReceived: 0, lReceived: 0 };
-      }
-      const qty = serial.sideQty || 0;
-      const received = serial.receivedSideQty || 0;
-      if (serial.side === "R") {
-        sizeSummary[sz].rTotal += qty;
-        sizeSummary[sz].rReceived += received;
-      } else if (serial.side === "L") {
-        sizeSummary[sz].lTotal += qty;
-        sizeSummary[sz].lReceived += received;
-      } else {
-        // legacy serials without side: treat as right
-        sizeSummary[sz].rTotal += qty || 1;
-        if (serial.isReceived) sizeSummary[sz].rReceived += qty || 1;
-      }
+      sizeTotals[sz] = (sizeTotals[sz] || 0) + (serial.sideQty || 1);
     }
 
     for (const entry of sizeReceived) {
       const { size } = entry;
-      const info = sizeSummary[size];
-      if (!info) {
+      const total = sizeTotals[size];
+      if (total === undefined) {
         const error = new CustomError(`Size ${size} not found in this PO`);
         error.statusCode = 400;
         throw error;
       }
 
-      const rightReceived = Number(entry.rightReceived ?? 0);
-      const leftReceived = Number(entry.leftReceived ?? 0);
-      const legacyQty = Number(entry.receivedQty ?? 0);
+      const receivedQty = Number(entry.receivedQty ?? 0);
 
-      if (rightReceived < 0 || leftReceived < 0 || legacyQty < 0) {
+      if (receivedQty < 0) {
         const error = new CustomError(`Received quantity cannot be negative for size ${size}`);
         error.statusCode = 400;
         throw error;
       }
 
-      // Validate: total requested cannot exceed total planned
-      if (rightReceived > info.rTotal) {
+      if (receivedQty > total) {
         const error = new CustomError(
-          `Cannot receive ${rightReceived} right for size ${size} — only ${info.rTotal} planned`
-        );
-        error.statusCode = 400;
-        throw error;
-      }
-      if (leftReceived > info.lTotal) {
-        const error = new CustomError(
-          `Cannot receive ${leftReceived} left for size ${size} — only ${info.lTotal} planned`
-        );
-        error.statusCode = 400;
-        throw error;
-      }
-      // Legacy single-qty path: cap at total units for the size
-      if (legacyQty > info.rTotal + info.lTotal) {
-        const error = new CustomError(
-          `Cannot receive ${legacyQty} for size ${size} — only ${info.rTotal + info.lTotal} units planned`
+          `Cannot receive ${receivedQty} for size ${size} — only ${total} units planned`
         );
         error.statusCode = 400;
         throw error;
