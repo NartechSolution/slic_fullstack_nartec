@@ -44,51 +44,36 @@ exports.getDigitalLink = async (req, res, next) => {
 
       if (mergeRecord) {
         // Redirect-style: build a full FG trace response inline
-        const [s1, s2, events1, events2] = await Promise.all([
-          prisma.controlSerial.findFirst({
-            where: { serialNumber: mergeRecord.serial1 },
-            include: { product: true, supplier: true, binLocation: true },
-          }),
-          prisma.controlSerial.findFirst({
-            where: { serialNumber: mergeRecord.serial2 },
+        // New FGs store the same serial in serial1 and serial2; older ones paired two
+        const serialNumbers = [...new Set([mergeRecord.serial1, mergeRecord.serial2].filter(Boolean))];
+
+        const [serialRows, events] = await Promise.all([
+          prisma.controlSerial.findMany({
+            where: { serialNumber: { in: serialNumbers } },
             include: { product: true, supplier: true, binLocation: true },
           }),
           prisma.serialEvent.findMany({
-            where: { serialNumber: mergeRecord.serial1 },
-            orderBy: { occurredAt: "asc" },
-          }),
-          prisma.serialEvent.findMany({
-            where: { serialNumber: mergeRecord.serial2 },
+            where: { serialNumber: { in: serialNumbers } },
             orderBy: { occurredAt: "asc" },
           }),
         ]);
 
-        const product = s1?.product || s2?.product;
+        const product = serialRows.find((s) => s.product)?.product;
 
         // Build combined timeline
         const timeline = [
-          ...events1.map((e) => ({
+          ...events.map((e) => ({
             type: e.eventType,
             title: eventTypeToTitle(e.eventType),
             description: e.description,
-            side: s1?.side || null,
-            serialNumber: mergeRecord.serial1,
-            performedBy: e.performedBy,
-            occurredAt: e.occurredAt,
-          })),
-          ...events2.map((e) => ({
-            type: e.eventType,
-            title: eventTypeToTitle(e.eventType),
-            description: e.description,
-            side: s2?.side || null,
-            serialNumber: mergeRecord.serial2,
+            serialNumber: e.serialNumber,
             performedBy: e.performedBy,
             occurredAt: e.occurredAt,
           })),
           {
             type: "FG_CREATED",
             title: "Finished Good Created",
-            description: `FG serial ${mergeRecord.fgSerial} from ${mergeRecord.serial1} + ${mergeRecord.serial2}`,
+            description: `FG serial ${mergeRecord.fgSerial} from ${serialNumbers.join(" + ")}`,
             occurredAt: mergeRecord.createdAt,
             performedBy: mergeRecord.mergedBy,
           },
@@ -99,8 +84,7 @@ exports.getDigitalLink = async (req, res, next) => {
             type: "FINISHED_GOOD",
             fg: {
               fgSerial: mergeRecord.fgSerial,
-              serial1: mergeRecord.serial1,
-              serial2: mergeRecord.serial2,
+              serialNumbers,
               poNumber: mergeRecord.poNumber,
               itemCode: mergeRecord.itemCode,
               size: mergeRecord.size,
@@ -123,8 +107,7 @@ exports.getDigitalLink = async (req, res, next) => {
                   size: mergeRecord.size,
                 }
               : null,
-            leftShoe: s1 ? { serialNumber: s1.serialNumber, side: s1.side, sideQty: s1.sideQty, size: s1.size, isReceived: s1.isReceived, bin: s1.binLocation?.binNumber } : null,
-            rightShoe: s2 ? { serialNumber: s2.serialNumber, side: s2.side, sideQty: s2.sideQty, size: s2.size, isReceived: s2.isReceived, bin: s2.binLocation?.binNumber } : null,
+            serials: serialRows.map((s) => ({ serialNumber: s.serialNumber, qty: s.sideQty, size: s.size, isReceived: s.isReceived, bin: s.binLocation?.binNumber })),
             timeline,
           })
         );

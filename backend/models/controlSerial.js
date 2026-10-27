@@ -1043,6 +1043,8 @@ class ControlSerialModel {
         isSentToSupplier: true,
         isArchived: true,
         isReceived: true,
+        sideQty: true,
+        receivedSideQty: true,
         binLocationId: true,
         masterId: true,
         product: { select: { id: true, ItemCode: true, ProductSize: true } },

@@ -4,14 +4,15 @@
  * Reads over MergeRecord (+ ControlSerial + product) to expose a dedicated
  * Finished Goods API for the warehouse/production UI.
  *
- * A "Finished Good" is the result of merging two ControlSerials (left + right)
- * into a single FG barcode. Each MergeRecord = 1 finished pair.
+ * A "Finished Good" is one unit (pair) of a ControlSerial turned into an FG
+ * barcode. Each MergeRecord = 1 finished pair. Older records paired two
+ * serials; new ones store the same serial in serial1 and serial2.
  *
  * Endpoints:
  *   GET /api/finished-goods              — paginated list with filters
  *   GET /api/finished-goods/stats        — dashboard counters
  *   GET /api/finished-goods/grouped      — grouped by product + size (for the FG screen card view)
- *   GET /api/finished-goods/:fgSerial    — full trace (both serials + full history)
+ *   GET /api/finished-goods/:fgSerial    — full trace (source serial(s) + full history)
  *
  * Endpoints are read-only — actual FG creation goes through the existing
  * /api/merge-serial/merge endpoint.
@@ -21,6 +22,9 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const generateResponse = require("../utils/response");
 const CustomError = require("../exceptions/customError");
+
+// Unique source serial(s) of a MergeRecord
+const fgSerialNumbers = (r) => [...new Set([r.serial1, r.serial2].filter(Boolean))];
 
 // ── GET /api/finished-goods ─────────────────────────────────────────────────
 // Paginated, filterable list of finished goods (one row per FG serial).
@@ -91,8 +95,7 @@ exports.listFinishedGoods = async (req, res, next) => {
       return {
         id: r.id,
         fgSerial: r.fgSerial,
-        serial1: r.serial1,
-        serial2: r.serial2,
+        serialNumbers: fgSerialNumbers(r),
         poNumber: r.poNumber,
         itemCode: r.itemCode,
         itemName: product?.EnglishName || null,
@@ -213,8 +216,7 @@ exports.getFinishedGoodsGrouped = async (req, res, next) => {
       g.barcodes.push({
         id: r.id,
         fgSerial: r.fgSerial,
-        serial1: r.serial1,
-        serial2: r.serial2,
+        serialNumbers: fgSerialNumbers(r),
         createdAt: r.createdAt,
       });
     }
@@ -279,18 +281,12 @@ exports.getFinishedGoodTrace = async (req, res, next) => {
       throw err;
     }
 
-    const [s1, s2, events1, events2, product] = await Promise.all([
-      prisma.controlSerial.findFirst({
-        where: { serialNumber: record.serial1 },
-        include: {
-          product: true,
-          supplier: true,
-          binLocation: true,
-          master: { select: { poNumber: true, receivedStatus: true, isSentToSupplier: true } },
-        },
-      }),
-      prisma.controlSerial.findFirst({
-        where: { serialNumber: record.serial2 },
+    // New FGs store the same serial in serial1 and serial2; older ones paired two
+    const serialNumbers = fgSerialNumbers(record);
+
+    const [serialRows, events, product] = await Promise.all([
+      prisma.controlSerial.findMany({
+        where: { serialNumber: { in: serialNumbers } },
         include: {
           product: true,
           supplier: true,
@@ -299,11 +295,7 @@ exports.getFinishedGoodTrace = async (req, res, next) => {
         },
       }),
       prisma.serialEvent.findMany({
-        where: { serialNumber: record.serial1 },
-        orderBy: { occurredAt: "asc" },
-      }),
-      prisma.serialEvent.findMany({
-        where: { serialNumber: record.serial2 },
+        where: { serialNumber: { in: serialNumbers } },
         orderBy: { occurredAt: "asc" },
       }),
       record.itemCode
@@ -316,25 +308,15 @@ exports.getFinishedGoodTrace = async (req, res, next) => {
       {
         type: "FG_CREATED",
         title: "Finished Good Created",
-        description: `FG serial ${record.fgSerial} generated from merging ${record.serial1} + ${record.serial2}`,
+        description: `FG serial ${record.fgSerial} generated from ${serialNumbers.join(" + ")}`,
         occurredAt: record.createdAt,
         performedBy: record.mergedBy,
       },
-      ...events1.map((e) => ({
+      ...events.map((e) => ({
         type: e.eventType,
         title: formatEventTitle(e.eventType),
         description: e.description,
-        side: s1?.side || null,
-        serialNumber: record.serial1,
-        performedBy: e.performedBy,
-        occurredAt: e.occurredAt,
-      })),
-      ...events2.map((e) => ({
-        type: e.eventType,
-        title: formatEventTitle(e.eventType),
-        description: e.description,
-        side: s2?.side || null,
-        serialNumber: record.serial2,
+        serialNumber: e.serialNumber,
         performedBy: e.performedBy,
         occurredAt: e.occurredAt,
       })),
@@ -344,8 +326,7 @@ exports.getFinishedGoodTrace = async (req, res, next) => {
       generateResponse(200, true, "Finished good trace retrieved", {
         fg: {
           fgSerial: record.fgSerial,
-          serial1: record.serial1,
-          serial2: record.serial2,
+          serialNumbers,
           poNumber: record.poNumber,
           itemCode: record.itemCode,
           size: record.size,
@@ -367,32 +348,16 @@ exports.getFinishedGoodTrace = async (req, res, next) => {
               brandName: product.BrandName,
             }
           : null,
-        leftShoe: s1
-          ? {
-              serialNumber: s1.serialNumber,
-              side: s1.side,
-              sideQty: s1.sideQty,
-              size: s1.size,
-              isReceived: s1.isReceived,
-              isSentToSupplier: s1.isSentToSupplier,
-              bin: s1.binLocation?.binNumber || null,
-              supplier: s1.supplier?.name || null,
-              poNumber: s1.master?.poNumber || s1.poNumber,
-            }
-          : null,
-        rightShoe: s2
-          ? {
-              serialNumber: s2.serialNumber,
-              side: s2.side,
-              sideQty: s2.sideQty,
-              size: s2.size,
-              isReceived: s2.isReceived,
-              isSentToSupplier: s2.isSentToSupplier,
-              bin: s2.binLocation?.binNumber || null,
-              supplier: s2.supplier?.name || null,
-              poNumber: s2.master?.poNumber || s2.poNumber,
-            }
-          : null,
+        serials: serialRows.map((s) => ({
+          serialNumber: s.serialNumber,
+          qty: s.sideQty,
+          size: s.size,
+          isReceived: s.isReceived,
+          isSentToSupplier: s.isSentToSupplier,
+          bin: s.binLocation?.binNumber || null,
+          supplier: s.supplier?.name || null,
+          poNumber: s.master?.poNumber || s.poNumber,
+        })),
         timeline,
       })
     );
