@@ -313,11 +313,11 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
     }
   };
 
-  // Serials + units per item code (1 serial per size, skipping zero-qty sizes)
+  // Serials + units per item code (1 unique serial per unit, so serials = qty)
   const groupTotals = (group) =>
     group.sizeQuantities.reduce(
       (acc, row) => ({
-        serials: acc.serials + ((row.qty || 0) > 0 ? 1 : 0),
+        serials: acc.serials + (row.qty || 0),
         units: acc.units + (row.qty || 0),
       }),
       { serials: 0, units: 0 }
@@ -682,7 +682,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                       <strong>{grandTotals.serials}</strong> {t("unique control serial(s) will be generated")} ({grandTotals.units} {t("total units")}) {t("for")} <strong>{itemGroups.length}</strong> {t("item code(s)")}
                     </p>
                     <p className="text-xs text-blue-700 mt-1 italic">
-                      {t("Note: each size generates 1 serial carrying its quantity.")}
+                      {t("Note: each unit gets its own unique serial — Qty 20 generates 20 serials.")}
                     </p>
                     {itemGroups.length > 0 && (
                       <div className="mt-2 text-xs text-blue-700 space-y-2">
@@ -693,7 +693,7 @@ const AddControlSerialPopup = ({ isVisible, setVisibility, refreshData, itemCode
                               <div key={row.id} className="ps-3">
                                 • {t("Size")} <strong>{row.size || "___"}</strong>: {t("Qty")}={row.qty || 0}
                                 {" → "}
-                                <strong>{(row.qty || 0) > 0 ? 1 : 0}</strong> {t("serial(s)")}, {row.qty || 0} {t("units")}
+                                <strong>{row.qty || 0}</strong> {t("serial(s)")}
                               </div>
                             ))}
                           </div>

@@ -142,7 +142,7 @@ exports.createControlSerials = async (req, res, next) => {
 
     const master = await masterPromise;
 
-    // ── Step 4: Generate 1 serial object per size carrying its qty ──
+    // ── Step 4: Generate 1 unique serial per unit (pair) — qty N → N serials ──
     const serials = [];
 
     let totalQty = 0;
@@ -150,17 +150,19 @@ exports.createControlSerials = async (req, res, next) => {
       const product = sizeProductMap.get(size);
       totalQty += qty;
 
-      if (currentNum > 999999) throw new Error("Series number exceeds maximum value (999999)");
-      serials.push({
-        serialNumber: `${ItemCode}${currentNum.toString().padStart(6, "0")}`,
-        ItemCode: product.id,
-        supplierId,
-        poNumber,
-        size,
-        masterId: master.id,
-        sideQty: qty,
-      });
-      currentNum++;
+      for (let i = 0; i < qty; i++) {
+        if (currentNum > 999999) throw new Error("Series number exceeds maximum value (999999)");
+        serials.push({
+          serialNumber: `${ItemCode}${currentNum.toString().padStart(6, "0")}`,
+          ItemCode: product.id,
+          supplierId,
+          poNumber,
+          size,
+          masterId: master.id,
+          sideQty: 1,
+        });
+        currentNum++;
+      }
     }
 
     // ── Step 5: Bulk raw-SQL INSERT (1 000 rows/chunk, 50 parallel) ─────────
