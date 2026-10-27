@@ -1,13 +1,14 @@
 /**
  * Merge Serial Controller
  * =======================
- * Handles pairing of two shoe serials (left + right) into a Finished Good barcode.
+ * Turns one unit (pair) of a control serial into a Finished Good barcode.
  *
  * Rules enforced:
- *  - Both serials must exist as ControlSerial records
- *  - Both must share the same ItemCode (product)
- *  - Both must share the same size
- *  - Neither can already be in an existing MergeRecord (prevents double-merge)
+ *  - The serial must exist as a ControlSerial record and not be archived
+ *  - A serial can produce at most `sideQty` FGs (its planned qty in pairs)
+ *
+ * MergeRecord.serial1/serial2 are both required columns; single-serial merges
+ * store the same serial in both.
  */
 
 const { PrismaClient } = require("@prisma/client");
@@ -16,10 +17,10 @@ const generateResponse = require("../utils/response");
 const CustomError = require("../exceptions/customError");
 
 // ── Helper: generate a deterministic FG serial ──────────────────────────────
-function buildFgSerial(serial1, serial2, poNumber, size) {
+function buildFgSerial(poNumber, size) {
   const ts = Date.now();
   // Random suffix prevents collisions when two merges land in the same ms
-  // (matters when batch-scanning many pairs of the same master serial).
+  // (matters when batch-scanning many units of the same master serial).
   const rnd = Math.floor(Math.random() * 9000) + 1000;
   const po = (poNumber || "NOPO").replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
   const sz = (size || "XX").replace(/\s+/g, "");
@@ -104,8 +105,7 @@ exports.validateSerial = async (req, res, next) => {
     }
 
     // A "master" ControlSerial can be merged up to `sideQty` times — once per
-    // physical unit it represents. The legacy rule (one merge per serial string)
-    // breaks for shoe-pair flows where 1 R-master + 1 L-master cover 50 pairs.
+    // pair it represents.
     const mergeCount = await countMergeUsages(serial.serialNumber);
     const cap = serial.sideQty && serial.sideQty > 0 ? serial.sideQty : 1;
     const remaining = Math.max(0, cap - mergeCount);
@@ -122,8 +122,7 @@ exports.validateSerial = async (req, res, next) => {
     res.status(200).json(
       generateResponse(200, true, "Serial validated successfully", {
         serialNumber: serial.serialNumber,
-        side: serial.side || null,
-        sideQty: cap,
+        qty: cap,
         // Merge-usage tracking
         mergeCount,
         mergeCap: cap,
@@ -153,63 +152,31 @@ exports.validateSerial = async (req, res, next) => {
   }
 };
 
-// ── POST /api/merge-serial/merge — pair two serials into FG ─────────────────
+// ── POST /api/merge-serial/merge — turn one unit of a serial into an FG ─────
 exports.mergeSerials = async (req, res, next) => {
   try {
-    const { serial1, serial2, mergedBy } = req.body;
+    const { mergedBy } = req.body;
+    const serialNumber = req.body.serialNumber?.trim();
 
-    if (!serial1?.trim() || !serial2?.trim()) {
-      const err = new CustomError("Both serial1 and serial2 are required");
+    if (!serialNumber) {
+      const err = new CustomError("serialNumber is required");
       err.statusCode = 400;
       throw err;
     }
 
-    if (serial1.trim() === serial2.trim()) {
-      const err = new CustomError("serial1 and serial2 must be different");
-      err.statusCode = 400;
-      throw err;
-    }
+    const serial = await prisma.controlSerial.findFirst({
+      where: { serialNumber },
+      include: { product: true },
+    });
 
-    // Fetch both serials in parallel
-    const [s1, s2] = await Promise.all([
-      prisma.controlSerial.findFirst({
-        where: { serialNumber: serial1.trim() },
-        include: { product: true },
-      }),
-      prisma.controlSerial.findFirst({
-        where: { serialNumber: serial2.trim() },
-        include: { product: true },
-      }),
-    ]);
-
-    // Validate existence
-    if (!s1) {
-      const err = new CustomError(`Serial not found: ${serial1}`);
-      err.statusCode = 404;
-      throw err;
-    }
-    if (!s2) {
-      const err = new CustomError(`Serial not found: ${serial2}`);
+    if (!serial) {
+      const err = new CustomError(`Serial not found: ${serialNumber}`);
       err.statusCode = 404;
       throw err;
     }
 
-    // Validate same ItemCode (product)
-    if (s1.ItemCode !== s2.ItemCode) {
-      const err = new CustomError(
-        `Serials belong to different products: ${s1.product?.ItemCode} vs ${s2.product?.ItemCode}`
-      );
-      err.statusCode = 400;
-      throw err;
-    }
-
-    // Validate same size
-    const size1 = (s1.size || s1.product?.ProductSize || "").trim();
-    const size2 = (s2.size || s2.product?.ProductSize || "").trim();
-    if (size1 !== size2) {
-      const err = new CustomError(
-        `Serials have different sizes: "${size1}" vs "${size2}"`
-      );
+    if (serial.isArchived) {
+      const err = new CustomError(`Serial ${serialNumber} is archived and cannot be merged`);
       err.statusCode = 400;
       throw err;
     }
@@ -217,98 +184,72 @@ exports.mergeSerials = async (req, res, next) => {
     // Cap-based merge check
     // ─────────────────────
     // A master ControlSerial can be merged up to `sideQty` times — once per
-    // physical unit it represents. We count how many times each input serial
-    // has been used in a MergeRecord and reject only when the cap is reached.
-    // This lets workers scan the same R + L master barcodes many times to
-    // pair every unit in the lot, instead of being blocked after the first one.
-    const [c1, c2] = await Promise.all([
-      countMergeUsages(serial1.trim()),
-      countMergeUsages(serial2.trim()),
-    ]);
-    const cap1 = s1.sideQty && s1.sideQty > 0 ? s1.sideQty : 1;
-    const cap2 = s2.sideQty && s2.sideQty > 0 ? s2.sideQty : 1;
+    // pair it represents. This lets workers scan the same master barcode many
+    // times to produce every FG in the lot.
+    const count = await countMergeUsages(serialNumber);
+    const cap = serial.sideQty && serial.sideQty > 0 ? serial.sideQty : 1;
 
-    if (c1 >= cap1) {
+    if (count >= cap) {
       const err = new CustomError(
-        `Serial ${serial1} has reached its merge cap (${c1}/${cap1}). All units under this master serial have been paired.`
-      );
-      err.statusCode = 400;
-      throw err;
-    }
-    if (c2 >= cap2) {
-      const err = new CustomError(
-        `Serial ${serial2} has reached its merge cap (${c2}/${cap2}). All units under this master serial have been paired.`
+        `Serial ${serialNumber} has reached its merge cap (${count}/${cap}). All units under this master serial have been produced.`
       );
       err.statusCode = 400;
       throw err;
     }
 
-    const poNumber = s1.poNumber || s2.poNumber || null;
-    const fgSerial = buildFgSerial(serial1, serial2, poNumber, size1);
+    const size = (serial.size || serial.product?.ProductSize || "").trim();
+    const poNumber = serial.poNumber || null;
+    const fgSerial = buildFgSerial(poNumber, size);
     const performer = mergedBy || "System";
 
-    // Create merge record + fire events for both serials in a transaction
+    // Create merge record + fire event in a transaction
     const [mergeRecord] = await prisma.$transaction([
       prisma.mergeRecord.create({
         data: {
-          serial1: serial1.trim(),
-          serial2: serial2.trim(),
+          serial1: serialNumber,
+          serial2: serialNumber,
           fgSerial,
           poNumber,
-          itemCode: s1.product?.ItemCode || null,
-          size: size1 || null,
-          gtin: s1.product?.GTIN || null,
+          itemCode: serial.product?.ItemCode || null,
+          size: size || null,
+          gtin: serial.product?.GTIN || null,
           mergedBy: performer,
         },
       }),
       prisma.serialEvent.create({
         data: {
-          serialNumber: serial1.trim(),
+          serialNumber,
           eventType: "MERGED",
-          description: `Merged with ${serial2} → FG: ${fgSerial}`,
-          metadata: JSON.stringify({ fgSerial, pairedWith: serial2, poNumber }),
-          performedBy: performer,
-        },
-      }),
-      prisma.serialEvent.create({
-        data: {
-          serialNumber: serial2.trim(),
-          eventType: "MERGED",
-          description: `Merged with ${serial1} → FG: ${fgSerial}`,
-          metadata: JSON.stringify({ fgSerial, pairedWith: serial1, poNumber }),
+          description: `Finished Good created → FG: ${fgSerial}`,
+          metadata: JSON.stringify({ fgSerial, poNumber }),
           performedBy: performer,
         },
       }),
     ]);
 
     // Post-merge usage — useful for the UI to show "X of Y merged · N left"
-    const newC1 = c1 + 1;
-    const newC2 = c2 + 1;
+    const newCount = count + 1;
 
     res.status(201).json(
-      generateResponse(201, true, "Serials merged successfully", {
+      generateResponse(201, true, "Finished Good created successfully", {
         fgSerial: mergeRecord.fgSerial,
-        serial1: mergeRecord.serial1,
-        serial2: mergeRecord.serial2,
+        serialNumber,
         poNumber: mergeRecord.poNumber,
         itemCode: mergeRecord.itemCode,
         size: mergeRecord.size,
         gtin: mergeRecord.gtin,
         mergedAt: mergeRecord.createdAt,
-        // Cap usage post-merge — let the frontend show remaining counts and
-        // decide whether to clear the inputs (cap reached) or keep them for
-        // batch scanning the same master pair.
-        usage: {
-          serial1: { count: newC1, cap: cap1, remaining: Math.max(0, cap1 - newC1) },
-          serial2: { count: newC2, cap: cap2, remaining: Math.max(0, cap2 - newC2) },
-        },
+        // Cap usage post-merge — lets the frontend show remaining counts and
+        // decide whether to clear the input (cap reached) or keep it for
+        // batch scanning the same master serial.
+        usage: { count: newCount, cap, remaining: Math.max(0, cap - newCount) },
         product: {
-          itemCode: s1.product?.ItemCode,
-          englishName: s1.product?.EnglishName,
-          gtin: s1.product?.GTIN,
-          size: size1,
-          color: s1.product?.color,
-          image: s1.product?.image,
+          itemCode: serial.product?.ItemCode,
+          englishName: serial.product?.EnglishName,
+          gtin: serial.product?.GTIN,
+          size,
+          color: serial.product?.color,
+          image: serial.product?.image,
         },
       })
     );
