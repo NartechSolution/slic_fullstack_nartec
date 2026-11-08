@@ -233,6 +233,32 @@ class ItemCodeModel {
     return itemCodes;
   }
 
+  static async findAllByItemCode(itemCode) {
+    return await prisma.tblItemCodes1S1Br.findMany({
+      where: { ItemCode: itemCode.toString() },
+    });
+  }
+
+  static async updateManyByIds(ids, data) {
+    return await prisma.tblItemCodes1S1Br.updateMany({
+      where: { id: { in: ids.map((id) => id.toString()) } },
+      data,
+    });
+  }
+
+  /**
+   * Counts records (other than the excluded ids) that still reference an image path.
+   * Used to avoid deleting an image file that is shared by several records.
+   */
+  static async countByImageExcludingIds(image, excludeIds = []) {
+    return await prisma.tblItemCodes1S1Br.count({
+      where: {
+        image,
+        id: { notIn: excludeIds.map((id) => id.toString()) },
+      },
+    });
+  }
+
   static async findManyByItemCodeAndSizes(itemCode, sizes) {
     return await prisma.tblItemCodes1S1Br.findMany({
       where: {

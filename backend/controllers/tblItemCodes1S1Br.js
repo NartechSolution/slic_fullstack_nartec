@@ -325,8 +325,114 @@ exports.putItemCode = async (req, res, next) => {
       width,
       color,
       label,
+      applyTo, // "selected" (default) | "all" | "multiple"
+      targetGTINs, // JSON array of GTINs, used when applyTo === "multiple"
     } = req.body;
 
+    // ---- Apply to ALL / MULTIPLE sizes sharing the same ItemCode ----
+    if (applyTo === "all" || applyTo === "multiple") {
+      const groupItemCode = existingItemCode.ItemCode;
+      if (!groupItemCode) {
+        const error = new CustomError(
+          "Selected record has no ItemCode, cannot apply to other sizes"
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+
+      let groupRecords = await ItemCodeModel.findAllByItemCode(groupItemCode);
+
+      if (applyTo === "multiple") {
+        let gtinList = targetGTINs;
+        if (typeof gtinList === "string") {
+          try {
+            gtinList = JSON.parse(gtinList);
+          } catch (e) {
+            const error = new CustomError("Invalid targetGTINs format");
+            error.statusCode = 400;
+            throw error;
+          }
+        }
+        if (!Array.isArray(gtinList) || gtinList.length === 0) {
+          const error = new CustomError("Please select at least one size");
+          error.statusCode = 400;
+          throw error;
+        }
+        const gtinSet = new Set(gtinList.map((g) => g.toString()));
+        // Only records belonging to the same ItemCode can be targeted
+        groupRecords = groupRecords.filter((r) => gtinSet.has(String(r.GTIN)));
+      }
+
+      if (groupRecords.length === 0) {
+        const error = new CustomError("No matching sizes found to update");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const groupIds = groupRecords.map((r) => r.id);
+
+      // Shared fields only — each record keeps its own size, GTIN and quantity
+      const sharedData = {};
+      if (itemCode) sharedData.ItemCode = itemCode;
+      if (description) sharedData.EnglishName = description;
+      if (ArabicName) sharedData.ArabicName = ArabicName;
+      if (upper !== undefined) sharedData.upper = upper;
+      if (sole !== undefined) sharedData.sole = sole;
+      if (width !== undefined) sharedData.width = width;
+      if (color !== undefined) sharedData.color = color;
+      if (label !== undefined) sharedData.label = label;
+
+      if (req.file) {
+        imagePath = req.file.path;
+        sharedData.image = imagePath;
+      }
+
+      if (Object.keys(sharedData).length === 0) {
+        const error = new CustomError("Update data is required");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const result = await ItemCodeModel.updateManyByIds(groupIds, sharedData);
+
+      if (!result || result.count === 0) {
+        const error = new CustomError(`Couldn't update item codes`);
+        error.statusCode = 500;
+        throw error;
+      }
+
+      // Remove old images that are no longer referenced by any other record
+      if (req.file) {
+        const oldImages = [
+          ...new Set(groupRecords.map((r) => r.image).filter(Boolean)),
+        ];
+        for (const oldImage of oldImages) {
+          if (oldImage === imagePath) continue;
+          const stillUsed = await ItemCodeModel.countByImageExcludingIds(
+            oldImage,
+            groupIds
+          );
+          if (stillUsed === 0) {
+            await deleteFile(oldImage);
+          }
+        }
+      }
+
+      return res.status(200).json(
+        generateResponse(
+          200,
+          true,
+          `${result.count} item code(s) updated successfully`,
+          {
+            updatedCount: result.count,
+            itemCode: sharedData.ItemCode || groupItemCode,
+            imageUpdated: !!req.file,
+          }
+        )
+      );
+    }
+
+    // ---- Apply to the SELECTED size only (original behaviour) ----
     // Prepare the updated data
     const updatedData = {
       ItemCode: itemCode || existingItemCode.ItemCode,
@@ -345,9 +451,15 @@ exports.putItemCode = async (req, res, next) => {
     if (req.file) {
       imagePath = req.file.path; // Store the path of the uploaded image
       updatedData.image = imagePath; // Add the new image path to the updated data
-      // delete old image if exists
+      // delete old image if exists (and isn't shared with other sizes)
       if (existingItemCode.image) {
-        await deleteFile(existingItemCode.image);
+        const stillUsed = await ItemCodeModel.countByImageExcludingIds(
+          existingItemCode.image,
+          [existingItemCode.id]
+        );
+        if (stillUsed === 0) {
+          await deleteFile(existingItemCode.image);
+        }
       }
     }
 
@@ -469,6 +581,32 @@ exports.findByItemCode = async (req, res, next) => {
       .json(
         generateResponse(200, true, "Item code retrieved successfully", item)
       );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /v1/itemCodes/sizes?itemCode=value
+ * Returns every size/GTIN record sharing the given ItemCode (used by the edit popup).
+ */
+exports.getSizesByItemCode = async (req, res, next) => {
+  try {
+    const itemCode = req.query.itemCode;
+    if (!itemCode) {
+      const error = new CustomError("itemCode is required");
+      error.statusCode = 400;
+      throw error;
+    }
+    const records = await ItemCodeModel.findAllByItemCode(itemCode);
+    const sizes = records.map((r) => ({
+      id: r.id,
+      GTIN: r.GTIN,
+      ProductSize: r.ProductSize,
+    }));
+    res
+      .status(200)
+      .json(generateResponse(200, true, "Sizes retrieved successfully", sizes));
   } catch (error) {
     next(error);
   }

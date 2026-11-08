@@ -10,6 +10,17 @@ import { QRCodeSVG } from "qrcode.react";
 import { useTranslation } from "react-i18next";
 import imageLiveUrl from "../../../utils/urlConverter/imageLiveUrl";
 
+// True only for a 13-digit code with a correct EAN-13 check digit
+const isValidEAN13 = (value) => {
+  const code = String(value ?? "").trim();
+  if (!/^\d{13}$/.test(code)) return false;
+  const digits = code.split("").map(Number);
+  const sum = digits
+    .slice(0, 12)
+    .reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 1 : 3), 0);
+  return (10 - (sum % 10)) % 10 === digits[12];
+};
+
 const UpdateGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
   const { t, i18n } = useTranslation();
   const [barcode, setBarcode] = useState("");
@@ -28,17 +39,83 @@ const UpdateGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
   const [imagePreview, setImagePreview] = useState(null);
   const [existingImage, setExistingImage] = useState(null);
   const [loading, setLoading] = useState(false);
+  // All size records sharing this itemCode, and which of them the update applies to
+  const [sizeOptions, setSizeOptions] = useState([]);
+  const [selectedGTINs, setSelectedGTINs] = useState([]);
+  const [sizesLoading, setSizesLoading] = useState(false);
   const memberDataString = sessionStorage.getItem('slicUserData');
   const memberData = JSON.parse(memberDataString);
-  
+
+  // get this session data
+  const updateProductsData = JSON.parse(sessionStorage.getItem("updateListOfEmployeeData"));
+  const currentGTIN = updateProductsData?.GTIN ? String(updateProductsData.GTIN) : "";
+
   const handleCloseCreatePopup = () => {
     setVisibility(false);
     setImage(null);
     setImagePreview(null);
+    setSelectedGTINs(currentGTIN ? [currentGTIN] : []);
+    setApplyTo("selected");
   };
 
-  // get this session data
-  const updateProductsData = JSON.parse(sessionStorage.getItem("updateListOfEmployeeData"));
+  // "selected" = only this record (default, original behaviour)
+  // "all"      = every size of the same itemCode
+  // "multiple" = only the sizes ticked by the user
+  const [applyTo, setApplyTo] = useState("selected");
+  const allGTINs = sizeOptions.map((s) => String(s.GTIN));
+  const isAllSelected = allGTINs.length > 0 && allGTINs.every((g) => selectedGTINs.includes(g));
+
+  // Load all sizes of this item code (used by the "Select Sizes" option)
+  useEffect(() => {
+    if (currentGTIN) setSelectedGTINs([currentGTIN]);
+    const code = updateProductsData?.ItemCode;
+    if (!code) {
+      setSizeOptions(currentGTIN ? [{ GTIN: currentGTIN, ProductSize: updateProductsData?.ProductSize }] : []);
+      return;
+    }
+    setSizesLoading(true);
+    newRequest
+      .get(`/itemCodes/v1/itemCodes/sizes?itemCode=${encodeURIComponent(code)}`, {
+        headers: { Authorization: `Bearer ${memberData?.data?.token}` },
+      })
+      .then((res) => {
+        const list = res?.data?.data;
+        // Server without this endpoint returns the SPA index.html instead of JSON
+        if (!Array.isArray(list)) {
+          throw new Error("Invalid sizes response");
+        }
+        // make sure the current record is always present
+        if (currentGTIN && !list.some((s) => String(s.GTIN) === currentGTIN)) {
+          list.unshift({ GTIN: currentGTIN, ProductSize: updateProductsData?.ProductSize });
+        }
+        list.sort((a, b) =>
+          String(a.ProductSize ?? "").localeCompare(String(b.ProductSize ?? ""), undefined, { numeric: true })
+        );
+        setSizeOptions(list);
+      })
+      .catch(() => {
+        toast.warning(t("Could not load other sizes for this item code"));
+        setSizeOptions(currentGTIN ? [{ GTIN: currentGTIN, ProductSize: updateProductsData?.ProductSize }] : []);
+      })
+      .finally(() => setSizesLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Size is per-record, so restore the original value when updating more than this record
+  useEffect(() => {
+    if (applyTo !== "selected") setStartSize(updateProductsData?.ProductSize || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyTo]);
+
+  const toggleSize = (gtin) => {
+    setSelectedGTINs((prev) =>
+      prev.includes(gtin) ? prev.filter((g) => g !== gtin) : [...prev, gtin]
+    );
+  };
+
+  const toggleSelectAllSizes = () => {
+    setSelectedGTINs(isAllSelected ? [] : allGTINs);
+  };
 
   useEffect(() => {
     setItemCode(updateProductsData?.ItemCode || "");
@@ -89,6 +166,10 @@ const UpdateGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
 
   const handleAddGTIN = async (e) => {
     e.preventDefault();
+    if (applyTo === "multiple" && selectedGTINs.length === 0) {
+      toast.error(t("Please select at least one size"));
+      return;
+    }
     setLoading(true);
 
     try {
@@ -102,7 +183,11 @@ const UpdateGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
       formData.append('width', width);
       formData.append('label', label);
       formData.append('color', color);
-      
+      formData.append('applyTo', applyTo);
+      if (applyTo === 'multiple') {
+        formData.append('targetGTINs', JSON.stringify(selectedGTINs));
+      }
+
       // Only append image if a new one is selected
       if (image) {
         formData.append('image', image);
@@ -137,7 +222,7 @@ const UpdateGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
           <div className="popup-container h-auto sm:w-[50%] w-full">
             <div
               className="popup-form w-full"
-              style={{ maxHeight: "90vh", overflowY: "auto" }}
+              style={{ maxHeight: "90vh", overflowY: "auto", overflowX: "hidden" }}
             >
               <div className="relative">
                 <div className="fixed top-0 left-0 z-10 flex justify-between w-full px-3 bg-secondary">
@@ -203,7 +288,7 @@ const UpdateGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
                   </div>
                 </div>
               </div>
-              <form onSubmit={handleAddGTIN} className="w-full overflow-y-auto">
+              <form onSubmit={handleAddGTIN} className="w-full overflow-y-auto overflow-x-hidden">
                 <div className={`flex justify-between flex-col  sm:gap-3 gap-3 mt-5 ${i18n.language==='ar'? 'sm:flex-row-reverse':'sm:flex-row'}`}>
                   <div className="w-full lg:mt-0 md:mt-3 mt-6">
                     <div className="flex justify-center items-center sm:gap-3 gap-3">
@@ -259,7 +344,9 @@ const UpdateGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
                           value={startSize}
                           onChange={(e) => setStartSize(e.target.value)}
                           placeholder={t("Enter Size")}
-                          className={`border w-full rounded-md border-secondary placeholder:text-secondary p-2 mb-3  ${i18n.language==='ar'?'text-end':'text-start'}`}
+                          disabled={applyTo !== "selected"}
+                          title={applyTo !== "selected" ? t("Each size keeps its own size value when updating multiple sizes") : undefined}
+                          className={`border w-full rounded-md border-secondary placeholder:text-secondary p-2 mb-3 disabled:bg-gray-100 disabled:cursor-not-allowed ${i18n.language==='ar'?'text-end':'text-start'}`}
                           required
                         />
                       </div>
@@ -447,13 +534,110 @@ const UpdateGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
                       </div>
                     </div>
 
+                    {/* Apply To Option */}
+                    <div className="w-full font-body sm:text-base text-sm flex flex-col gap-1 mb-1">
+                      <span className={`text-secondary ${i18n.language==='ar'?'text-end':'text-start'}`}>
+                        {t("Apply Changes To")}
+                      </span>
+                      <div className={`flex flex-col sm:flex-row gap-2 ${i18n.language==='ar'?'sm:flex-row-reverse':''}`}>
+                        {[
+                          {
+                            value: "selected",
+                            label: `${t("Selected Size")}${updateProductsData?.ProductSize ? ` (${updateProductsData.ProductSize})` : ""}`,
+                          },
+                          { value: "all", label: t("All Sizes") },
+                          { value: "multiple", label: t("Select Sizes") },
+                        ].map((opt) => (
+                          <label
+                            key={opt.value}
+                            className={`flex-1 flex items-center gap-2 border rounded-md p-2 cursor-pointer ${applyTo === opt.value ? "border-secondary bg-blue-50" : "border-gray-300"}`}
+                          >
+                            <input
+                              type="radio"
+                              name="applyTo"
+                              value={opt.value}
+                              checked={applyTo === opt.value}
+                              onChange={() => {
+                                setApplyTo(opt.value);
+                                if (opt.value === "multiple" && selectedGTINs.length === 0 && currentGTIN) {
+                                  setSelectedGTINs([currentGTIN]);
+                                }
+                              }}
+                            />
+                            <span>{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
+
+                      {/* Multiple sizes picker */}
+                      {applyTo === "multiple" && (
+                        <div className="border border-secondary rounded-md p-2 mt-1">
+                          {sizesLoading ? (
+                            <div className="flex justify-center py-2">
+                              <CircularProgress size={20} />
+                            </div>
+                          ) : (
+                            <>
+                              <label className={`flex items-center gap-2 pb-2 mb-2 border-b border-gray-200 cursor-pointer font-semibold ${i18n.language==='ar'?'flex-row-reverse':''}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={isAllSelected}
+                                  ref={(el) => {
+                                    if (el) el.indeterminate = selectedGTINs.length > 0 && !isAllSelected;
+                                  }}
+                                  onChange={toggleSelectAllSizes}
+                                />
+                                <span>
+                                  {t("Select All")} ({selectedGTINs.length}/{sizeOptions.length})
+                                </span>
+                              </label>
+                              <div className="flex flex-wrap gap-2">
+                                {sizeOptions.map((s) => {
+                                  const g = String(s.GTIN);
+                                  const checked = selectedGTINs.includes(g);
+                                  return (
+                                    <label
+                                      key={g}
+                                      title={g}
+                                      className={`flex items-center gap-1 border rounded-md px-2 py-1 cursor-pointer text-sm ${checked ? "border-secondary bg-blue-50" : "border-gray-300"}`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleSize(g)}
+                                      />
+                                      <span>
+                                        {s.ProductSize ?? g}
+                                        {g === currentGTIN ? ` (${t("current")})` : ""}
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {applyTo !== "selected" && (
+                        <span className={`text-xs text-gray-600 ${i18n.language==='ar'?'text-end':'text-start'}`}>
+                          {applyTo === "all"
+                            ? t("Changes will be applied to all sizes of item code")
+                            : `${t("Changes will be applied to")} ${selectedGTINs.length} ${t("size(s) of item code")}`}{" "}
+                          <strong>{updateProductsData?.ItemCode}</strong>
+                          {". "}
+                          {t("Each size keeps its own size and barcode.")}
+                        </span>
+                      )}
+                    </div>
+
                     <div className="mt-5">
                       <Button
                         variant="contained"
                         style={{ backgroundColor: "#021F69", color: "#ffffff" }}
                         type="submit"
                         disabled={loading}
-                        className="w-full ml-2"
+                        className="w-full"
                         endIcon={
                           loading ? (
                             <CircularProgress size={24} color="inherit" />
@@ -468,13 +652,18 @@ const UpdateGTINPopUp = ({ isVisible, setVisibility, refreshGTINData }) => {
                   </div>
 
                   <div className="sm:w-1/3 w-full flex flex-col justify-start items-center lg:mt-3 md:mt-3 gap-3">
-                    <Barcode
-                      value={barcode}
-                      format="EAN13"
-                      height={75}
-                      width={1.5}
-                      background="transparent"
-                    />
+                    {barcode && (
+                      <div className="max-w-full overflow-hidden flex justify-center">
+                        <Barcode
+                          value={String(barcode)}
+                          format={isValidEAN13(barcode) ? "EAN13" : "CODE128"}
+                          height={75}
+                          width={isValidEAN13(barcode) ? 1.5 : 1.2}
+                          fontSize={14}
+                          background="transparent"
+                        />
+                      </div>
+                    )}
 
                     {/* <QRCodeSVG value={`${barcode}, ${itemCode}, ${quantity}, ${description}, ${startSize}`} height={120} width={150} /> */}
                     <QRCodeSVG value={`${barcode}`} height={120} width={150} />
