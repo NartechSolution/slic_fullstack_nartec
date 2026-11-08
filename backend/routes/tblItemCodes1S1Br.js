@@ -22,6 +22,12 @@ router.get("/v1/itemCodes/all", isAuth, itemCodesController.getAllItemCodes);
  */
 router.get("/v1/itemCodes/search", isAuth, itemCodesController.searchItemCodes);
 
+/**
+ * GET /v1/itemCodes/sizes?itemCode=value
+ * All size/GTIN records that share the given ItemCode
+ */
+router.get("/v1/itemCodes/sizes", isAuth, itemCodesController.getSizesByItemCode);
+
 router.post(
   "/v1/itemCode",
   isAuth,
