@@ -362,6 +362,44 @@ const F3TenderCashPopUp = ({
     }
   };
 
+  // SLIC ERP accepts only ONE sales return per POS reference number + transaction code.
+  // A return normally sends the original invoice number as its POS reference (unchanged
+  // behaviour, keeps the ERP link to the original sale). If POS history already has a
+  // return with the same code for this invoice (e.g. the return leg of an exchange, or an
+  // earlier partial return), the ERP would reject it, so this return uses its own new POS
+  // number instead. Returning more than was sold is still blocked by archiveInvoice, which
+  // removes returned quantities from the invoice lines after every return.
+  const resolveSalesReturnPosRefNo = async (originalInvoiceNo, transactionCode) => {
+    const keepOriginal = { posRefNo: originalInvoiceNo, usedNewRef: false };
+    if (
+      !originalInvoiceNo ||
+      !transactionCode ||
+      !invoiceNumber ||
+      `${invoiceNumber}` === `${originalInvoiceNo}`
+    ) {
+      return keepOriginal;
+    }
+
+    try {
+      const res = await newRequest.get(
+        `/invoice/v1/getPOSInvoiceMaster?filter[InvoiceNo]=${encodeURIComponent(
+          originalInvoiceNo
+        )}&filter[TransactionCode]=${encodeURIComponent(transactionCode)}`
+      );
+      const existingReturns = Array.isArray(res?.data) ? res.data : [];
+      if (existingReturns.length > 0) {
+        console.log(
+          `Invoice ${originalInvoiceNo} already has a ${transactionCode} return (Doc ${existingReturns[0]?.DocNo}); using new POS ref ${invoiceNumber}`
+        );
+        return { posRefNo: `${invoiceNumber}`, usedNewRef: true };
+      }
+    } catch (err) {
+      // Lookup failed: fall back to the original behaviour.
+      console.warn("Could not check existing returns for this invoice:", err);
+    }
+    return keepOriginal;
+  };
+
   const handleSubmitDirectSalesReturn = async () => {
     setLoading(true);
     console.log("Direct Sales Return Data", exchangeData);
@@ -388,6 +426,17 @@ const F3TenderCashPopUp = ({
       const modifiedTransactionCode = selectTransactionCode.slice(0, -2) + "IN";
       const customerCode = getCustomerCode();
 
+      // Original invoice number unless this invoice already has a return with this code
+      const originalInvoiceNo = invoiceHeaderData?.InvoiceNo;
+      const { posRefNo: salesReturnPosRefNo, usedNewRef } =
+        await resolveSalesReturnPosRefNo(originalInvoiceNo, selectTransactionCode);
+      // When a new POS ref is used, keep the original invoice number visible in the ERP
+      const salesReturnRemarks = usedNewRef
+        ? [`Ref POS Inv ${originalInvoiceNo}`, invoiceHeaderData?.Remarks]
+            .filter(Boolean)
+            .join(" | ")
+        : invoiceHeaderData?.Remarks;
+
       // Body for the sales return (EXSR)
       const salesReturnBody = {
         _keyword_: "salesreturn",
@@ -406,8 +455,8 @@ const F3TenderCashPopUp = ({
             UserId: "SYSADMIN",
             CustomerName: invoiceHeaderData?.CustomerName,
             MobileNo: invoiceHeaderData?.MobileNo,
-            Remarks: invoiceHeaderData?.Remarks,
-            PosRefNo: invoiceHeaderData?.InvoiceNo,
+            Remarks: salesReturnRemarks,
+            PosRefNo: salesReturnPosRefNo,
             ZATCAPaymentMode: paymentModes.code,
             TaxExemptionReason: examptReason?.name || "",
             SalesmanCode: slicUserData?.SalesmanCode,
