@@ -214,6 +214,7 @@ function verdict(run) {
   if (slowest.ms < SLOW_STEP_MS) return { cls: "good", text: `No slow step. The slowest step took ${secs(slowest.ms)}.` };
   const l = slowest.label;
   if (l.startsWith("Print dialog")) return { cls: "bad", text: `Slow step: the browser print dialog / printer on this machine (${secs(slowest.ms)}). The POS and ERP are not involved in this step. Check the default printer (online, correct driver) and the Windows print spooler.` };
+  if (l.startsWith("Wait for print dialog")) return { cls: "bad", text: `Slow step: the browser took ${secs(slowest.ms)} to open the print dialog. This is the browser / printer setup on this machine, not the POS or ERP.` };
   if (l.startsWith("Print window loaded")) return { cls: "bad", text: `Slow step: loading the receipt in the print window (${secs(slowest.ms)}). Check this machine's browser (extensions, memory).` };
   if (l.startsWith("Create WhatsApp PDF")) return { cls: "bad", text: `Slow step: creating the WhatsApp PDF copy (${secs(slowest.ms)}). This machine is slow at this step (CPU/memory).` };
   return { cls: "bad", text: `Slow step: ${l} (${secs(slowest.ms)}).` };
@@ -237,6 +238,47 @@ function finish(run) {
   render();
   setStatus("");
   setBusy(false);
+}
+
+// window.print() can return before the dialog even opens (Chrome defers it while the print
+// window is still loading), so the dialog time is measured with the beforeprint / afterprint
+// events, and the print window is only closed after printing has finished.
+function printAndMeasure(win, run) {
+  return new Promise((resolve) => {
+    const tCall = performance.now();
+    let tStart = null;
+    let done = false;
+    const ticker = setInterval(() => {
+      setStatus(tStart == null
+        ? `Waiting for the print dialog to open… ${secs(performance.now() - tCall)}`
+        : `Print dialog open ${secs(performance.now() - tStart)} – press Print as soon as the preview appears.`);
+    }, 1000);
+    const guard = setTimeout(() => {
+      if (tStart == null) run.error = "The print dialog never opened (the browser ignored the print request). Close other print dialogs, reload this page and try again.";
+      else run.error = "The print dialog was open for more than 10 minutes and did not report closing.";
+      end();
+    }, 600000);
+    function end() {
+      if (done) return;
+      done = true;
+      clearInterval(ticker);
+      clearTimeout(guard);
+      try { win.close(); } catch (e) { /* already closed */ }
+      resolve();
+    }
+    win.addEventListener("beforeprint", () => {
+      tStart = performance.now();
+      step(run, "Wait for print dialog to open", tCall);
+    }, { once: true });
+    win.addEventListener("afterprint", () => {
+      if (tStart == null) { tStart = tCall; step(run, "Wait for print dialog to open", tCall); }
+      step(run, "Print dialog (preview loading + pressing Print)", tStart);
+      end();
+    }, { once: true });
+    setStatus("Opening the print dialog – press Print as soon as the preview appears.");
+    win.focus();
+    win.print();
+  });
 }
 function fail(run, message) {
   run.error = message;
@@ -279,13 +321,8 @@ async function receiptTest({ print }) {
         QRCode.toCanvas(canvas, zatcaText, { width: 380 }, (error) => {
           if (error) { run.error = "Drawing the QR code failed: " + error.message; printWindow.close(); return resolve(); }
           tl = step(run, "Draw ZATCA QR code", tl);
-          if (print) {
-            setStatus("Print dialog is open – press Print as soon as the preview appears.");
-            printWindow.print(); // blocks until the print dialog is closed
-            step(run, "Print dialog (preview loading + pressing Print)", tl);
-          }
-          printWindow.close();
-          resolve();
+          if (!print) { printWindow.close(); return resolve(); }
+          printAndMeasure(printWindow, run).then(resolve);
         });
       };
     });
@@ -328,15 +365,8 @@ function minimalTest() {
   w.document.write(`<html><head><title>Printer test</title><style>@page { size: 3in 3in; margin: 0; } body { font: 16px Arial, sans-serif; padding: 10px; }</style></head>
     <body><b>SLIC POS printer test</b><br>TEST PRINT - NOT AN INVOICE<br>${new Date().toLocaleString()}</body></html>`);
   w.document.close();
-  const tOpened = step(run, "Open print window", t);
-  setTimeout(() => {
-    setStatus("Print dialog is open – press Print as soon as the preview appears.");
-    w.focus();
-    w.print(); // blocks until the print dialog is closed
-    step(run, "Print dialog (preview loading + pressing Print)", tOpened);
-    w.close();
-    finish(run);
-  }, 0);
+  step(run, "Open print window", t);
+  printAndMeasure(w, run).then(() => finish(run));
 }
 
 // ---------- copy results ----------
