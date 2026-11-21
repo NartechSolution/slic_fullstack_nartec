@@ -269,15 +269,35 @@ async function updateSupplier(id, updateData) {
  */
 async function deleteSupplier(id) {
   try {
+    // Suppliers referenced by control serials / POs cannot be deleted
+    // (FKs are NoAction), so check first and return a clear message.
+    const [masterCount, serialCount] = await Promise.all([
+      prisma.controlSerialMaster.count({ where: { supplierId: id } }),
+      prisma.controlSerial.count({ where: { supplierId: id } }),
+    ]);
+    if (masterCount > 0 || serialCount > 0) {
+      throw new CustomError(
+        `Cannot delete this supplier: it is linked to ${masterCount} purchase order record(s) and ${serialCount} control serial(s). Reject the supplier instead, or remove the linked records first.`,
+        409
+      );
+    }
+
     const supplier = await prisma.supplier.delete({
       where: { id: id },
     });
     return supplier;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     if (error.code === "P2025") {
       const customError = new CustomError("Supplier not found");
       customError.statusCode = 404;
       throw customError;
+    }
+    if (error.code === "P2003" || error.code === "P2014") {
+      throw new CustomError(
+        "Cannot delete this supplier because it is linked to existing records. Reject the supplier instead.",
+        409
+      );
     }
     console.error("Error deleting supplier:", error.message || error);
     throw new CustomError("Error deleting supplier");

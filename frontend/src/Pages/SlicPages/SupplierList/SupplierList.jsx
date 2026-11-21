@@ -40,7 +40,7 @@ const SupplierList = () => {
     cacheTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
     onError: (err) => {
-      toast.error(err?.response?.data?.error || err?.response?.data?.message || "Failed to load data");
+      toast.error(err?.response?.data?.message || "Failed to load data");
     },
   });
 
@@ -58,7 +58,7 @@ const SupplierList = () => {
       refetch();
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.error || err?.response?.data?.message || "Failed to approve supplier");
+      toast.error(err?.response?.data?.message || "Failed to approve supplier");
     },
   });
 
@@ -76,7 +76,7 @@ const SupplierList = () => {
       refetch();
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.error || err?.response?.data?.message || "Failed to reject supplier");
+      toast.error(err?.response?.data?.message || "Failed to reject supplier");
     },
   });
 
@@ -91,7 +91,7 @@ const SupplierList = () => {
       refetch();
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.error || err?.response?.data?.message || "Failed to delete supplier");
+      toast.error(err?.response?.data?.message || "Failed to delete supplier");
     },
   });
 
